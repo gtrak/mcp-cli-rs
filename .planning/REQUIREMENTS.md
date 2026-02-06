@@ -109,12 +109,65 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| CONFIG-01 | Phase 1 | Pending |
+| CONFIG-02 | Phase 1 | Pending |
+| CONFIG-03 | Phase 1 | Pending |
+| CONFIG-04 | Phase 1 | Pending |
+| CONFIG-05 | Phase 1 | Pending |
+| CONN-01 | Phase 1 | Pending |
+| CONN-02 | Phase 1 | Pending |
+| CONN-03 | Phase 1 | Pending |
+| CONN-04 | Phase 1 | Pending |
+| CONN-05 | Phase 2 | Pending |
+| CONN-06 | Phase 2 | Pending |
+| CONN-07 | Phase 2 | Pending |
+| CONN-08 | Phase 2 | Pending |
+| DISC-01 | Phase 1 | Pending |
+| DISC-02 | Phase 1 | Pending |
+| DISC-03 | Phase 1 | Pending |
+| DISC-04 | Phase 1 | Pending |
+| DISC-05 | Phase 3 | Pending |
+| DISC-06 | Phase 1 | Pending |
+| EXEC-01 | Phase 1 | Pending |
+| EXEC-02 | Phase 1 | Pending |
+| EXEC-03 | Phase 1 | Pending |
+| EXEC-04 | Phase 1 | Pending |
+| EXEC-05 | Phase 3 | Pending |
+| EXEC-06 | Phase 1 | Pending |
+| EXEC-07 | Phase 3 | Pending |
+| FILT-01 | Phase 4 | Pending |
+| FILT-02 | Phase 4 | Pending |
+| FILT-03 | Phase 4 | Pending |
+| FILT-04 | Phase 4 | Pending |
+| FILT-05 | Phase 4 | Pending |
+| ERR-01 | Phase 1 | Pending |
+| ERR-02 | Phase 1 | Pending |
+| ERR-03 | Phase 1 | Pending |
+| ERR-04 | Phase 3 | Pending |
+| ERR-05 | Phase 1 | Pending |
+| ERR-06 | Phase 1 | Pending |
+| ERR-07 | Phase 3 | Pending |
+| CLI-01 | Phase 1 | Pending |
+| CLI-02 | Phase 1 | Pending |
+| CLI-03 | Phase 1 | Pending |
+| CLI-04 | Phase 3 | Pending |
+| CLI-05 | Phase 4 | Pending |
+| XP-01 | Phase 4 | Pending |
+| XP-02 | Phase 4 | Pending |
+| XP-03 | Phase 1 | Pending |
+| XP-04 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 42 total
-- Mapped to phases: 0
-- Unmapped: 42 ⚠️
+- Mapped to phases: 42 ✅
+- Unmapped: 0
+
+**Phase Distribution:**
+- Phase 1: 25 requirements (Configuration, Core Connections, Discovery, Basic Execution, Basic Errors, CLI Foundation)
+- Phase 2: 4 requirements (Connection Daemon, IPC)
+- Phase 3: 6 requirements (Concurrency, Retry, Colored Output, Signal Handling)
+- Phase 4: 7 requirements (Tool Filtering, Argument Formats, Windows Validation, Cross-Platform Daemon)
 
 ---
 *Requirements defined: 2025-02-06*
-*Last updated: 2025-02-06 after initial definition*
+*Last updated: 2025-02-06 after roadmap creation*
