@@ -110,3 +110,61 @@ impl Config {
         self.servers.is_empty()
     }
 }
+
+impl ServerTransport {
+    /// Get the transport type name.
+    pub fn type_name(&self) -> &str {
+        match self {
+            ServerTransport::Stdio { .. } => "stdio",
+            ServerTransport::Http { .. } => "http",
+        }
+    }
+
+    /// Extract the command for stdio transport.
+    pub fn command(&self) -> &str {
+        match self {
+            ServerTransport::Stdio { command, .. } => command,
+            ServerTransport::Http { .. } => "",
+        }
+    }
+
+    /// Extract the arguments for stdio transport.
+    pub fn args(&self) -> &[String] {
+        match self {
+            ServerTransport::Stdio { args, .. } => args,
+            ServerTransport::Http { .. } => &[],
+        }
+    }
+
+    /// Extract environment variables for stdio transport.
+    pub fn env(&self) -> &HashMap<String, String> {
+        match self {
+            ServerTransport::Stdio { env, .. } => env,
+            ServerTransport::Http { .. } => &HashMap::new(),
+        }
+    }
+
+    /// Extract working directory for stdio transport.
+    pub fn cwd(&self) -> Option<&String> {
+        match self {
+            ServerTransport::Stdio { cwd, .. } => cwd.as_ref(),
+            ServerTransport::Http { .. } => None,
+        }
+    }
+
+    /// Extract the URL for HTTP transport.
+    pub fn url(&self) -> &str {
+        match self {
+            ServerTransport::Stdio { .. } => "",
+            ServerTransport::Http { url, .. } => url,
+        }
+    }
+
+    /// Extract headers for HTTP transport.
+    pub fn headers(&self) -> &HashMap<String, String> {
+        match self {
+            ServerTransport::Stdio { .. } => &HashMap::new(),
+            ServerTransport::Http { headers, .. } => headers,
+        }
+    }
+}
