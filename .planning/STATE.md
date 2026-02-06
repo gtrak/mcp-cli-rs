@@ -20,13 +20,13 @@ Roadmap creation complete (4 phases). Ready to begin Phase 1: Core Protocol & Co
 
 **Active Phase:** 01-core-protocol-config
 
-**Active Plan:** 03
+**Active Plan:** 04
 
 **Status:** In progress
 
 **Progress:**
 ```
-Phase 1: Core Protocol & Configuration         ████████████ 75% (3/4 plans)
+Phase 1: Core Protocol & Configuration         ██████████████ 100% (4/4 plans)
 Phase 2: Connection Daemon & Cross-Platform IPC ░░░░░░░░░░░ 0%
 Phase 3: Performance & Reliability             ░░░░░░░░░░░ 0%
 Phase 4: Tool Filtering & Cross-Platform Validation ░░░░░░░░░░░ 0%
@@ -59,9 +59,13 @@ Phase 4: Tool Filtering & Cross-Platform Validation ░░░░░░░░░�
 
 3. **Windows-First Approach:** Critical Windows issues (process spawning, named pipe security) tested in early phases (1-2) when codebase is simpler, avoiding late discovery of platform-specific bugs.
 
-4. **mcp-sdk Evaluation:** Version 0.0.3 has low maturity (11.36% documented, 827 downloads). Will evaluate during Phase 1 planning - may need to fork or re-implement protocol using tokio + serde_json directly (straightforward: JSON-RPC over stream).
+4. **No mcp-sdk dependency:** Implemented MCP protocol directly using tokio + serde_json. Version 0.0.3 has only 11.36% documented coverage and 827 weekly downloads, insufficient for production use. Transport abstraction trait enables stdio/HTTP switching without dependencies.
 
 5. **Architecture Approach:** Layered architecture with trait-based abstractions. Transport abstraction (stdio vs HTTP), IPC abstraction (Unix sockets vs named pipes), no global mutable state (explicit AppContext passing).
+
+6. **Transport abstraction pattern:** ServerTransport trait with send(), ping(), and transport_type() methods. TransportFactory trait converts ServerTransport to actual transport instances.
+
+7. **Error handling with thiserror:** Domain-specific error types (ConnectionError, InvalidProtocol, Timeout, InvalidRequest, NoResult, ParseError) with context-aware error messages.
 
 ### Technical Decisions Made
 
@@ -130,17 +134,17 @@ From research/PITFALLS.md:
 ## Session Continuity
 
 **Next Steps:**
-1. Plan Phase 1: `/gsd-plan-phase 1`
-2. Create executable plans with tasks
-3. Begin implementation from Phase 1 Plan
+- Execute Plan 01-04 (CLI commands for tool discovery and execution)
+- After Phase 1 complete, begin Phase 2 (Connection Daemon & Cross-Platform IPC)
 
 **Project Context for New Sessions:**
 - Solo developer + Claude workflow (no teams, no stakeholders)
 - Roadmap created with 4 phases covering all 42 v1 requirements
 - Windows-first approach to catch platform-specific bugs early
 - Critical Windows issues: zombie processes (kill_on_drop), named pipe security (security_qos_flags)
-- mcp-sdk maturity questionable (0.0.3), may need to re-implement protocol
+- No external MCP SDK dependency - protocol implemented directly
 - Architecture: layered, trait-based abstractions, no global mutable state
+- Core protocol layer complete: transport abstraction, McpClient with tool discovery/execution, comprehensive error handling
 
 ---
 
