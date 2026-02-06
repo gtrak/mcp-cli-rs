@@ -1,7 +1,7 @@
 //! Configuration file loading utilities for MCP servers.
 
-use crate::config::Config;
-use crate::error::{McpError, McpErrorKind};
+use crate::config::{Config, ServerConfig, ServerTransport};
+use crate::error::McpError;
 use std::path::Path;
 use tokio::fs;
 use tracing::debug;
@@ -87,40 +87,37 @@ pub async fn find_config_path(cli_path: Option<&str>) -> Option<String> {
 /// # Returns
 /// * `Ok(())` if validation passes
 /// * `Err(McpError)` with detailed message if validation fails
-pub fn validate_server_config(server: &crate::config::ServerConfig, config_path: &str) -> Result<(), McpError> {
+pub fn validate_server_config(server: &ServerConfig, config_path: &str) -> Result<(), McpError> {
     match &server.transport {
         ServerTransport::Stdio { command, .. } => {
             if command.is_empty() {
-                return Err(McpError::new(
-                    McpErrorKind::MissingRequiredField,
-                    &format!(
-                        "Server '{}' in {} has empty 'command' field (required for stdio transport)",
-                        server.name, config_path
-                    ),
-                ));
+                return Err(McpError::MissingRequiredField {
+                    server: server.name.clone(),
+                    field: "command",
+                });
             }
             debug!("Server '{}' stdio config validated (command: {})", server.name, command);
         }
         ServerTransport::Http { url, .. } => {
             if url.is_empty() {
-                return Err(McpError::new(
-                    McpErrorKind::MissingRequiredField,
-                    &format!(
-                        "Server '{}' in {} has empty 'url' field (required for http transport)",
-                        server.name, config_path
-                    ),
-                ));
+                return Err(McpError::MissingRequiredField {
+                    server: server.name.clone(),
+                    field: "url",
+                });
             }
 
             // Validate URL format
             if !url.starts_with("http://") && !url.starts_with("https://") {
-                return Err(McpError::new(
-                    McpErrorKind::ConfigParseError,
-                    &format!(
-                        "Server '{}' in {} has invalid URL '{}': must start with http:// or https://",
-                        server.name, config_path, url
-                    ),
-                ));
+                return Err(McpError::ConfigParseError {
+                    path: Path::new(config_path).to_path_buf(),
+                    source: Box::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!(
+                            "Server '{}' has invalid URL '{}': must start with http:// or https://",
+                            server.name, url
+                        ),
+                    )),
+                });
             }
 
             debug!("Server '{}' HTTP config validated (url: {})", server.name, url);
@@ -164,37 +161,37 @@ pub fn validate_config(config: &Config, config_path: &str) -> Result<(), McpErro
 /// - Parses TOML using the toml crate (v0.8)
 /// - Validates all server configurations
 /// - Displays warning if no servers configured (CONFIG-05)
-pub async fn load_config(path: &str) -> Result<Config, McpError> {
+pub async fn load_config(path: &std::path::Path) -> Result<Config, McpError> {
     // Read file content asynchronously (XP-03: use tokio::fs)
     let content = fs::read_to_string(path).await.map_err(|e| {
-        debug!("Failed to read config file {}: {}", path, e);
-        McpError::new(
-            McpErrorKind::ConfigReadError,
-            &format!("Failed to read config file '{}': {}", path, e),
-        )
+        debug!("Failed to read config file {}: {}", path.display(), e);
+        McpError::config_read(path, e)
     })?;
 
-    debug!("Config file loaded successfully: {}", path);
+    debug!("Config file loaded successfully: {}", path.display());
 
     // Parse TOML
     let config: Config = toml::from_str(&content).map_err(|e| {
-        debug!("Failed to parse TOML from {}: {}", path, e);
-        McpError::new(
-            McpErrorKind::ConfigParseError,
-            &format!("Failed to parse TOML from '{}': {}", path, e),
-        )
+        debug!("Failed to parse TOML from {}: {}", path.display(), e);
+        McpError::ConfigParseError {
+            path: path.to_path_buf(),
+            source: Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e.to_string(),
+            )),
+        }
     })?;
 
     // Validate all server configurations
-    validate_config(&config, path)?;
+    validate_config(&config, &path.to_string_lossy())?;
 
     // CONFIG-05: Display warning if no servers configured
     if config.is_empty() {
-        tracing::warn!("Config file '{}' contains no server definitions", path);
+        tracing::warn!("Config file '{}' contains no server definitions", path.display());
     } else {
         debug!(
             "Config file '{}' parsed successfully with {} server(s)",
-            path,
+            path.display(),
             config.servers.len()
         );
     }
@@ -224,19 +221,23 @@ pub async fn find_and_load(cli_path: Option<&str>) -> Result<Config, McpError> {
 
     if config_path.is_none() {
         // CONFIG-04: Clear error message for missing config
-        return Err(McpError::new(
-            McpErrorKind::ConfigReadError,
-            "MCP configuration file not found. Configuration search order:\n\
-             1. MCP_CONFIG_PATH environment variable\n\
-             2. CLI -c/--config argument\n\
-             3. ./mcp_servers.toml (current directory)\n\
-             4. ~/.mcp_servers.toml (home directory)\n\
-             5. ~/.config/mcp/mcp_servers.toml (config directory)",
-        ));
+        return Err(McpError::ConfigReadError {
+            path: Path::new("mcp_servers.toml").to_path_buf(),
+            source: std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "MCP configuration file not found. Configuration search order:\n\
+                 1. MCP_CONFIG_PATH environment variable\n\
+                 2. CLI -c/--config argument\n\
+                 3. ./mcp_servers.toml (current directory)\n\
+                 4. ~/.mcp_servers.toml (home directory)\n\
+                 5. ~/.config/mcp/mcp_servers.toml (config directory)",
+            ),
+        });
     }
 
-    let config_path = config_path.unwrap();
+    let config_path_str = config_path.unwrap();
+    let config_path = Path::new(&config_path_str);
 
     // Load and parse the config
-    load_config(&config_path).await
+    load_config(config_path).await
 }

@@ -2,7 +2,12 @@
 //!
 //! This module provides types and utilities for parsing MCP server configurations
 //! from TOML files, supporting both stdio and HTTP transports.
+//!
+//! Requires the `std::sync::LazyLock` crate feature for static HashMaps.
 
+use std::sync::LazyLock;
+
+use crate::McpError;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -76,6 +81,33 @@ pub struct ServerConfig {
     pub disabled_tools: Option<Vec<String>>,
 }
 
+impl ServerConfig {
+    /// Create a transport for this server configuration.
+    ///
+    /// This implements TransportFactory trait to bridge config and transport layers.
+    /// Implements Task 4 of Plan 01-04.
+    pub fn create_transport(
+        &self,
+        _server_name: &str,
+    ) -> std::result::Result<Box<dyn crate::transport::Transport + Send + Sync>, McpError> {
+        match &self.transport {
+            ServerTransport::Stdio {
+                command,
+                args,
+                env,
+                cwd,
+            } => {
+                let transport =
+                    crate::client::stdio::StdioTransport::new(command, args, env, cwd.as_deref())?;
+                Ok(Box::new(transport))
+            }
+            ServerTransport::Http { url, headers } => Ok(Box::new(
+                crate::client::http::HttpTransport::new(url, headers.clone()),
+            )),
+        }
+    }
+}
+
 /// Overall MCP configuration containing multiple server definitions.
 ///
 /// This is the root config structure parsed from TOML files.
@@ -100,7 +132,7 @@ impl Config {
     ///
     /// Returns None if no server with the given name exists.
     pub fn get_server(&self, name: &str) -> Option<&ServerConfig> {
-        self.servers_by_name().get(name)
+        self.servers_by_name().get(name).map(|v| &**v)
     }
 
     /// Checks if the configuration has any servers defined.
@@ -140,7 +172,10 @@ impl ServerTransport {
     pub fn env(&self) -> &HashMap<String, String> {
         match self {
             ServerTransport::Stdio { env, .. } => env,
-            ServerTransport::Http { .. } => &HashMap::new(),
+            ServerTransport::Http { .. } => {
+                static EMPTY: LazyLock<HashMap<String, String>> = LazyLock::new(HashMap::new);
+                &EMPTY
+            }
         }
     }
 
@@ -163,8 +198,13 @@ impl ServerTransport {
     /// Extract headers for HTTP transport.
     pub fn headers(&self) -> &HashMap<String, String> {
         match self {
-            ServerTransport::Stdio { .. } => &HashMap::new(),
+            ServerTransport::Stdio { .. } => {
+                static EMPTY: LazyLock<HashMap<String, String>> = LazyLock::new(HashMap::new);
+                &EMPTY
+            }
             ServerTransport::Http { headers, .. } => headers,
         }
     }
 }
+
+pub mod loader;

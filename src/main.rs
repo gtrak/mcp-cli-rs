@@ -1,5 +1,7 @@
 use clap::{Parser, Subcommand};
-use mcp_cli_rs::error::{exit_code, McpError, Result};
+use mcp_cli_rs::cli::commands::{AppContext, cmd_list_servers, cmd_server_info, cmd_tool_info, cmd_call_tool, cmd_search_tools};
+use mcp_cli_rs::config;
+use mcp_cli_rs::error::{exit_code, Result};
 
 #[derive(Parser)]
 #[command(name = "mcp")]
@@ -68,37 +70,43 @@ async fn main() {
 }
 
 async fn run(cli: Cli) -> Result<()> {
+    // Load configuration using the loader
+    let config = if let Some(path) = cli.config {
+        // Use explicitly provided config path
+        config::loader::load_config(&path).await?
+    } else {
+        // Search for config in standard locations
+        match config::loader::find_and_load(None).await {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                eprintln!("Configuration error: {}", e);
+                std::process::exit(1);
+            }
+        }
+    };
+
+    // Create AppContext
+    let ctx = AppContext::new(config);
+
     match cli.command {
         Some(Commands::List { with_descriptions }) => {
-            // TODO: Implement in Plan 04
-            eprintln!("List command not yet implemented");
-            Ok(())
+            cmd_list_servers(&ctx, with_descriptions).await
         }
         Some(Commands::Info { name }) => {
-            // TODO: Implement in Plan 04
-            eprintln!("Info command not yet implemented");
-            Ok(())
+            cmd_server_info(&ctx, &name).await
         }
         Some(Commands::Tool { tool }) => {
-            // TODO: Implement in Plan 04
-            eprintln!("Tool command not yet implemented");
-            Ok(())
+            cmd_tool_info(&ctx, &tool).await
         }
         Some(Commands::Call { tool, args }) => {
-            // TODO: Implement in Plan 04
-            eprintln!("Call command not yet implemented");
-            Ok(())
+            cmd_call_tool(&ctx, &tool, args.as_deref()).await
         }
         Some(Commands::Search { pattern }) => {
-            // TODO: Implement in Plan 04
-            eprintln!("Search command not yet implemented");
-            Ok(())
+            cmd_search_tools(&ctx, &pattern).await
         }
         None => {
             // DISC-01: List all servers when no subcommand provided
-            // TODO: Implement in Plan 04
-            eprintln!("No command specified - will list servers");
-            Ok(())
+            cmd_list_servers(&ctx, false).await
         }
     }
 }
