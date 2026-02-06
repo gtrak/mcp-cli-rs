@@ -51,6 +51,14 @@ Project follows a solo developer + Claude workflow with no team coordination art
 - Stdio transport violations (XP-03 newline delimiters)
 - Blocking I/O in async (tokio::fs/process used everywhere)
 
+**Plans:** 4 plans in 3 waves
+
+Plans:
+- [ ] 01-01-PLAN.md — Project setup, error handling, CLI scaffolding
+- [ ] 01-02-PLAN.md — Configuration parsing (mcp_servers.toml)
+- [ ] 01-03-PLAN.md — MCP protocol & transports (stdio + HTTP)
+- [ ] 01-04-PLAN.md — CLI commands & tool execution
+
 ---
 
 ## Phase 2: Connection Daemon & Cross-Platform IPC
