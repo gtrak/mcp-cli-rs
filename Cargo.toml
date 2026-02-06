@@ -1,0 +1,33 @@
+[package]
+name = "mcp-cli-rs"
+version = "0.1.0"
+edition = "2021"
+description = "MCP CLI client in Rust with cross-platform support"
+
+[dependencies]
+# Core framework
+clap = { version = "4.5", features = ["derive"] }
+tokio = { version = "1.49", features = ["full"] }
+
+# MCP protocol
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Transport/Network
+reqwest = { version = "0.12", features = ["json"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Utilities
+shell-words = "1.1"
+glob = "0.3"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.13"
