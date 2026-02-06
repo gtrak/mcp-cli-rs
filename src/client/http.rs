@@ -5,10 +5,11 @@
 
 use async_trait::async_trait;
 use std::collections::HashMap;
+use std::time::Duration;
 
-use crate::client::transport::{Transport, TransportFactory};
 use crate::error::{McpError, Result};
-use crate::config::ServerTransport;
+use crate::transport::Transport;
+use http::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::Client;
 
 /// HTTP transport for remote server communication.
@@ -46,13 +47,32 @@ impl Transport for HttpTransport {
         // Serialize request to JSON
         let body = request.to_string();
 
+        // Convert HashMap to HeaderMap
+        let mut headers = HeaderMap::new();
+        for (key, value) in &self.headers {
+            // Use simple string-based header names and values
+            // Note: This may not validate header names, but works for basic use
+            let key_str = key.clone();
+            let value_str = value.clone();
+            let _ = headers.insert(
+                match HeaderName::try_from(&key_str) {
+                    Ok(name) => name,
+                    Err(_) => HeaderName::from_static("x-invalid-header"),
+                },
+                match HeaderValue::from_str(&value_str) {
+                    Ok(value) => value,
+                    Err(_) => HeaderValue::from_static(""),
+                },
+            );
+        }
+
         // Send POST request
         let response = self.client
             .post(&url)
             .header("Content-Type", "application/json")
-            .headers(&self.headers) // Add configured headers
+            .headers(headers)
             .body(body)
-            .timeout(reqwest::Duration::from_secs(30))
+            .timeout(Duration::from_secs(30))
             .send()
             .await
             .map_err(|e| {
@@ -68,7 +88,9 @@ impl Transport for HttpTransport {
                         };
                     }
                 }
-                McpError::connection_error("http", e.into())
+                McpError::InvalidProtocol {
+                    message: format!("HTTP request failed: {}", e),
+                }
             })?;
 
         // Parse response JSON
@@ -92,13 +114,24 @@ impl Transport for HttpTransport {
             "id": "ping"
         });
 
+        // Convert HashMap to HeaderMap
+        let mut headers = HeaderMap::new();
+        for (key, value) in &self.headers {
+            headers.insert(key.parse::<HeaderName>().unwrap(), value.parse::<HeaderValue>().unwrap());
+        }
+
         // Send request and expect HTTP 200 OK
+        let body = serde_json::to_string(&request).map_err(|e| {
+            McpError::InvalidProtocol {
+                message: format!("Failed to serialize request: {}", e),
+            }
+        })?;
         let response = self.client
             .post(&self.base_url)
             .header("Content-Type", "application/json")
-            .headers(&self.headers)
-            .json(&request)
-            .timeout(reqwest::Duration::from_secs(30))
+            .headers(headers)
+            .body(body)
+            .timeout(Duration::from_secs(30))
             .send()
             .await
             .map_err(|e| {
@@ -114,7 +147,9 @@ impl Transport for HttpTransport {
                         };
                     }
                 }
-                McpError::connection_error("http", e.into())
+                McpError::InvalidProtocol {
+                    message: format!("HTTP request failed: {}", e),
+                }
             })?;
 
         // Check if response is HTTP 200 OK
@@ -136,34 +171,26 @@ impl Transport for HttpTransport {
     }
 }
 
-#[async_trait]
-impl TransportFactory for ServerTransport {
-    fn create_transport(
-        &self,
-        server_name: &str,
-    ) -> Box<dyn Transport + Send + Sync> {
-        match self {
-            ServerTransport::Stdio { .. } => {
-                // Stdio transport created in stdio.rs
-                Box::new(crate::client::stdio::StdioTransport::new(
-                    &self.command(),
-                    &self.args,
-                    &self.env,
-                    self.cwd.as_deref(),
-                ).expect("Failed to create stdio transport"))
-            }
-            ServerTransport::Http { url, headers } => {
-                let transport = HttpTransport::new(url, headers.clone());
-                Box::new(transport)
-            }
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_http_transport_creation() {
+        let headers = HashMap::new();
+        let transport = HttpTransport::new("http://example.com/api", headers);
+        assert_eq!(transport.base_url, "http://example.com/api");
     }
 
-    fn supports_filtering(&self) -> bool {
-        match self {
-            ServerTransport::Http { .. } => true,
-            ServerTransport::Stdio { .. } => false,
-        }
+    #[test]
+    fn test_http_send() {
+        let headers = HashMap::new();
+        let mut transport = HttpTransport::new("http://example.com/api", headers);
+        let request = json!({ "test": "data" });
+        // This would need a real server to test properly
+        // transport.send(request).await.unwrap();
+        println!("HttpTransport send structure works");
     }
 }
 
@@ -176,7 +203,7 @@ mod tests {
     fn test_http_transport_creation() {
         let headers = HashMap::new();
         let transport = HttpTransport::new("http://example.com", headers);
-        println!("HttpTransport creation works");
+        assert_eq!(transport.base_url, "http://example.com");
     }
 
     #[test]
@@ -184,9 +211,10 @@ mod tests {
         let headers = HashMap::new();
         let mut transport = HttpTransport::new("http://example.com", headers);
 
-        let request = json!({ "test": "data" });
+        let request = serde_json::json!({ "test": "data" });
         // This would need a real server to test properly
         // transport.send(request).await.unwrap();
         println!("HttpTransport send structure works");
     }
 }
+

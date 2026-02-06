@@ -56,6 +56,17 @@ pub enum McpError {
     // CLI errors (ERR-06)
     #[error("Ambiguous command: {}", hint)]
     AmbiguousCommand { hint: String },
+
+    // CLI usage errors (ERR-05, ERR-06)
+    #[error("Usage error: {}", message)]
+    UsageError { message: String },
+
+    // IO errors
+    #[error("IO error: {}", source)]
+    IOError {
+        #[source]
+        source: std::io::Error,
+    },
 }
 
 /// Exit codes (ERR-03)
@@ -67,11 +78,12 @@ pub fn exit_code(error: &McpError) -> i32 {
         | McpError::ConfigParseError { .. }
         | McpError::MissingRequiredField { .. }
         | McpError::InvalidJson { .. }
-        | McpError::AmbiguousCommand { .. } => 1, // Client error
+        | McpError::AmbiguousCommand { .. }
+        | McpError::UsageError { .. } => 1, // Client error
 
         McpError::InvalidProtocol { .. } => 2, // Server error
 
-        McpError::ConnectionError { .. } | McpError::Timeout { .. } => 3, // Network error
+        McpError::ConnectionError { .. } | McpError::Timeout { .. } | McpError::IOError { .. } => 3, // Network or IO error
     }
 }
 
@@ -102,6 +114,16 @@ impl McpError {
         Self::ToolNotFound {
             tool: tool.to_string(),
             server: server.to_string(),
+        }
+    }
+
+    pub fn io_error(source: std::io::Error) -> Self {
+        Self::IOError { source }
+    }
+
+    pub fn usage_error(message: impl Into<String>) -> Self {
+        Self::UsageError {
+            message: message.into(),
         }
     }
 }
