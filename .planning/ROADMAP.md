@@ -54,10 +54,10 @@ Project follows a solo developer + Claude workflow with no team coordination art
 **Plans:** 4 plans in 3 waves
 
 Plans:
-- [ ] 01-01-PLAN.md — Project setup, error handling, CLI scaffolding
-- [ ] 01-02-PLAN.md — Configuration parsing (mcp_servers.toml)
-- [ ] 01-03-PLAN.md — MCP protocol & transports (stdio + HTTP)
-- [ ] 01-04-PLAN.md — CLI commands & tool execution
+- [x] 01-01-PLAN.md — Project setup, error handling, CLI scaffolding
+- [x] 01-02-PLAN.md — Configuration parsing (mcp_servers.toml)
+- [x] 01-03-PLAN.md — MCP protocol & transports (stdio + HTTP)
+- [x] 01-04-PLAN.md — CLI commands & tool execution
 
 ---
 
@@ -175,7 +175,7 @@ Plans:
 
 | Phase | Name | Status | Completion |
 |-------|------|--------|------------|
-| 1 | Core Protocol & Configuration | Pending | 0% |
+| 1 | Core Protocol & Configuration | Complete | 100% |
 | 2 | Connection Daemon & Cross-Platform IPC | Pending | 0% |
 | 3 | Performance & Reliability | Pending | 0% |
 | 4 | Tool Filtering & Cross-Platform Validation | Pending | 0% |
