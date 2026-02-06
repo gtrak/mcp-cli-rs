@@ -8,6 +8,7 @@ description = "MCP CLI client in Rust with cross-platform support"
 # Core framework
 clap = { version = "4.5", features = ["derive"] }
 tokio = { version = "1.49", features = ["full"] }
+async-trait = "0.1"
 
 # MCP protocol
 serde = { version = "1.0", features = ["derive"] }

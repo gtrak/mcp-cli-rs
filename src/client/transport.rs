@@ -1,0 +1,68 @@
+//! Transport abstraction for MCP server communication.
+//!
+//! This module provides a trait-based abstraction for communicating with MCP servers
+//! over different transports (stdio, HTTP). This enables the client to switch between
+//! transports without code changes.
+
+use async_trait::async_trait;
+use serde_json::Value;
+
+use crate::error::{McpError, Result};
+
+/// Transport protocol for MCP server communication.
+///
+/// This trait provides a common interface for sending JSON-RPC messages to MCP servers
+/// regardless of the underlying transport (stdio, HTTP, etc.).
+#[async_trait]
+pub trait Transport: Send + Sync {
+    /// Send a JSON-RPC request and get the response.
+    ///
+    /// This method serializes the request to JSON, sends it to the server,
+    /// and returns the parsed response.
+    async fn send(&mut self, request: Value) -> Result<Value>;
+
+    /// Check if the connection is healthy.
+    ///
+    /// This method sends a minimal "ping" request and expects a response.
+    /// Used in Phase 2 for connection health checks (CONN-06).
+    async fn ping(&self) -> Result<()>;
+
+    /// Get the transport type for debugging.
+    ///
+    /// Returns a string identifying the transport type (e.g., "stdio", "http").
+    fn transport_type(&self) -> &str;
+}
+
+/// Trait extension for transport factory methods.
+///
+/// This trait allows server configurations to be converted to transport instances.
+#[async_trait]
+pub trait TransportFactory: Send + Sync {
+    /// Convert a ServerTransport configuration to an actual Transport instance.
+    ///
+    /// This method is implemented for ServerTransport enum to create stdio or
+    /// HTTP transport instances based on the configuration.
+    fn create_transport(
+        &self,
+        server_name: &str,
+    ) -> Box<dyn Transport + Send + Sync>;
+
+    /// Check if transport requires tool filtering support (Phase 4).
+    ///
+    /// Returns true if the transport supports allowed_tools/disabled_tools.
+    /// Currently, this is only relevant for HTTP transport.
+    fn supports_filtering(&self) -> bool {
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_transport_type() {
+        // This is a placeholder test - actual transport implementations will be in stdio.rs and http.rs
+        println!("Transport trait implemented");
+    }
+}
