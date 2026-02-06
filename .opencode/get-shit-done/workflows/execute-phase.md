@@ -66,6 +66,15 @@ git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
 
 Store `COMMIT_PLANNING_DOCS` for use in git operations.
 
+**Load parallelization config:**
+
+```bash
+# Check if parallelization is enabled (default: true)
+PARALLELIZATION=$(cat .planning/config.json 2>/dev/null | grep -o '"parallelization"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
+```
+
+Store `PARALLELIZATION` for use in wave execution step. When `false`, plans within a wave execute sequentially instead of in parallel.
+
 **Load git branching config:**
 
 ```bash
@@ -236,7 +245,9 @@ The "What it builds" column comes from skimming plan names/objectives. Keep it b
 </step>
 
 <step name="execute_waves">
-Execute each wave in sequence. Autonomous plans within a wave run in parallel.
+Execute each wave in sequence. Autonomous plans within a wave run in parallel **only if `PARALLELIZATION=true`**.
+
+**If `PARALLELIZATION=false`:** Execute plans within each wave sequentially (one at a time). This prevents side effects from concurrent operations like tests, linting, and code generation.
 
 **For each wave:**
 
@@ -265,49 +276,74 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel.
    - Bad: "Executing terrain generation plan"
    - Good: "Procedural terrain generator using Perlin noise — creates height maps, biome zones, and collision meshes. Required before vehicle physics can interact with ground."
 
-2. **Read files and spawn all autonomous agents in wave simultaneously:**
+ 2. **Read files and spawn agents:**
 
-   Before spawning, read file contents. The `@` syntax does not work across Task() boundaries - content must be inlined.
+    Before spawning, read file contents for sparse context delegation. The `@` syntax does not work across Task() boundaries - content must be inlined.
 
-   ```bash
-   # Read each plan in the wave
-   PLAN_CONTENT=$(cat "{plan_path}")
-   STATE_CONTENT=$(cat .planning/STATE.md)
-   CONFIG_CONTENT=$(cat .planning/config.json 2>/dev/null)
-   ```
+    ```bash
+    # Read plan frontmatter only (structured YAML - first 30 lines)
+    PLAN_FRONTMATTER=$(head -30 "{plan_path}" | sed '/^---$/,/^---$/!d')
 
-   Use Task tool with multiple parallel calls. Each agent gets prompt with inlined content:
+    # Read STATE frontmatter + key sections only
+    STATE_FRONTMATTER=$(head -30 .planning/STATE.md | sed '/^---$/,/^---$/!d')
+    STATE_POSITION=$(sed -n '/### Current Position/,/^###/p' .planning/STATE.md | head -10)
+    STATE_DECISIONS=$(sed -n '/### Decisions Made/,/^###/p' .planning/STATE.md | head -20)
 
-   ```
-   <objective>
-   Execute plan {plan_number} of phase {phase_number}-{phase_name}.
+    # Read config frontmatter only if exists
+    if [ -f .planning/config.json ]; then
+      CONFIG_FRONTMATTER=$(head -20 .planning/config.json | grep -E '"model_profile"|"mode"' 2>/dev/null || echo "")
+    fi
+    ```
 
-   Commit each task atomically. Create SUMMARY.md. Update STATE.md.
-   </objective>
+    **If `PARALLELIZATION=true` (default):** Use Task tool with multiple parallel calls.
 
-   <execution_context>
-   @./.opencode/get-shit-done/workflows/execute-plan.md
-   @./.opencode/get-shit-done/templates/summary.md
-   @./.opencode/get-shit-done/references/checkpoints.md
-   @./.opencode/get-shit-done/references/tdd.md
-   </execution_context>
+    **If `PARALLELIZATION=false`:** Spawn agents one at a time, waiting for each to complete before starting the next. This ensures no concurrent file modifications or build operations.
 
-   <context>
-   Plan:
-   {plan_content}
+    Each agent gets prompt with sparse context:
 
-   Project state:
-   {state_content}
+    ```
+    <objective>
+    Execute plan {plan_number} of phase {phase_number}-{phase_name}.
 
-   Config (if exists):
-   {config_content}
-   </context>
+    Commit each task atomically. Create SUMMARY.md. Update STATE.md.
+    </objective>
+
+    <execution_context>
+    @./.opencode/get-shit-done/workflows/execute-plan.md
+    @./.opencode/get-shit-done/templates/summary.md
+    @./.opencode/get-shit-done/references/checkpoints.md
+    @./.opencode/get-shit-done/references/tdd.md
+    </execution_context>
+
+    <context_summary>
+    Plan frontmatter:
+    {plan_frontmatter}
+    </context_summary>
+
+    <context_state>
+    State frontmatter:
+    {state_frontmatter}
+
+    Current position:
+    {state_position}
+
+    Decisions made:
+    {state_decisions}
+    </context_state>
+
+    <context_references>
+    Full plan: {plan_path} (read when executing tasks)
+    Full state: .planning/STATE.md (read sections as needed)
+    Config: .planning/config.json (if exists)
+    </context_references>
+
 
    <success_criteria>
    - [ ] All tasks executed
    - [ ] Each task committed individually
    - [ ] SUMMARY.md created in plan directory
    - [ ] STATE.md updated with position and decisions
+   - [ ] Referenced files read when needed (lazy loading)
    </success_criteria>
    ```
 
@@ -321,6 +357,20 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel.
    - Verify SUMMARY.md exists at expected path
    - Read SUMMARY.md to extract what was built
    - Note any issues or deviations
+
+   **Spot-check claims before trusting SUMMARY:**
+
+   For each completed plan's SUMMARY.md:
+   - Pick the first 2 files from `key-files.created` frontmatter — verify they exist on disk with `[ -f ]`
+   - Check `git log --oneline --all --grep="{phase}-{plan}"` returns at least 1 commit
+   - Check SUMMARY.md for `## Self-Check: FAILED` marker
+
+   If ANY spot-check fails:
+   - Do NOT proceed silently
+   - Report which plan failed verification and what was missing
+   - Route to failure handler (step 4): ask user "Retry plan?" or "Continue with remaining waves?"
+
+   If spot-checks pass: proceed normally.
 
    **Output:**
    ```

@@ -75,7 +75,7 @@ Phase: $ARGUMENTS
    For each wave in order:
    - Spawn `gsd-executor` for each plan in wave (parallel Task calls)
    - Wait for completion (Task blocks)
-   - Verify SUMMARYs created
+   - Verify SUMMARYs created and spot-check claims
    - Proceed to next wave
 
 5. **Aggregate results**
@@ -88,9 +88,13 @@ Phase: $ARGUMENTS
    git status --porcelain
    ```
 
-   **If changes exist:** Orchestrator made corrections between executor completions. Commit them:
+   **If changes exist:** Orchestrator made corrections between executor completions. Stage and commit them individually:
    ```bash
-   git add -u && git commit -m "fix({phase}): orchestrator corrections"
+   # Stage each modified file individually (never use git add -u, git add ., or git add -A)
+   git status --porcelain | grep '^ M' | cut -c4- | while read file; do
+     git add "$file"
+   done
+   git commit -m "fix({phase}): orchestrator corrections"
    ```
 
    **If clean:** Continue to verification.
@@ -252,23 +256,34 @@ After user runs /gsd-plan-phase {Z} --gaps:
 <wave_execution>
 **Parallel spawning:**
 
-Before spawning, read file contents. The `@` syntax does not work across Task() boundaries.
+Before spawning, read file contents for sparse context delegation. The `@` syntax does not work across Task() boundaries.
 
 ```bash
-# Read each plan and STATE.md
-PLAN_01_CONTENT=$(cat "{plan_01_path}")
-PLAN_02_CONTENT=$(cat "{plan_02_path}")
-PLAN_03_CONTENT=$(cat "{plan_03_path}")
-STATE_CONTENT=$(cat .planning/STATE.md)
+# Read plan frontmatter only (structured YAML - first 30 lines)
+PLAN_01_FRONTMATTER=$(head -30 "{plan_01_path}" | sed '/^---$/,/^---$/!d')
+PLAN_02_FRONTMATTER=$(head -30 "{plan_02_path}" | sed '/^---$/,/^---$/!d')
+PLAN_03_FRONTMATTER=$(head -30 "{plan_03_path}" | sed '/^---$/,/^---$/!d')
+
+# Read STATE frontmatter + key sections only
+STATE_FRONTMATTER=$(head -30 .planning/STATE.md | sed '/^---$/,/^---$/!d')
+STATE_POSITION=$(sed -n '/### Current Position/,/^###/p' .planning/STATE.md | head -10)
+STATE_DECISIONS=$(sed -n '/### Decisions Made/,/^###/p' .planning/STATE.md | head -20)
+
+# Read config frontmatter only if exists
+if [ -f .planning/config.json ]; then
+  CONFIG_FRONTMATTER=$(head -20 .planning/config.json | grep -E '"model_profile"|"mode"' 2>/dev/null || echo "")
+fi
 ```
 
-Spawn all plans in a wave with a single message containing multiple Task calls, with inlined content:
+Spawn all plans in a wave with a single message containing multiple Task calls, with sparse context:
 
 ```
-Task(prompt="Execute plan at {plan_01_path}\n\nPlan:\n{plan_01_content}\n\nProject state:\n{state_content}", subagent_type="gsd-executor", model="{executor_model}")
-Task(prompt="Execute plan at {plan_02_path}\n\nPlan:\n{plan_02_content}\n\nProject state:\n{state_content}", subagent_type="gsd-executor", model="{executor_model}")
-Task(prompt="Execute plan at {plan_03_path}\n\nPlan:\n{plan_03_content}\n\nProject state:\n{state_content}", subagent_type="gsd-executor", model="{executor_model}")
+Task(prompt="Execute plan {plan_01_number}\n\nPlan frontmatter:\n{plan_01_frontmatter}\n\nState frontmatter:\n{state_frontmatter}\n\nCurrent Position:\n{state_position}\n\nDecisions Made:\n{state_decisions}\n\nConfig:\n{config_frontmatter}", subagent_type="gsd-executor", model="{executor_model}")
+Task(prompt="Execute plan {plan_02_number}\n\nPlan frontmatter:\n{plan_02_frontmatter}\n\nState frontmatter:\n{state_frontmatter}\n\nCurrent Position:\n{state_position}\n\nDecisions Made:\n{state_decisions}\n\nConfig:\n{config_frontmatter}", subagent_type="gsd-executor", model="{executor_model}")
+Task(prompt="Execute plan {plan_03_number}\n\nPlan frontmatter:\n{plan_03_frontmatter}\n\nState frontmatter:\n{state_frontmatter}\n\nCurrent Position:\n{state_position}\n\nDecisions Made:\n{state_decisions}\n\nConfig:\n{config_frontmatter}", subagent_type="gsd-executor", model="{executor_model}")
 ```
+
+**Context reduction:** ~90% (full files → frontmatter + key sections only)
 
 All three run in parallel. Task tool blocks until all complete.
 

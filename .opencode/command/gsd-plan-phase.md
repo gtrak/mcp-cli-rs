@@ -117,11 +117,11 @@ if [ -z "$PHASE_DIR" ]; then
   PHASE_DIR=".planning/phases/${PHASE}-${PHASE_NAME}"
 fi
 
-# Load CONTEXT.md immediately - this informs ALL downstream agents
-CONTEXT_CONTENT=$(cat "${PHASE_DIR}"/*-CONTEXT.md 2>/dev/null)
+# Load CONTEXT.md frontmatter only - this informs ALL downstream agents
+CONTEXT_FRONTMATTER=$(head -30 "${PHASE_DIR}"/*-CONTEXT.md 2>/dev/null | sed '/^---$/,/^---$/!d' || echo "")
 ```
 
-**CRITICAL:** Store `CONTEXT_CONTENT` now. It must be passed to:
+**CRITICAL:** Store `CONTEXT_FRONTMATTER` now. It must be passed to:
 - **Researcher** — constrains what to research (locked decisions vs Claude's discretion)
 - **Planner** — locked decisions must be honored, not revisited
 - **Checker** — verifies plans respect user's stated vision
@@ -222,8 +222,8 @@ Write research findings to: {phase_dir}/{phase}-RESEARCH.md
 
 ```
 Task(
-  prompt="First, read ./.opencode/agents/gsd-phase-researcher.md for your role and instructions.\n\n" + research_prompt,
-  subagent_type="general-purpose",
+  prompt=research_prompt,
+  subagent_type="gsd-phase-researcher",
   model="{researcher_model}",
   description="Research Phase {phase}"
 )
@@ -248,24 +248,48 @@ ls "${PHASE_DIR}"/*-PLAN.md 2>/dev/null
 
 **If exists:** Offer: 1) Continue planning (add more plans), 2) View existing, 3) Replan from scratch. Wait for response.
 
-## 7. Read Context Files
+## 7. Read Context Files (Sparse Context Protocol)
 
-Read and store context file contents for the planner agent. The `@` syntax does not work across Task() boundaries - content must be inlined.
+Read and store context file contents for the planner agent using sparse context protocol. The `@` syntax does not work across Task() boundaries - content must be inlined.
+
+**Sparse context: Read frontmatter + priority sections only (90-95% reduction)**
 
 ```bash
-# Read required files
-STATE_CONTENT=$(cat .planning/STATE.md)
-ROADMAP_CONTENT=$(cat .planning/ROADMAP.md)
+# Read STATE frontmatter + priority sections only
+STATE_FRONTMATTER=$(head -30 .planning/STATE.md | sed '/^---$/,/^---$/!d')
+STATE_POSITION=$(sed -n '/### Current Position/,/^###/p' .planning/STATE.md | head -10)
+STATE_DECISIONS=$(sed -n '/### Decisions Made/,/^###/p' .planning/STATE.md | head -20)
+STATE_PENDING=$(sed -n '/### Pending Todos/,/^###/p' .planning/STATE.md | head -10)
 
-# Read optional files (empty string if missing)
-REQUIREMENTS_CONTENT=$(cat .planning/REQUIREMENTS.md 2>/dev/null)
-# CONTEXT_CONTENT already loaded in step 4
-RESEARCH_CONTENT=$(cat "${PHASE_DIR}"/*-RESEARCH.md 2>/dev/null)
+# Read current phase from roadmap only
+PHASE_ROADMAP=$(grep -A10 "Phase ${PHASE}:" .planning/ROADMAP.md)
 
-# Gap closure files (only if --gaps mode)
-VERIFICATION_CONTENT=$(cat "${PHASE_DIR}"/*-VERIFICATION.md 2>/dev/null)
-UAT_CONTENT=$(cat "${PHASE_DIR}"/*-UAT.md 2>/dev/null)
+# Read phase-specific requirements if exist
+if [ -f .planning/REQUIREMENTS.md ]; then
+  PHASE_REQUIREMENTS=$(grep -A20 "[A-Z]*-${PHASE}" .planning/REQUIREMENTS.md 2>/dev/null || grep -A20 "Phase ${PHASE} requirement" .planning/REQUIREMENTS.md 2>/dev/null || echo "")
+else
+  PHASE_REQUIREMENTS=""
+fi
+
+# CONTEXT_CONTENT already loaded as frontmatter only in step 4
+# CONTEXT_FRONTMATTER=$(head -30 "${PHASE_DIR}"/*-CONTEXT.md | sed '/^---$/,/^---$/!d')
+
+# Research frontmatter only
+if [ -f "${PHASE_DIR}"/*-RESEARCH.md ]; then
+  RESEARCH_FRONTMATTER=$(head -30 "${PHASE_DIR}"/*-RESEARCH.md | sed '/^---$/,/^---$/!d')
+else
+  RESEARCH_FRONTMATTER=""
+fi
+
+# Gap closure frontmatter only (if --gaps mode)
+if [ -f "${PHASE_DIR}"/*-VERIFICATION.md ]; then
+  VERIFICATION_FRONTMATTER=$(head -30 "${PHASE_DIR}"/*-VERIFICATION.md | sed '/^---$/,/^---$/!d')
+fi
+if [ -f "${PHASE_DIR}"/*-UAT.md ]; then
+  UAT_FRONTMATTER=$(head -30 "${PHASE_DIR}"/*-UAT.md | sed '/^---$/,/^---$/!d')
+fi
 ```
+
 
 ## 8. Spawn gsd-planner Agent
 
@@ -281,37 +305,64 @@ Display stage banner:
 Fill prompt with inlined content and spawn:
 
 ```markdown
-<planning_context>
+<planning_context_summary>
 
 **Phase:** {phase_number}
 **Mode:** {standard | gap_closure}
 
-**Project State:**
-{state_content}
+**State Frontmatter:**
+{STATE_FRONTMATTER}
 
-**Roadmap:**
-{roadmap_content}
+**Current Position:**
+{STATE_POSITION}
 
-**Requirements (if exists):**
-{requirements_content}
+**Decisions Made:**
+{STATE_DECISIONS}
 
-**Phase Context (if exists):**
+**Pending Todos:**
+{STATE_PENDING}
+
+**Phase Goal:**
+{PHASE_ROADMAP}
+
+**Phase Requirements:**
+{PHASE_REQUIREMENTS}
+
+**Phase Context Frontmatter (if exists):**
 
 IMPORTANT: If phase context exists below, it contains USER DECISIONS from /gsd-discuss-phase.
 - **Decisions** = LOCKED — honor these exactly, do not revisit or suggest alternatives
 - **Claude's Discretion** = Your freedom — make implementation choices here
 - **Deferred Ideas** = Out of scope — do NOT include in this phase
 
-{context_content}
+{CONTEXT_FRONTMATTER}
 
-**Research (if exists):**
-{research_content}
+**Research Frontmatter (if exists):**
+{RESEARCH_FRONTMATTER}
 
-**Gap Closure (if --gaps mode):**
-{verification_content}
-{uat_content}
+**Gap Closure Frontmatter (if --gaps mode):**
+{VERIFICATION_FRONTMATTER}
+{UAT_FRONTMATTER}
 
-</planning_context>
+</planning_context_summary>
+
+<context_references>
+
+**Full files available for reference when needed:**
+- State: @.planning/STATE.md
+- Roadmap: @.planning/ROADMAP.md
+- Requirements: @.planning/REQUIREMENTS.md (if exists)
+- Phase Context: {phase_dir}/{phase}-CONTEXT.md (if exists)
+- Research: {phase_dir}/{phase}-RESEARCH.md (if exists)
+- Verification: {phase_dir}/{phase}-VERIFICATION.md (if –gaps mode)
+- UAT: {phase_dir}/{phase}-UAT.md (if –gaps mode)
+
+**Reference reading guidelines:**
+- Read full file when you need complete details
+- Use section-specific reads when specific information needed
+- Don't read all referenced files at once
+</context_references>
+
 
 <downstream_consumer>
 Output consumed by /gsd-execute-phase
@@ -337,8 +388,8 @@ Before returning PLANNING COMPLETE:
 
 ```
 Task(
-  prompt="First, read ./.opencode/agents/gsd-planner.md for your role and instructions.\n\n" + filled_prompt,
-  subagent_type="general-purpose",
+  prompt=filled_prompt,
+  subagent_type="gsd-planner",
   model="{planner_model}",
   description="Plan Phase {phase}"
 )
@@ -486,8 +537,8 @@ Return what changed.
 
 ```
 Task(
-  prompt="First, read ./.opencode/agents/gsd-planner.md for your role and instructions.\n\n" + revision_prompt,
-  subagent_type="general-purpose",
+  prompt=revision_prompt,
+  subagent_type="gsd-planner",
   model="{planner_model}",
   description="Revise Phase {phase} plans"
 )
