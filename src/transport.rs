@@ -48,13 +48,15 @@ pub trait TransportFactory: Send + Sync {
     ) -> Box<dyn Transport + Send + Sync>;
 
     /// Check if transport requires tool filtering support (Phase 4).
-    ///
-    /// Returns true if the transport supports allowed_tools/disabled_tools.
-    /// Currently, this is only relevant for HTTP transport.
     fn supports_filtering(&self) -> bool {
         false
     }
 }
+
+/// Type alias for boxed, thread-safe transport connections.
+///
+/// This simplifies the signature of methods that return BoxedTransport.
+pub type BoxedTransport = Box<dyn Transport + Send + Sync>;
 
 #[cfg(test)]
 mod tests {
@@ -66,3 +68,5 @@ mod tests {
         println!("Transport trait implemented");
     }
 }
+
+// TransportFactory trait is already defined above, no re-export needed

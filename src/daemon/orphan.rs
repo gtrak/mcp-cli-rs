@@ -9,9 +9,9 @@
 
 use anyhow::Result;
 use std::fs;
-use std::path::Path;
-use std::time::Duration;
-use std::time::SystemTime;
+use std::path::{Path, PathBuf};
+
+use crate::daemon::cleanup_socket;
 
 /// Get the PID file path for a socket
 ///
@@ -50,31 +50,32 @@ pub fn is_daemon_running(pid: u32) -> bool {
 
 #[cfg(windows)]
 pub fn is_daemon_running(pid: u32) -> bool {
-    use std::ptr;
-    use winapi::um::processthreadsapi::{GetExitCodeProcess, OpenProcess};
-    use winapi::um::winnt::{DWORD, PROCESS_QUERY_INFORMATION};
+    use windows_sys::Win32::System::Threading::{GetExitCodeProcess, OpenProcess};
+    use windows_sys::Win32::System::Threading::PROCESS_QUERY_INFORMATION;
+
+    const STILL_ACTIVE: u32 = 259;
 
     unsafe {
         // Open the process with query information rights
         let process_handle = OpenProcess(PROCESS_QUERY_INFORMATION, 0, pid);
 
-        if process_handle == ptr::null_mut() {
+        if process_handle.is_null() {
             // Process doesn't exist or we don't have access
             return false;
         }
 
-        let mut exit_code: DWORD = 0;
+        let mut exit_code: u32 = 0;
         let success = GetExitCodeProcess(process_handle, &mut exit_code);
 
         // Close the handle
-        let _ = winapi::um::handleapi::CloseHandle(process_handle);
+        let _ = windows_sys::Win32::Foundation::CloseHandle(process_handle);
 
-        if !success {
+        if success == 0 {
             return false;
         }
 
-        // If exit code is STILL_ACTIVE (STILL_ACTIVE), process is running
-        exit_code == 259 // STILL_ACTIVE
+        // If exit code is STILL_ACTIVE (259), process is running
+        exit_code == STILL_ACTIVE
     }
 }
 
@@ -102,7 +103,7 @@ pub fn write_daemon_pid(socket_path: &Path, pid: u32) -> Result<()> {
     let pid_file = get_pid_file_path(socket_path);
     let pid_str = pid.to_string();
 
-    fs::write(&pid_file, pid_str)?;
+    fs::write(&pid_file, &pid_str)?;
 
     tracing::info!("PID file written: {:?} -> {}", pid_file, pid_str);
 
@@ -121,7 +122,7 @@ pub fn write_daemon_pid(socket_path: &Path, pid: u32) -> Result<()> {
 ///
 /// Returns Ok(()) if cleanup successful.
 /// Returns error if IPC check needed but daemon still running (no cleanup needed).
-pub fn cleanup_orphaned_daemon(socket_path: &Path) -> Result<()> {
+pub async fn cleanup_orphaned_daemon(socket_path: &Path) -> Result<()> {
     // Try to connect via IPC to check if daemon is running
     let ipc_result = try_connect_via_ipc(socket_path);
 
@@ -135,7 +136,8 @@ pub fn cleanup_orphaned_daemon(socket_path: &Path) -> Result<()> {
     tracing::warn!("Daemon not responding, cleaning up orphaned resources");
 
     // Remove socket file (already handled by cleanup_socket, but double-check)
-    let _ = cleanup_socket(socket_path).await;
+    let socket_path_clone = socket_path.to_path_buf();
+    let _ = cleanup_socket(socket_path_clone).await;
 
     // Check if daemon PID file exists
     if !get_pid_file_path(socket_path).exists() {
@@ -175,6 +177,32 @@ pub fn cleanup_orphaned_daemon(socket_path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Remove PID file
+///
+/// Public helper for daemon shutdown cleanup
+pub fn remove_pid_file(socket_path: &PathBuf) -> Result<()> {
+    let pid_file = get_pid_file_path(socket_path);
+    if pid_file.exists() {
+        if let Err(e) = fs::remove_file(&pid_file) {
+            tracing::warn!("Failed to remove PID file: {}", e);
+        }
+    }
+    Ok(())
+}
+
+/// Remove fingerprint file
+///
+/// Public helper for daemon shutdown cleanup
+pub fn remove_fingerprint_file(socket_path: &PathBuf) -> Result<()> {
+    let fp_file = get_fingerprint_file_path(socket_path);
+    if fp_file.exists() {
+        if let Err(e) = fs::remove_file(&fp_file) {
+            tracing::warn!("Failed to remove fingerprint file: {}", e);
+        }
+    }
+    Ok(())
+}
+
 /// Try to connect to daemon via IPC
 ///
 /// Returns IpcClient if connection succeeds, Err otherwise.
@@ -199,12 +227,12 @@ pub fn kill_daemon_process(pid: u32) -> Result<()> {
 
     #[cfg(windows)]
     {
-        use winapi::um::processthreadsapi::{OpenProcess, TerminateProcess};
-        use winapi::um::winnt::{DWORD, PROCESS_TERMINATE};
+        use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess};
+        use windows_sys::Win32::System::Threading::PROCESS_TERMINATE;
 
         unsafe {
             let process_handle = OpenProcess(PROCESS_TERMINATE, 0, pid);
-            if process_handle == ptr::null_mut() {
+            if process_handle.is_null() {
                 return Err(anyhow::anyhow!(
                     "Failed to open process handle for PID: {}",
                     pid
@@ -212,9 +240,9 @@ pub fn kill_daemon_process(pid: u32) -> Result<()> {
             }
 
             let success = TerminateProcess(process_handle, 1);
-            let _ = winapi::um::handleapi::CloseHandle(process_handle);
+            let _ = windows_sys::Win32::Foundation::CloseHandle(process_handle);
 
-            if !success {
+            if success == 0 {
                 return Err(anyhow::anyhow!("Failed to terminate process PID: {}", pid));
             }
 

@@ -14,6 +14,7 @@ pub mod protocol;
 pub mod lifecycle;
 pub mod pool;
 pub mod fingerprint;
+pub mod orphan;
 
 /// Configuration fingerprint hash
 pub type ConfigFingerprint = String;
@@ -72,6 +73,14 @@ pub async fn run_daemon(config: Config, socket_path: PathBuf) -> Result<()> {
     let config_fingerprint = config_fingerprint(&config);
     tracing::info!("Config fingerprint: {}", config_fingerprint);
 
+    // Get current process PID
+    let pid = std::process::id();
+    tracing::info!("Daemon PID: {}", pid);
+
+    // Write PID to file for orphan detection
+    let _ = crate::daemon::orphan::write_daemon_pid(&socket_path, pid);
+    tracing::info!("PID file written");
+
     // Initialize lifecycle with 60s timeout
     let lifecycle = DaemonLifecycle::new(60);
 
@@ -128,8 +137,18 @@ pub async fn run_daemon(config: Config, socket_path: PathBuf) -> Result<()> {
         }
     }
 
-    tracing::info!("Daemon shutting down, removing socket file");
-    cleanup_socket(socket_path).await?;
+    tracing::info!("Daemon shutting down, removing resource files");
+    let socket_path_clone = socket_path.clone();
+    cleanup_socket(socket_path_clone).await?;
+
+    // Remove PID file
+    let _ = crate::daemon::orphan::remove_pid_file(&socket_path);
+    tracing::info!("PID file removed");
+
+    // Remove fingerprint file
+    let _ = crate::daemon::orphan::remove_fingerprint_file(&socket_path);
+    tracing::info!("Fingerprint file removed");
+
     tracing::info!("Daemon shutdown complete");
     Ok(())
 }
@@ -295,4 +314,26 @@ mod tests {
         assert!(matches!(response, DaemonResponse::ShutdownAck));
         assert!(!lifecycle.is_running());
     }
+}
+
+/// Remove PID file
+pub fn remove_pid_file(socket_path: &PathBuf) -> Result<()> {
+    let pid_file = crate::daemon::orphan::get_pid_file_path(socket_path);
+    if pid_file.exists() {
+        if let Err(e) = std::fs::remove_file(&pid_file) {
+            tracing::warn!("Failed to remove PID file: {}", e);
+        }
+    }
+    Ok(())
+}
+
+/// Remove fingerprint file
+pub fn remove_fingerprint_file(socket_path: &PathBuf) -> Result<()> {
+    let fp_file = crate::daemon::orphan::get_fingerprint_file_path(socket_path);
+    if fp_file.exists() {
+        if let Err(e) = std::fs::remove_file(&fp_file) {
+            tracing::warn!("Failed to remove fingerprint file: {}", e);
+        }
+    }
+    Ok(())
 }

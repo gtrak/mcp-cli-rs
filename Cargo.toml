@@ -37,7 +37,13 @@ futures-util = "0.3"
 interprocess = { version = "2.3", features = ["tokio"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.59", features = ["Win32_Security"] }
+windows-sys = { version = "0.59", features = ["Win32_Security", "Win32_System_Threading", "Win32_System_ProcessStatus", "Win32_Foundation"] }
+winapi = { version = "0.3", features = [
+    "processthreadsapi",
+    "handleapi",
+    "winnt",
+    "securitybaseapi",
+] }
 
 # Cryptography (for config fingerprinting)
 sha2 = "0.10"
