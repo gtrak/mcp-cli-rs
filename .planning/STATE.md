@@ -1,7 +1,7 @@
 # State: MCP CLI Rust Rewrite
 
 **Created:** 2025-02-06
-**Last updated:** 2026-02-07
+**Last updated:** 2026-02-07 - Completed plan 02-03 (daemon binary with idle timeout)
 **Mode:** yolo
 **Depth:** standard
 
@@ -13,7 +13,7 @@
 Reliable cross-platform MCP server interaction without dependencies. Developers and AI agents can discover available tools, inspect schemas, and execute operations through a simple CLI that works consistently on Linux, macOS, and Windows.
 
 **Current Focus:**
-Roadmap creation complete (4 phases). Ready to begin Phase 1: Core Protocol & Configuration.
+Executing Phase 2: Connection Daemon & Cross-Platform IPC (Wave 2 in progress)
 
 ---
 
@@ -21,14 +21,14 @@ Roadmap creation complete (4 phases). Ready to begin Phase 1: Core Protocol & Co
 
 **Active Phase:** 02-connection-daemon-ipc
 
-**Active Plan:** Plan 02 complete (6 plans planned)
+**Active Plan:** Plan 02-03 complete (3/6 plans complete)
 
 **Status:** Executing Phase 2 plans
 
 **Progress:**
 ```
 Phase 1: Core Protocol & Configuration         ██████████████ 100% (4/4 plans complete)
-Phase 2: Connection Daemon & Cross-Platform IPC ████████████░░  33% (2/6 plans complete)
+Phase 2: Connection Daemon & Cross-Platform IPC ████████████▓▓  50% (3/6 plans complete)
 Phase 3: Performance & Reliability             ░░░░░░░░░░░ 0%
 Phase 4: Tool Filtering & Cross-Platform Validation ░░░░░░░░░░░ 0%
 ```
@@ -71,6 +71,14 @@ Phase 4: Tool Filtering & Cross-Platform Validation ░░░░░░░░░�
 8. **IPC abstraction implementation:** Created IpcServer, IpcClient, IpcStream traits with factory functions (create_ipc_server, get_socket_path). Unix socket implementation provided with create_dir_all for socket directory and StaleSocket detection.
 
 9. **Windows named pipe IPC:** Windows implementation using tokio::net::windows::named_pipe with SECURITY_IDENTIFICATION (set by interprocess crate). NamedPipeIpcServer/Client support multiple connections with first_pipe_instance(true) to prevent multiple daemons.
+
+10. **NDJSON Protocol for CLI-Daemon Communication:** Newline-delimited JSON format for CLI-daemon requests/responses, one JSON object per line with newline terminator. Simple and robust, matching MCP protocol conventions.
+
+11. **Idle Timeout Default 60 Seconds:** Daemon self-terminates after 60 seconds of inactivity, tracked via Arc<Mutex<Instant>> for thread-safe activity updates.
+
+12. **Config Fingerprinting:** SHA256-based fingerprint calculation for config validation, enabling CLI to detect configuration changes and restart daemon when needed.
+
+13. **Stub Implementation Strategy:** Implemented stub handlers for ExecuteTool, ListTools, ListServers returning Error::NotImplemented. Full implementation deferred to plan 02-04 (connection pool integration).
 
 ### Technical Decisions Made
 
@@ -144,8 +152,8 @@ From research/PITFALLS.md:
 **Next Steps:**
 - Execute remaining Phase 2 plans via `/gsd-execute-phase 2`
 - Phase 2 plans are organized into 4 waves for parallel execution
-- Plans remaining: 02-03, 02-04, 02-05, 02-06 (Wave 1, 02-01 and 02-02 complete)
-- Next: Wave 1 continues (IPC abstraction implementations)
+- Plans remaining: 02-04, 02-05, 02-06 (02-01, 02-02, 02-03 complete)
+- Next: Wave 1 continues (connection pool and CLI integration)
 
 **Project Context for New Sessions:**
 - Solo developer + Claude workflow (no teams, no stakeholders)
@@ -156,10 +164,11 @@ From research/PITFALLS.md:
 - Architecture: layered, trait-based abstractions, no global mutable state
 - Core protocol layer complete: transport abstraction, McpClient with tool discovery/execution, comprehensive error handling
 - IPC abstraction layer complete: Unix socket implementation + Windows named pipe backend
+- Daemon layer complete: binary with IPC communication, idle timeout, lifecycle management
 
 ---
 
-**Last updated:** 2026-02-07 - Completed plans 02-01 (IPC abstraction) and 02-02 (Windows named pipes)
+**Last updated:** 2026-02-07 - Completed plans 02-01 (IPC abstraction), 02-02 (Windows named pipes), 02-03 (daemon binary)
 **Mode:** yolo
 **Depth:** standard
-**Plan completed:** 02-01-SUMMARY.md, 02-02-SUMMARY.md
+**Plan completed:** 02-01-SUMMARY.md, 02-02-SUMMARY.md, 02-03-SUMMARY.md
