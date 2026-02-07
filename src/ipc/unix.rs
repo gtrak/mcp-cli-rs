@@ -6,7 +6,7 @@ use tokio::net::UnixListener;
 use tokio::net::UnixStream;
 
 use crate::ipc::IpcServer;
-use crate::error::{Result, IpcError};
+use crate::error::{McpError};
 
 /// Unix socket implementation of IPC server
 ///
@@ -19,24 +19,26 @@ impl UnixIpcServer {
     /// Create a new UnixIpcServer at the specified path
     ///
     /// Creates parent directories if needed and removes stale socket files
-    pub fn new(path: &Path) -> Result<Self> {
+    pub async fn new(path: &Path) -> Result<Self, McpError> {
         // Create parent directory if needed
         if let Some(parent) = path.parent() {
-            tokio::fs::create_dir_all(parent).await?;
+            tokio::fs::create_dir_all(parent).await
+                .map_err(|e| McpError::IOError { source: e })?;
         }
 
         // Remove stale socket file if exists
         if path.exists() {
-            std::fs::remove_file(path)
-                .map_err(|e| IpcError {
+            tokio::fs::remove_file(path).await
+                .map_err(|e| McpError::IpcError {
                     message: format!("Failed to remove stale socket file: {}", path.display()),
                 })?;
         }
 
         // Bind Unix listener to the socket path
         let listener = UnixListener::bind(path)
-            .map_err(|e| IpcError {
-                message: format!("Failed to bind Unix socket at {}: {}", path.display(), e),
+            .map_err(|e| McpError::SocketBindError {
+                path: path.to_string_lossy().to_string(),
+                source: e,
             })?;
 
         Ok(Self { listener })
@@ -48,13 +50,13 @@ impl IpcServer for UnixIpcServer {
     /// Accept an incoming connection
     ///
     /// Returns a boxed stream and address string for the connection
-    async fn accept(&self) -> Result<(Box<dyn crate::ipc::IpcStream>, String)> {
+    async fn accept(&self) -> Result<(Box<dyn crate::ipc::IpcStream>, String), McpError> {
         match self.listener.accept().await {
             Ok((stream, addr)) => {
                 // UnixStream already implements AsyncRead + AsyncWrite
-                Ok((Box::new(stream) as Box<dyn crate::ipc::IpcStream>, addr.to_string()))
+                Ok((Box::new(stream) as Box<dyn crate::ipc::IpcStream>, addr.to_string_lossy().to_string()))
             }
-            Err(e) => Err(IpcError {
+            Err(e) => Err(McpError::IpcError {
                 message: format!("Failed to accept connection: {}", e),
             }),
         }
@@ -71,10 +73,12 @@ impl crate::ipc::IpcClient for UnixIpcClient {
     /// Connect to an IPC server at the given path
     ///
     /// Returns a boxed stream for communication
-    async fn connect(&self, path: &Path) -> Result<Box<dyn crate::ipc::IpcStream>> {
+    async fn connect(&self, path: &Path) -> Result<Box<dyn crate::ipc::IpcStream>, McpError> {
         let stream = UnixStream::connect(path)
-            .map_err(|e| IpcError {
-                message: format!("Failed to connect to Unix socket {}: {}", path.display(), e),
+            .await
+            .map_err(|e| McpError::ConnectionError {
+                server: path.to_string_lossy().to_string(),
+                source: e,
             })?;
 
         Ok(Box::new(stream) as Box<dyn crate::ipc::IpcStream>)

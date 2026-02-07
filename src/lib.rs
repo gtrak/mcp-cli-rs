@@ -14,3 +14,13 @@ pub mod transport;
 pub use transport::{Transport, TransportFactory};
 pub use config::ServerTransport;
 pub use cli::commands::AppContext;
+
+// Daemon module
+pub mod daemon;
+pub use daemon::{run_daemon, DaemonState};
+pub mod ipc;
+pub use ipc::{create_ipc_server, get_socket_path};
+
+// Connection pool (stub, full impl in 02-04)
+pub mod pool;
+pub use pool::{ConnectionPoolInterface, DummyConnectionPool};

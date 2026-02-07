@@ -6,15 +6,15 @@
 //! Requires the `std::sync::LazyLock` crate feature for static HashMaps.
 
 use std::sync::LazyLock;
+use serde::{Deserialize, Serialize};
 
 use crate::McpError;
-use serde::Deserialize;
 use std::collections::HashMap;
 
 /// Transport protocol for MCP server connections.
 ///
 /// Supports both local stdio execution and remote HTTP connections.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub enum ServerTransport {
     /// Server runs locally via stdio communication.
@@ -58,7 +58,7 @@ pub enum ServerTransport {
 /// Configuration for a single MCP server.
 ///
 /// Represents a configured MCP server with optional tool filtering capabilities.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ServerConfig {
     /// Unique server identifier.
     pub name: String,
@@ -111,7 +111,7 @@ impl ServerConfig {
 /// Overall MCP configuration containing multiple server definitions.
 ///
 /// This is the root config structure parsed from TOML files.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     /// List of MCP servers to configure.
     pub servers: Vec<ServerConfig>,

@@ -1,12 +1,23 @@
 //! Platform-agnostic IPC abstraction for daemon communication
 
 use async_trait::async_trait;
+use tokio::io::{AsyncRead, AsyncWrite};
 use std::path::Path;
+use crate::error::McpError;
+
+#[cfg(unix)]
+pub mod unix;
+#[cfg(windows)]
+pub mod windows;
 
 /// Stream abstraction for IPC communication
 ///
 /// Wraps platform-specific stream types to provide a unified interface
-pub trait IpcStream: async_trait::AsyncRead + async_trait::AsyncWrite + Send + Sync + Unpin {}
+/// Note: For AsyncBufRead operations, wrap in tokio::io::BufReader
+pub trait IpcStream: AsyncRead + AsyncWrite + Send + Sync + Unpin {}
+
+// Implement IpcStream for Box<dyn IpcStream> so boxed streams can be used directly
+impl IpcStream for Box<dyn IpcStream> {}
 
 /// Server trait for accepting IPC connections
 ///
@@ -16,7 +27,7 @@ pub trait IpcServer: Send + Sync {
     /// Accept an incoming connection
     ///
     /// Returns a boxed stream and address string for the connection
-    async fn accept(&self) -> Result<(Box<dyn IpcStream>, String), crate::error::IpcError>;
+    async fn accept(&self) -> Result<(Box<dyn IpcStream>, String), McpError>;
 }
 
 /// Client trait for connecting to IPC servers
@@ -27,14 +38,14 @@ pub trait IpcClient: Send + Sync {
     /// Connect to an IPC server at the given path
     ///
     /// Returns a boxed stream for communication
-    async fn connect(&self, path: &Path) -> Result<Box<dyn IpcStream>, crate::error::IpcError>;
+    async fn connect(&self, path: &Path) -> Result<Box<dyn IpcStream>, McpError>;
 }
 
 /// Factory function to create platform-specific IPC server
 ///
 /// Returns Box<dyn IpcServer> with platform-specific implementation
 #[cfg(windows)]
-pub fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, crate::error::IpcError> {
+pub fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, McpError> {
     Ok(Box::new(crate::ipc::windows::NamedPipeIpcServer::new(path)?))
 }
 
@@ -59,7 +70,7 @@ pub fn get_socket_path() -> std::path::PathBuf {
 ///
 /// Returns Box<dyn IpcClient> with platform-specific implementation
 #[cfg(unix)]
-pub fn create_ipc_client(path: &Path) -> Result<Box<dyn IpcClient>, crate::error::IpcError> {
+pub fn create_ipc_client(path: &Path) -> Result<Box<dyn IpcClient>, McpError> {
     Ok(Box::new(crate::ipc::unix::UnixIpcClient))
 }
 
@@ -67,7 +78,7 @@ pub fn create_ipc_client(path: &Path) -> Result<Box<dyn IpcClient>, crate::error
 ///
 /// Returns Box<dyn IpcClient> with platform-specific implementation
 #[cfg(windows)]
-pub fn create_ipc_client(path: &Path) -> Result<Box<dyn IpcClient>, crate::error::IpcError> {
+pub fn create_ipc_client(path: &Path) -> Result<Box<dyn IpcClient>, McpError> {
     Ok(Box::new(crate::ipc::windows::NamedPipeIpcClient))
 }
 
