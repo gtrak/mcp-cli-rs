@@ -1,15 +1,18 @@
 use anyhow::Result;
 use std::io::ErrorKind;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::sync::Mutex;
 use std::time::Duration;
 
 use crate::config::Config;
 use crate::ipc::{create_ipc_server, IpcServer};
 use crate::daemon::lifecycle::DaemonLifecycle;
+use crate::daemon::pool::ConnectionPool;
 
 pub mod protocol;
 pub mod lifecycle;
+pub mod pool;
 
 /// Configuration fingerprint hash
 pub type ConfigFingerprint = String;
@@ -24,7 +27,7 @@ pub struct DaemonState {
     /// Lifecycle manager for idle timeout
     pub lifecycle: DaemonLifecycle,
     /// Connection pool (stub for now, full impl in 02-04)
-    pub connection_pool: Arc<Mutex<dyn crate::pool::ConnectionPoolInterface>>,
+    pub connection_pool: Arc<Mutex<dyn crate::daemon::pool::ConnectionPoolInterface>>,
 }
 
 impl DaemonState {
@@ -77,8 +80,8 @@ pub async fn run_daemon(config: Config, socket_path: PathBuf) -> Result<()> {
         crate::daemon::lifecycle::run_idle_timer(&lifecycle_clone).await;
     });
 
-    // Initialize connection pool stub
-    let connection_pool = Arc::new(Mutex::new(crate::pool::DummyConnectionPool::new()));
+    // Initialize connection pool
+    let connection_pool = Arc::new(Mutex::new(ConnectionPool::new(Arc::new(config.clone()))));
 
     let state = DaemonState {
         config: Arc::new(config),

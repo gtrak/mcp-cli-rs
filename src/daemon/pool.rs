@@ -5,24 +5,24 @@
 //!
 //! See RESEARCH.md for connection pooling strategy and health check requirements.
 
-use anyhow::Result;
+use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
 
 use crate::config::Config;
-use crate::error::Result as StdResult;
-use crate::transport::{Transport, TransportFactory};
+use crate::error::Result;
+use crate::error::McpError;
+use crate::transport::{Transport, BoxedTransport};
 
 /// Represents a pooled MCP server connection with metadata for tracking.
 ///
 /// This struct wraps a transport connection with tracking information including
 /// when it was created, last used, and health check failure count.
-#[derive(Clone)]
 pub struct PooledConnection {
     /// The underlying transport connection
-    pub transport: Box<dyn Transport + Send + Sync>,
+    pub transport: BoxedTransport,
     /// Server name this connection is for
     pub server_name: String,
     /// Time when connection was created
@@ -53,13 +53,7 @@ impl PooledConnection {
     ///
     /// Sends an MCP ping request and resets failure count if successful.
     /// Returns Ok(()) if healthy, Err otherwise.
-    async fn health_check(&mut self) -> StdResult<()> {
-        let ping_request = serde_json::json!({
-            "jsonrpc": "2.0",
-            "method": "ping",
-            "id": "health-check"
-        });
-
+    async fn health_check(&mut self) -> Result<()> {
         // Timeout after 5 seconds to prevent hanging on dead connections
         match timeout(Duration::from_secs(5), self.transport.ping()).await {
             Ok(Ok(_)) => {
@@ -77,15 +71,15 @@ impl PooledConnection {
                 );
                 Err(e)
             }
-            Err(_) => {
-                // Timeout - treat as failure
-                self.health_check_failures += 1;
-                tracing::warn!(
-                    "Health check timeout for server {} (failures: {})",
-                    self.server_name, self.health_check_failures
-                );
-                Err(anyhow::anyhow!("Health check timeout for server {}", self.server_name))
-            }
+             Err(_) => {
+                 // Timeout - treat as failure
+                 self.health_check_failures += 1;
+                 tracing::warn!(
+                     "Health check timeout for server {} (failures: {})",
+                     self.server_name, self.health_check_failures
+                 );
+                 Err(McpError::Timeout { timeout: 5 })
+             }
         }
     }
 }
@@ -132,67 +126,46 @@ impl ConnectionPool {
     /// 4. If not exists: creates new connection and adds to pool
     ///
     /// Returns a Box<dyn Transport> that can be used to communicate with the server.
-    ///
-    /// This method is atomic (mutex-protected) and handles all caching logic.
     pub async fn get(&self, server_name: &str) -> Result<Box<dyn Transport + Send + Sync>> {
-        let mut connections = self.connections.lock().unwrap();
-        let mut pooled_conn = connections
-            .entry(server_name.to_string())
-            .or_insert_with(|| {
-                tracing::info!("Creating new connection for server: {}", server_name);
-                PooledConnection {
-                    transport: Box::new(self.create_transport_for_server(server_name)?),
-                    server_name: server_name.to_string(),
-                    created_at: Instant::now(),
-                    last_used: Instant::now(),
-                    health_check_failures: 0,
-                }
-            });
+        // First, check if we have a cached connection and remove it if it exists
+        let existing_conn = {
+            let mut connections = self.connections.lock().unwrap();
+            connections.remove(server_name)
+        };
 
-        // Check if connection is healthy
-        if !pooled_conn.is_healthy() {
-            tracing::warn!(
-                "Connection for server {} is unhealthy ({} failures), recreating",
-                server_name, pooled_conn.health_check_failures
-            );
-            // Remove unhealthy connection
-            connections.remove(server_name);
-            // Create new connection (fall through to creation below)
-        } else {
-            // Validate connection health
-            if let Err(e) = pooled_conn.health_check().await {
-                // Health check failed - increment failure count and recreate
-                pooled_conn.health_check_failures += 1;
-                tracing::warn!(
-                    "Health check failed for server {} (failures: {}), recreating",
-                    server_name, pooled_conn.health_check_failures
-                );
-                // Remove connection to trigger recreation
-                connections.remove(server_name);
+        if let Some(mut conn) = existing_conn {
+            // Connection exists - check if it's healthy
+            if conn.is_healthy() {
+                // Validate connection health (lock is dropped, so this is Send-safe)
+                if conn.health_check().await.is_ok() {
+                    // Health check passed - update last used timestamp
+                    conn.touch();
+                    tracing::debug!("Reusing cached connection for server: {}", server_name);
+                    return Ok(conn.transport);
+                } else {
+                    // Health check failed - increment failure count and drop it
+                    conn.health_check_failures += 1;
+                    tracing::warn!(
+                        "Health check failed for server {} (failures: {}), recreating",
+                        server_name, conn.health_check_failures
+                    );
+                    // Connection is dropped here, will create new one below
+                }
             } else {
-                // Health check passed - update last used timestamp
-                pooled_conn.touch();
-                tracing::debug!("Reusing cached connection for server: {}", server_name);
+                // Connection is unhealthy
+                tracing::warn!(
+                    "Connection for server {} is unhealthy ({} failures), recreating",
+                    server_name, conn.health_check_failures
+                );
+                // Connection is dropped here, will create new one below
             }
         }
 
-        // Create new transport if connection was removed or didn't exist
-        let mut new_connection = connections
-            .entry(server_name.to_string())
-            .or_insert_with(|| {
-                tracing::info!("Creating new connection for server: {}", server_name);
-                PooledConnection {
-                    transport: Box::new(self.create_transport_for_server(server_name)?),
-                    server_name: server_name.to_string(),
-                    created_at: Instant::now(),
-                    last_used: Instant::now(),
-                    health_check_failures: 0,
-                }
-            });
-
-        // Update last used timestamp
-        new_connection.touch();
-        Ok(new_connection.transport.clone())
+        // Create new connection
+        tracing::info!("Creating new connection for server: {}", server_name);
+        let transport = self.create_transport_for_server(server_name)?;
+        
+        Ok(transport)
     }
 
     /// Create a transport for the specified server
@@ -206,10 +179,20 @@ impl ConnectionPool {
             .servers
             .iter()
             .find(|s| s.name.as_str() == server_name)
-            .ok_or_else(|| anyhow::anyhow!("Server not found in config: {}", server_name))?;
+            .ok_or_else(|| McpError::ServerNotFound { server: server_name.to_string() })?;
 
-        // Create transport using factory
-        let transport = server_config.transport_factory.create_transport(server_name);
+        // Create transport using factory trait
+        let transport = server_config.create_transport(server_name)
+            .map_err(|e| {
+                tracing::error!("Failed to create transport for server {}: {}", server_name, e);
+                // The source type must be std::io::Error
+                // Create an I/O error with the error message
+                let source = std::io::Error::new(std::io::ErrorKind::Other, e.to_string());
+                McpError::ConnectionError {
+                    server: server_name.to_string(),
+                    source,
+                }
+            })?;
         Ok(transport)
     }
 
@@ -271,43 +254,6 @@ pub struct PoolStats {
     pub unhealthy_connections: usize,
 }
 
-/// Stub implementation for testing purposes
-pub struct DummyConnectionPool {
-    count: usize,
-}
-
-impl DummyConnectionPool {
-    pub fn new() -> Self {
-        DummyConnectionPool { count: 0 }
-    }
-}
-
-impl DummyConnectionPool {
-    pub async fn get(&mut self, _server_name: &str) -> Result<Box<dyn Transport + Send + Sync>> {
-        self.count += 1;
-        tracing::debug!("Dummy connection pool: returning mock connection (count: {})", self.count);
-        Ok(Box::new(crate::transport::StubTransport::new()))
-    }
-
-    pub fn remove(&mut self, _server_name: &str) {
-        self.count -= 1;
-    }
-
-    pub fn clear(&mut self) {
-        self.count = 0;
-    }
-
-    pub fn count(&self) -> usize {
-        self.count
-    }
-}
-
-impl Default for DummyConnectionPool {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// Connection pool interface for daemon integration
 ///
 /// This trait abstracts the connection pool so it can be mocked during testing
@@ -327,47 +273,97 @@ pub trait ConnectionPoolInterface: Send + Sync {
     fn count(&self) -> usize;
 }
 
+#[async_trait::async_trait]
+impl ConnectionPoolInterface for ConnectionPool {
+    async fn get(&self, server_name: &str) -> Result<Box<dyn Transport + Send + Sync>> {
+        self.get(server_name).await
+    }
+
+    fn remove(&self, server_name: &str) {
+        self.remove(server_name);
+    }
+
+    fn clear(&self) {
+        self.clear();
+    }
+
+    fn count(&self) -> usize {
+        self.count()
+    }
+}
+
+/// Stub implementation for testing purposes
+pub struct DummyConnectionPool {
+    count: usize,
+}
+
+impl DummyConnectionPool {
+    pub fn new() -> Self {
+        DummyConnectionPool { count: 0 }
+    }
+}
+
+impl DummyConnectionPool {
+    pub async fn get(&mut self, _server_name: &str) -> Result<BoxedTransport> {
+        self.count += 1;
+        tracing::debug!("Dummy connection pool: returning mock connection (count: {})", self.count);
+        // Return a simple stub transport
+        Ok(Box::new(DummyTransport::new()))
+    }
+
+    pub fn remove(&self, _server_name: &str) {
+        // Stub implementation - no-op
+    }
+
+    pub fn clear(&self) {
+        // Stub implementation - no-op
+    }
+
+    pub fn count(&self) -> usize {
+        self.count
+    }
+}
+
+impl Default for DummyConnectionPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Stub transport for testing
+struct DummyTransport;
+
+impl DummyTransport {
+    pub fn new() -> Self {
+        DummyTransport
+    }
+}
+
+#[async_trait]
+impl crate::transport::Transport for DummyTransport {
+    async fn send(&mut self, _request: serde_json::Value) -> crate::error::Result<serde_json::Value> {
+        // Stub implementation - return success
+        Ok(serde_json::json!({"result": "success"}))
+    }
+
+    async fn ping(&self) -> crate::error::Result<()> {
+        // Stub implementation - always succeeds
+        Ok(())
+    }
+
+    fn transport_type(&self) -> &str {
+        "dummy"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_config_fingerprint() {
-        let config = Config {
-            servers: vec![],
-        };
-        let fp = config_fingerprint(&config);
-        assert!(!fp.is_empty());
-    }
-
-    #[test]
-    fn test_handle_request_ping() {
-        let lifecycle = DaemonLifecycle::new(30);
-        let config = Config { servers: vec![] };
-        let state = DaemonState {
-            config: Arc::new(config),
-            config_fingerprint: String::new(),
-            lifecycle,
-            connection_pool: Arc::new(Mutex::new(crate::pool::ConnectionPool::new())),
-        };
-
-        let response = handle_request(DaemonRequest::Ping, &state);
-        assert!(matches!(response, DaemonResponse::Pong));
-    }
-
-    #[test]
-    fn test_handle_request_shutdown() {
-        let lifecycle = DaemonLifecycle::new(30);
-        let config = Config { servers: vec![] };
-        let state = DaemonState {
-            config: Arc::new(config),
-            config_fingerprint: String::new(),
-            lifecycle,
-            connection_pool: Arc::new(Mutex::new(crate::pool::ConnectionPool::new())),
-        };
-
-        let response = handle_request(DaemonRequest::Shutdown, &state);
-        assert!(matches!(response, DaemonResponse::ShutdownAck));
-        assert!(!lifecycle.is_running());
+    fn test_connection_pool_new() {
+        let config = Arc::new(Config { servers: vec![] });
+        let pool = ConnectionPool::new(config);
+        assert_eq!(pool.count(), 0);
     }
 }
