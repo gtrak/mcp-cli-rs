@@ -90,6 +90,16 @@ Plans:
 - Stale connection reuse (CONNECTION-04: health checks)
 - Platform conditionals in core logic (IPC abstraction trait)
 
+**Plans:** 6 plans in 4 waves
+
+Plans:
+- [ ] 02-01-PLAN.md — IPC abstraction trait and Unix socket implementation
+- [ ] 02-02-PLAN.md — Windows named pipe implementation with security
+- [ ] 02-03-PLAN.md — Daemon binary with idle timeout and lifecycle management
+- [ ] 02-04-PLAN.md — Connection pooling and health checks
+- [ ] 02-05-PLAN.md — Config change detection and orphan cleanup
+- [ ] 02-06-PLAN.md — CLI integration and cross-platform tests
+
 ---
 
 ## Phase 3: Performance & Reliability
