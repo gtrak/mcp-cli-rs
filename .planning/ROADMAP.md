@@ -93,12 +93,12 @@ Plans:
 **Plans:** 6 plans in 4 waves
 
 Plans:
-- [ ] 02-01-PLAN.md — IPC abstraction trait and Unix socket implementation
-- [ ] 02-02-PLAN.md — Windows named pipe implementation with security
-- [ ] 02-03-PLAN.md — Daemon binary with idle timeout and lifecycle management
-- [ ] 02-04-PLAN.md — Connection pooling and health checks
-- [ ] 02-05-PLAN.md — Config change detection and orphan cleanup
-- [ ] 02-06-PLAN.md — CLI integration and cross-platform tests
+- [x] 02-01-PLAN.md — IPC abstraction trait and Unix socket implementation
+- [x] 02-02-PLAN.md — Windows named pipe implementation with security
+- [x] 02-03-PLAN.md — Daemon binary with idle timeout and lifecycle management
+- [x] 02-04-PLAN.md — Connection pooling and health checks
+- [x] 02-05-PLAN.md — Config change detection and orphan cleanup
+- [x] 02-06-PLAN.md — CLI integration and cross-platform tests
 
 ---
 
