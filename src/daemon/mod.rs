@@ -13,6 +13,7 @@ use crate::daemon::pool::ConnectionPool;
 pub mod protocol;
 pub mod lifecycle;
 pub mod pool;
+pub mod fingerprint;
 
 /// Configuration fingerprint hash
 pub type ConfigFingerprint = String;
