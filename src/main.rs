@@ -1,9 +1,9 @@
 use clap::{Parser, Subcommand};
 use mcp_cli_rs::cli::commands::{cmd_list_servers, cmd_server_info, cmd_tool_info, cmd_call_tool, cmd_search_tools};
 use mcp_cli_rs::cli::daemon::ensure_daemon;
-use mcp_cli_rs::config::Config;
 use mcp_cli_rs::config::loader::{find_and_load, load_config};
 use mcp_cli_rs::error::{exit_code, Result};
+use std::sync::Arc;
 
 #[derive(Parser)]
 #[command(name = "mcp")]
@@ -73,7 +73,7 @@ async fn main() {
 
 async fn run(cli: Cli) -> Result<()> {
     // Load configuration using the loader
-    let daemon_config = if let Some(path) = &cli.config {
+    let config = if let Some(path) = &cli.config {
         // Use explicitly provided config path
         load_config(path).await?
     } else {
@@ -81,8 +81,11 @@ async fn run(cli: Cli) -> Result<()> {
         find_and_load(None).await?
     };
 
+    // Wrap config in Arc for shared ownership
+    let daemon_config = Arc::new(config);
+
     // Ensure daemon is running with fresh config
-    let daemon_client = ensure_daemon(&daemon_config).await
+    let daemon_client = ensure_daemon(Arc::clone(&daemon_config)).await
         .map_err(|e| mcp_cli_rs::error::McpError::io_error(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
     // Use daemon client for all operations
