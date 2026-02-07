@@ -1,24 +1,10 @@
 //! CLI commands for MCP CLI tool.
 
-use crate::client::McpClient;
 use crate::config::{Config, ServerConfig, ServerTransport};
 use crate::error::{McpError, Result};
 use crate::transport::Transport;
 use std::io::{self, Read, IsTerminal};
-
-/// Context for CLI operations.
-///
-/// Contains the loaded configuration and provides access to server configurations.
-pub struct AppContext {
-    pub config: Config,
-}
-
-impl AppContext {
-    /// Create a new AppContext from a configuration.
-    pub fn new(config: Config) -> Self {
-        Self { config }
-    }
-}
+use crate::ipc::ProtocolClient;
 
 /// Execute the list servers command.
 ///
@@ -26,13 +12,13 @@ impl AppContext {
 /// Implements DISC-01: discovery of available tools.
 ///
 /// # Arguments
-/// * `ctx` - Application context
+/// * `daemon` - Daemon IPC client
 /// * `with_descriptions` - If true, show tool descriptions (DISC-06)
 ///
 /// # Errors
 /// Returns McpError::ConfigParseError if config file is invalid
-pub async fn cmd_list_servers(ctx: &AppContext, with_descriptions: bool) -> Result<()> {
-    if ctx.config.is_empty() {
+pub async fn cmd_list_servers(mut daemon: Box<dyn crate::ipc::ProtocolClient>, with_descriptions: bool) -> Result<()> {
+    if daemon.config().is_empty() {
         println!("No servers configured. Please create a config file.");
         return Ok(());
     }
@@ -40,25 +26,34 @@ pub async fn cmd_list_servers(ctx: &AppContext, with_descriptions: bool) -> Resu
     println!("Configured servers:");
     println!();
 
-    let _servers_by_name = ctx.config.servers_by_name();
+    let _servers_by_name = daemon.config().servers_by_name();
 
-    for server in &ctx.config.servers {
+    for server in &daemon.config().servers {
         println!("{}. {} ({})", server.name, server.description.as_deref().unwrap_or(""), server.transport.type_name());
 
-        // Try to connect and list tools for each server
-        let transport = create_transport_for_server(server).unwrap();
-        let mut client = McpClient::new(server.name.clone(), transport);
-        match client.list_tools().await {
-            Ok(tools) => {
-                println!("  - {} tool(s)", tools.len());
-                if with_descriptions && !tools.is_empty() {
-                    println!("    Tools:");
-                    for tool in &tools {
-                        println!("      - {}: {}", tool.name, tool.description.as_deref().unwrap_or(""));
+        // Send ListServers request to daemon
+        match daemon.list_servers().await {
+            Ok(server_names) => {
+                for server_name in &server_names {
+                    println!("  - Server: {}", server_name);
+
+                    // Send ListTools request for each server
+                    match daemon.list_tools(server_name).await {
+                        Ok(tools) => {
+                            println!("    Tools:");
+                            if with_descriptions && !tools.is_empty() {
+                                for tool in &tools {
+                                    println!("      - {}: {}", tool.name, tool.description);
+                                }
+                            } else {
+                                println!("      - {} tool(s)", tools.len());
+                            }
+                        }
+                        Err(e) => println!("      - Failed to list tools: {}", e),
                     }
                 }
             }
-            Err(e) => println!("  - Failed to list tools: {}", e),
+            Err(e) => println!("  - Failed to get servers list: {}", e),
         }
         println!();
     }
@@ -72,13 +67,13 @@ pub async fn cmd_list_servers(ctx: &AppContext, with_descriptions: bool) -> Resu
 /// Implements DISC-02: inspection of server details.
 ///
 /// # Arguments
-/// * `ctx` - Application context
+/// * `daemon` - Daemon IPC client
 /// * `server_name` - Name of the server to inspect
 ///
 /// # Errors
 /// Returns McpError::ServerNotFound if server doesn't exist (ERR-02)
-pub async fn cmd_server_info(ctx: &AppContext, server_name: &str) -> Result<()> {
-    let server = ctx.config.get_server(server_name)
+pub async fn cmd_server_info(daemon: Box<dyn crate::ipc::ProtocolClient>, server_name: &str) -> Result<()> {
+    let server = daemon.config().get_server(server_name)
         .ok_or_else(|| McpError::ServerNotFound {
             server: server_name.to_string(),
         })?;
@@ -125,24 +120,22 @@ pub async fn cmd_server_info(ctx: &AppContext, server_name: &str) -> Result<()> 
 /// Implements DISC-03: inspection of tool details.
 ///
 /// # Arguments
-/// * `ctx` - Application context
+/// * `daemon` - Daemon IPC client
 /// * `tool_id` - Tool identifier in format "server/tool" or "server tool"
 ///
 /// # Errors
 /// Returns McpError::ToolNotFound if tool doesn't exist (ERR-02)
 /// Returns McpError::AmbiguousCommand if tool_id format is unclear (ERR-06)
-pub async fn cmd_tool_info(ctx: &AppContext, tool_id: &str) -> Result<()> {
+pub async fn cmd_tool_info(mut daemon: Box<dyn crate::ipc::ProtocolClient>, tool_id: &str) -> Result<()> {
     let (server_name, tool_name) = parse_tool_id(tool_id)?;
 
-    let server = ctx.config.get_server(&server_name)
+    let server = daemon.config().get_server(&server_name)
         .ok_or_else(|| McpError::ServerNotFound {
             server: server_name.clone(),
         })?;
 
-    let transport = create_transport_for_server(server)?;
-
-    let mut client = McpClient::new(server_name.clone(), transport);
-    let tools = client.list_tools().await?;
+    // Send ListTools request to daemon
+    let tools = daemon.list_tools(&server_name).await?;
 
     let tool = tools.iter()
         .find(|t| t.name == tool_name)
@@ -152,9 +145,7 @@ pub async fn cmd_tool_info(ctx: &AppContext, tool_id: &str) -> Result<()> {
         })?;
 
     println!("Tool: {}", tool.name);
-    if let Some(desc) = &tool.description {
-        println!("Description: {}", desc);
-    }
+    println!("Description: {}", tool.description);
     println!("Input schema (JSON Schema):");
     println!("{}", serde_json::to_string_pretty(&tool.input_schema)?);
 
@@ -167,29 +158,27 @@ pub async fn cmd_tool_info(ctx: &AppContext, tool_id: &str) -> Result<()> {
 /// Implements EXEC-01, EXEC-02, EXEC-04, EXEC-06.
 ///
 /// # Arguments
-/// * `ctx` - Application context
+/// * `daemon` - Daemon IPC client
 /// * `tool_id` - Tool identifier in format "server/tool" or "server tool"
 /// * `args_json` - JSON arguments as a string, or None to read from stdin
 ///
 /// # Errors
 /// Returns McpError::InvalidProtocol for malformed response
 /// Returns McpError::Timeout if timeout exceeded (EXEC-06)
-pub async fn cmd_call_tool(ctx: &AppContext, tool_id: &str, args_json: Option<&str>) -> Result<()> {
+pub async fn cmd_call_tool(mut daemon: Box<dyn crate::ipc::ProtocolClient>, tool_id: &str, args_json: Option<&str>) -> Result<()> {
     let (server_name, tool_name) = parse_tool_id(tool_id)?;
 
-    let server = ctx.config.get_server(&server_name)
+    let _server = daemon.config().get_server(&server_name)
         .ok_or_else(|| McpError::ServerNotFound {
             server: server_name.clone(),
         })?;
 
-    let transport = create_transport_for_server(server)?;
-    let mut client = McpClient::new(server_name.clone(), transport);
-
-    // Parse arguments
-    let arguments = match args_json {
+    // Send ExecuteTool request to daemon
+    let result = match args_json {
         Some(args) => {
-            serde_json::from_str(args)
-                .map_err(|e| McpError::InvalidJson { source: e })?
+            let arguments = serde_json::from_str(args)
+                .map_err(|e| McpError::InvalidJson { source: e })?;
+            daemon.execute_tool(&server_name, &tool_name, arguments).await?
         }
         None => {
             // Read from stdin if not provided
@@ -198,37 +187,13 @@ pub async fn cmd_call_tool(ctx: &AppContext, tool_id: &str, args_json: Option<&s
                 return Ok(());
             }
 
-            let mut input = String::new();
-            io::stdin()
-                .read_to_string(&mut input)
-                .map_err(|e| {
-                    McpError::ConfigReadError {
-                        path: std::path::PathBuf::from("stdin"),
-                        source: e,
-                    }
-                })?;
+            let input = read_stdin_async()?;
 
-            if input.trim().is_empty() {
-                println!("Stdin is empty. Pass JSON arguments as a command-line argument or pipe JSON to stdin.");
-                return Ok(());
-            }
-
-            serde_json::from_str(&input)
-                .map_err(|e| McpError::InvalidJson { source: e })?
+            let arguments = serde_json::from_str(&input)
+                .map_err(|e| McpError::InvalidJson { source: e })?;
+            daemon.execute_tool(&server_name, &tool_name, arguments).await?
         }
     };
-
-    // Execute the tool call with timeout (EXEC-06)
-    let result = tokio::time::timeout(
-        std::time::Duration::from_secs(1800), // 30 minute timeout from ROADMAP.md
-        client.call_tool(&tool_name, arguments)
-    ).await
-        .map_err(|_| McpError::Timeout { timeout: 1800 })?
-        .map_err(|e| {
-            McpError::InvalidProtocol {
-                message: format!("Server returned error: {}", e),
-            }
-        })?;
 
     // Format the result (EXEC-03)
     format_and_display_result(&result, server_name.as_str());
@@ -242,13 +207,13 @@ pub async fn cmd_call_tool(ctx: &AppContext, tool_id: &str, args_json: Option<&s
 /// Implements DISC-04: search of tools using glob patterns.
 ///
 /// # Arguments
-/// * `ctx` - Application context
+/// * `daemon` - Daemon IPC client
 /// * `pattern` - Glob pattern to search for (e.g., "*", "search*", "tool-*")
 ///
 /// # Errors
 /// Returns empty result if no tools match
-pub async fn cmd_search_tools(ctx: &AppContext, pattern: &str) -> Result<()> {
-    if ctx.config.is_empty() {
+pub async fn cmd_search_tools(mut daemon: Box<dyn crate::ipc::ProtocolClient>, pattern: &str) -> Result<()> {
+    if daemon.config().is_empty() {
         println!("No servers configured. Please create a config file.");
         return Ok(());
     }
@@ -257,30 +222,39 @@ pub async fn cmd_search_tools(ctx: &AppContext, pattern: &str) -> Result<()> {
 
     let mut matches_found = false;
 
-    for server in &ctx.config.servers {
+    for server in &daemon.config().servers {
         println!("Server: {} ({}):", server.name, server.transport.type_name());
 
-        let transport = create_transport_for_server(server).unwrap();
-        let mut client = McpClient::new(server.name.clone(), transport);
-        match client.list_tools().await {
-            Ok(tools) => {
-                // Match tool names against the glob pattern
-                let matched_tools: Vec<_> = tools.iter()
-                    .filter(|tool| {
-                        let tool_name = &tool.name;
-                        // Use globset for pattern matching instead of glob
-                        match glob::Pattern::new(pattern) {
-                            Ok(pattern) => pattern.matches(tool_name),
-                            Err(_) => tool_name.contains(pattern),
-                        }
-                    })
-                    .collect();
+        // Send ListServers request to daemon
+        match daemon.list_servers().await {
+            Ok(server_names) => {
+                for server_name in &server_names {
+                    println!("Server: {}:", server_name);
 
-                if !matched_tools.is_empty() {
-                    matches_found = true;
-                    println!("  - {} tool(s):", matched_tools.len());
-                    for tool in matched_tools {
-                        println!("      - {}: {}", tool.name, tool.description.as_deref().unwrap_or(""));
+                    // Send ListTools request for each server
+                    match daemon.list_tools(server_name).await {
+                        Ok(tools) => {
+                            // Match tool names against the glob pattern
+                            let matched_tools: Vec<_> = tools.iter()
+                                .filter(|tool| {
+                                    let tool_name = &tool.name;
+                                    // Use globset for pattern matching instead of glob
+                                    match glob::Pattern::new(pattern) {
+                                        Ok(pattern_obj) => pattern_obj.matches(tool_name),
+                                        Err(_) => tool_name.contains(pattern),
+                                    }
+                                })
+                                .collect();
+
+                            if !matched_tools.is_empty() {
+                                matches_found = true;
+                                println!("  - {} tool(s):", matched_tools.len());
+                                for tool in matched_tools {
+                                    println!("      - {}: {}", tool.name, tool.description);
+                                }
+                            }
+                        }
+                        Err(_) => {}
                     }
                 }
             }
