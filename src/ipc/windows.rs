@@ -102,7 +102,9 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
         // 2. Write to named pipe with newline delimiter
         // 3. Read response with newline delimiter
         // 4. Parse JSON response
-        Err(crate::error::McpError::NotImplemented)
+        Err(crate::error::McpError::IpcError {
+            message: "NDJSON protocol not implemented for Windows named pipes yet".to_string(),
+        })
     }
 
     /// Connect to an IPC server at the given path
