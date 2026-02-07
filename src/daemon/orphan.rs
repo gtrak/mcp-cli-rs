@@ -11,6 +11,8 @@ use anyhow::Result;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::config::Config;
+
 use crate::daemon::cleanup_socket;
 
 /// Get the PID file path for a socket
@@ -122,9 +124,9 @@ pub fn write_daemon_pid(socket_path: &Path, pid: u32) -> Result<()> {
 ///
 /// Returns Ok(()) if cleanup successful.
 /// Returns error if IPC check needed but daemon still running (no cleanup needed).
-pub async fn cleanup_orphaned_daemon(socket_path: &Path) -> Result<()> {
+pub async fn cleanup_orphaned_daemon(daemon_config: &Config, socket_path: &Path) -> Result<()> {
     // Try to connect via IPC to check if daemon is running
-    let ipc_result = try_connect_via_ipc(socket_path);
+    let ipc_result = try_connect_via_ipc(daemon_config, socket_path);
 
     if let Ok(client) = ipc_result {
         // Daemon is running, nothing to clean up
@@ -205,11 +207,13 @@ pub fn remove_fingerprint_file(socket_path: &PathBuf) -> Result<()> {
 
 /// Try to connect to daemon via IPC
 ///
-/// Returns IpcClient if connection succeeds, Err otherwise.
-#[allow(dead_code)]
-fn try_connect_via_ipc(socket_path: &Path) -> Result<Box<dyn crate::ipc::IpcClient>> {
-    let client = crate::ipc::create_ipc_client(socket_path)?;
-    Ok(client)
+/// Returns Ok(()) if connection succeeds, Err otherwise.
+fn try_connect_via_ipc(daemon_config: &Config, _socket_path: &Path) -> Result<()> {
+    // Try to create IPC client to check if daemon is running
+    // Note: This may fail if daemon is not running, which is expected
+    use std::sync::Arc;
+    let _client = crate::ipc::create_ipc_client(Arc::new(daemon_config.clone()))?;
+    Ok(())
 }
 
 /// Kill a daemon process by PID

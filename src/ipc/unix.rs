@@ -96,6 +96,20 @@ impl crate::ipc::IpcClient for UnixIpcClient {
         // 2. Write to Unix socket with newline delimiter
         // 3. Read response with newline delimiter
         // 4. Parse JSON response
+        Err(crate::error::McpError::IpcError {
+            message: "NDJSON protocol not implemented for Unix sockets yet".to_string(),
+        })
+    }
+
+    /// Send a daemon protocol request and receive response
+    async fn send_request(&self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
+        // TODO: Implement NDJSON protocol for Unix socket communication
+        // For now, we'll return an error since this is a placeholder
+        // The actual implementation will need to:
+        // 1. Serialize request to JSON
+        // 2. Write to Unix socket with newline delimiter
+        // 3. Read response with newline delimiter
+        // 4. Parse JSON response
         Err(crate::error::McpError::NotImplemented)
     }
 

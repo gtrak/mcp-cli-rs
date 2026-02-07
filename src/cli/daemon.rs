@@ -30,7 +30,7 @@ pub async fn ensure_daemon(daemon_config: Arc<Config>) -> Result<Box<dyn Protoco
 
     // Clean up orphaned daemons first
     tracing::debug!("Checking for orphaned daemons...");
-    if let Err(e) = cleanup_orphaned_daemon(daemon_config.clone(), &socket_path).await {
+    if let Err(e) = cleanup_orphaned_daemon(&daemon_config, &socket_path).await {
         tracing::warn!("Failed to cleanup orphaned daemons: {}", e);
         // Continue anyway - might not be orphaned, just not running
     }

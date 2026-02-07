@@ -94,7 +94,7 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
     }
 
     /// Send a daemon protocol request and receive response
-    async fn send_request(&self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
+    async fn send_request(&mut self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
         // TODO: Implement NDJSON protocol for named pipe communication
         // For now, we'll return an error since this is a placeholder
         // The actual implementation will need to:

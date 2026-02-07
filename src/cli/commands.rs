@@ -73,7 +73,8 @@ pub async fn cmd_list_servers(mut daemon: Box<dyn crate::ipc::ProtocolClient>, w
 /// # Errors
 /// Returns McpError::ServerNotFound if server doesn't exist (ERR-02)
 pub async fn cmd_server_info(daemon: Box<dyn crate::ipc::ProtocolClient>, server_name: &str) -> Result<()> {
-    let server = daemon.config().get_server(server_name)
+    let config = daemon.config();
+    let server = config.get_server(server_name)
         .ok_or_else(|| McpError::ServerNotFound {
             server: server_name.to_string(),
         })?;
