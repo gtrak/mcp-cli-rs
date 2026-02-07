@@ -1,7 +1,7 @@
 # State: MCP CLI Rust Rewrite
 
 **Created:** 2025-02-06
-**Last updated:** 2026-02-07 - Completed plan 02-05 (config change detection and orphan cleanup)
+**Last updated:** 2026-02-07 - Created gap closure plan 02-07 (fix ProtocolClient lifetime issue)
 **Mode:** yolo
 **Depth:** standard
 
@@ -19,16 +19,16 @@ Executing Phase 2: Connection Daemon & Cross-Platform IPC (Wave 4 - final plan w
 
 ## Current Position
 
-**Active Phase:** 02-connection-daemon-ipc
+**Active Phase:** 02-connection-daemon-ipc (gap closure mode)
 
-**Active Plan:** All 6 plans complete (with known compilation issue)
+**Active Plan:** 02-07 (fix ProtocolClient lifetime issue with Arc<Config>)
 
-**Status:** Phase 2 complete, needs gap closure for blocking issue
+**Status:** Plan 02-07 created, ready for execution to resolve blocking compilation issue
 
 **Progress:**
 ```
 Phase 1: Core Protocol & Configuration         ██████████████ 100% (4/4 plans complete)
-Phase 2: Connection Daemon & Cross-Platform IPC ██████████████ 100% (6/6 plans complete)
+Phase 2: Connection Daemon & Cross-Platform IPC ███████████░░ 86% (6/7 complete + gap closure created)
 Phase 3: Performance & Reliability             ░░░░░░░░░░░ 0%
 Phase 4: Tool Filtering & Cross-Platform Validation ░░░░░░░░░░░ 0%
 ```
@@ -82,6 +82,8 @@ Phase 4: Tool Filtering & Cross-Platform Validation ░░░░░░░░░�
 
 14. **Connection Pool with Health Checks:** Implemented connection pool caching transport connections with MCP ping health checks. Connections are validated before reuse, and automatically recreated after 3 consecutive health check failures. Thread-safe pool enables concurrent access from multiple client handlers.
 
+15. **ProtocolClient Lifetime Issue (BLOCKING - Gap Closure):** ProtocolClient trait uses lifetime parameter `<'config>` which borrows config. In main.rs::run(), config is scoped to the function but ProtocolClient needs longer-lived borrow. Solution: Convert from &Config to Arc<Config>, eliminating lifetime parameter and enabling shared ownership. Requires trait and wrapper refactoring (plan 02-07).
+
 ### Technical Decisions Made
 
 | Decision | Rationale |
@@ -97,6 +99,7 @@ Phase 4: Tool Filtering & Cross-Platform Validation ░░░░░░░░░�
 | IPC error categorization (IpcError variants) | Enables precise error handling and better error messages for IPC failures |
 | tokio::named_pipe instead of interprocess | Better tokio integration, same SECURITY_IDENTIFICATION protection, cleaner async patterns |
 | Connection pool with health checks | Thread-safe caching of transport connections, MCP ping validation, automatic recreation on failures |
+| Arc<Config> for ProtocolClient lifetime fix | Eliminates lifetime parameter, enables shared ownership across CLI operations |
 
 ### Known Pitfalls to Avoid
 
@@ -153,10 +156,10 @@ From research/PITFALLS.md:
 ## Session Continuity
 
 **Next Steps:**
-- Execute remaining Phase 2 plans via `/gsd-execute-phase 2`
-- Phase 2 plans are organized into 4 waves for parallel execution
-- Plans remaining: 02-04, 02-05, 02-06 (02-01, 02-02, 02-03 complete)
-- Next: Wave 1 continues (connection pool and CLI integration)
+- Execute gap closure plan 02-07 via `/gsd-execute-phase 2` to fix blocking lifetime issue
+- Gap closure plan resolves ProtocolClient<'config> lifetime error by converting to Arc<Config>
+- After execution: verify CLI compiles and daemon works, then mark Phase 2 complete
+- Then proceed to Phase 3: Performance & Reliability
 
 **Project Context for New Sessions:**
 - Solo developer + Claude workflow (no teams, no stakeholders)
@@ -168,10 +171,11 @@ From research/PITFALLS.md:
 - Core protocol layer complete: transport abstraction, McpClient with tool discovery/execution, comprehensive error handling
 - IPC abstraction layer complete: Unix socket implementation + Windows named pipe backend
 - Daemon layer complete: binary with IPC communication, idle timeout, lifecycle management
+- **CURRENT BLOCKER**: ProtocolClient<'config> lifetime issue prevents CLI compilation (gap closure plan 02-07 created)
 
 ---
 
-**Last updated:** 2026-02-07 - Completed plans 02-01 (IPC abstraction), 02-02 (Windows named pipes), 02-03 (daemon binary), 02-04 (connection pool)
+**Last updated:** 2026-02-07 - Created gap closure plan 02-07 to fix ProtocolClient lifetime issue
 **Mode:** yolo
 **Depth:** standard
-**Plan completed:** 02-01-SUMMARY.md, 02-02-SUMMARY.md, 02-03-SUMMARY.md, 02-04-SUMMARY.md
+**Plans completed:** 02-01, 02-02, 02-03, 02-04, 02-05, 02-06 (all 6 plans, 1 gap closure plan created)
