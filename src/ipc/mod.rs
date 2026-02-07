@@ -41,12 +41,17 @@ pub fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, crate::error
 /// Factory function to create platform-specific IPC server
 ///
 /// Returns Box<dyn IpcServer> with platform-specific implementation
+#[cfg(unix)]
+pub fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, crate::error::IpcError> {
+    Ok(Box::new(crate::ipc::unix::UnixIpcServer::new(path)?))
+}
+
+/// Factory function to create platform-specific IPC server
+///
+/// Returns Box<dyn IpcServer> with platform-specific implementation
 #[cfg(windows)]
 pub fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, crate::error::IpcError> {
-    // Windows implementation to be added in future wave
-    Err(crate::error::IpcError {
-        message: "Windows IPC not yet implemented".to_string(),
-    })
+    Ok(Box::new(crate::ipc::windows::NamedPipeIpcServer::new(path)?))
 }
 
 /// Get platform-specific socket path for IPC communication
@@ -78,3 +83,6 @@ pub fn get_socket_path() -> std::path::PathBuf {
 /// Re-export platform-specific implementations
 #[cfg(unix)]
 pub use unix::{UnixIpcServer, UnixIpcClient};
+
+#[cfg(windows)]
+pub use windows::{NamedPipeIpcServer, NamedPipeIpcClient};
