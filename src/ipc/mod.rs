@@ -33,22 +33,6 @@ pub trait IpcClient: Send + Sync {
 /// Factory function to create platform-specific IPC server
 ///
 /// Returns Box<dyn IpcServer> with platform-specific implementation
-#[cfg(unix)]
-pub fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, crate::error::IpcError> {
-    Ok(Box::new(crate::ipc::unix::UnixIpcServer::new(path)?))
-}
-
-/// Factory function to create platform-specific IPC server
-///
-/// Returns Box<dyn IpcServer> with platform-specific implementation
-#[cfg(unix)]
-pub fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, crate::error::IpcError> {
-    Ok(Box::new(crate::ipc::unix::UnixIpcServer::new(path)?))
-}
-
-/// Factory function to create platform-specific IPC server
-///
-/// Returns Box<dyn IpcServer> with platform-specific implementation
 #[cfg(windows)]
 pub fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, crate::error::IpcError> {
     Ok(Box::new(crate::ipc::windows::NamedPipeIpcServer::new(path)?))
@@ -69,6 +53,22 @@ pub fn get_socket_path() -> std::path::PathBuf {
         std::path::PathBuf::from(format!("/tmp/mcp-cli-{}", uid))
             .join("daemon.sock")
     }
+}
+
+/// Factory function to create platform-specific IPC client
+///
+/// Returns Box<dyn IpcClient> with platform-specific implementation
+#[cfg(unix)]
+pub fn create_ipc_client(path: &Path) -> Result<Box<dyn IpcClient>, crate::error::IpcError> {
+    Ok(Box::new(crate::ipc::unix::UnixIpcClient))
+}
+
+/// Factory function to create platform-specific IPC client
+///
+/// Returns Box<dyn IpcClient> with platform-specific implementation
+#[cfg(windows)]
+pub fn create_ipc_client(path: &Path) -> Result<Box<dyn IpcClient>, crate::error::IpcError> {
+    Ok(Box::new(crate::ipc::windows::NamedPipeIpcClient))
 }
 
 /// Get platform-specific socket path for IPC communication
