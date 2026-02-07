@@ -90,7 +90,7 @@ Plans:
 - Stale connection reuse (CONNECTION-04: health checks)
 - Platform conditionals in core logic (IPC abstraction trait)
 
-**Plans:** 7 plans in 4 waves (plus gap closure)
+**Plans:** 10 plans in 7 waves (including gap closure)
 
 Plans:
 - [x] 02-01-PLAN.md — IPC abstraction trait and Unix socket implementation
@@ -99,7 +99,10 @@ Plans:
 - [x] 02-04-PLAN.md — Connection pooling and health checks
 - [x] 02-05-PLAN.md — Config change detection and orphan cleanup
 - [x] 02-06-PLAN.md — CLI integration and cross-platform tests
-- [ ] 02-07-PLAN.md — Gap closure: Fix ProtocolClient lifetime issue (Arc<Config>)
+- [x] 02-07-PLAN.md — Gap closure: Fix ProtocolClient lifetime issue (Arc<Config>)
+- [ ] 02-08-PLAN.md — Gap closure: Implement NDJSON protocol for IPC communication
+- [ ] 02-09-PLAN.md — Gap closure: Implement daemon request handlers (ExecuteTool, ListTools, ListServers)
+- [ ] 02-10-PLAN.md — Gap closure: Implement config change detection and graceful shutdown
 
 ---
 
@@ -187,10 +190,10 @@ Plans:
 | Phase | Name | Status | Completion |
 |-------|------|--------|------------|
 | 1 | Core Protocol & Configuration | Complete | 100% |
-| 2 | Connection Daemon & Cross-Platform IPC | Gap Closure | 86% (6/7 plans + 1 gap closure) |
+| 2 | Connection Daemon & Cross-Platform IPC | Gap Closure | 70% (7/10 plans complete + 3 gap closure ready) |
 | 3 | Performance & Reliability | Pending | 0% |
 | 4 | Tool Filtering & Cross-Platform Validation | Pending | 0% |
 
 ---
 
-**Last updated:** 2026-02-07 (added gap closure plan 02-07)
+**Last updated:** 2026-02-07 (added gap closure plans 02-08, 02-09, 02-10)
