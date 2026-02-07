@@ -1,6 +1,8 @@
 use clap::{Parser, Subcommand};
-use mcp_cli_rs::cli::commands::{AppContext, cmd_list_servers, cmd_server_info, cmd_tool_info, cmd_call_tool, cmd_search_tools};
-use mcp_cli_rs::config;
+use mcp_cli_rs::cli::commands::{cmd_list_servers, cmd_server_info, cmd_tool_info, cmd_call_tool, cmd_search_tools};
+use mcp_cli_rs::cli::daemon::ensure_daemon;
+use mcp_cli_rs::config::Config;
+use mcp_cli_rs::config::loader::{find_and_load, load_config};
 use mcp_cli_rs::error::{exit_code, Result};
 
 #[derive(Parser)]
@@ -71,42 +73,37 @@ async fn main() {
 
 async fn run(cli: Cli) -> Result<()> {
     // Load configuration using the loader
-    let config = if let Some(path) = cli.config {
+    let daemon_config = if let Some(path) = &cli.config {
         // Use explicitly provided config path
-        config::loader::load_config(&path).await?
+        load_config(path).await?
     } else {
         // Search for config in standard locations
-        match config::loader::find_and_load(None).await {
-            Ok(cfg) => cfg,
-            Err(e) => {
-                eprintln!("Configuration error: {}", e);
-                std::process::exit(1);
-            }
-        }
+        find_and_load(None).await?
     };
 
-    // Create AppContext
-    let ctx = AppContext::new(config);
+    // Ensure daemon is running with fresh config
+    let daemon_client = ensure_daemon(&daemon_config).await
+        .map_err(|e| mcp_cli_rs::error::McpError::io_error(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
+    // Use daemon client for all operations
     match cli.command {
         Some(Commands::List { with_descriptions }) => {
-            cmd_list_servers(&ctx, with_descriptions).await
+            cmd_list_servers(daemon_client, with_descriptions).await
         }
         Some(Commands::Info { name }) => {
-            cmd_server_info(&ctx, &name).await
+            cmd_server_info(daemon_client, &name).await
         }
         Some(Commands::Tool { tool }) => {
-            cmd_tool_info(&ctx, &tool).await
+            cmd_tool_info(daemon_client, &tool).await
         }
         Some(Commands::Call { tool, args }) => {
-            cmd_call_tool(&ctx, &tool, args.as_deref()).await
+            cmd_call_tool(daemon_client, &tool, args.as_deref()).await
         }
         Some(Commands::Search { pattern }) => {
-            cmd_search_tools(&ctx, &pattern).await
+            cmd_search_tools(daemon_client, &pattern).await
         }
         None => {
-            // DISC-01: List all servers when no subcommand provided
-            cmd_list_servers(&ctx, false).await
+            cmd_list_servers(daemon_client, false).await
         }
     }
 }
