@@ -1,7 +1,7 @@
 # State: MCP CLI Rust Rewrite
 
 **Created:** 2025-02-06
-**Last updated:** 2026-02-07 - Completed plan 02-03 (daemon binary with idle timeout)
+**Last updated:** 2026-02-07 - Completed plan 02-04 (connection pool with health checks)
 **Mode:** yolo
 **Depth:** standard
 
@@ -21,14 +21,14 @@ Executing Phase 2: Connection Daemon & Cross-Platform IPC (Wave 2 in progress)
 
 **Active Phase:** 02-connection-daemon-ipc
 
-**Active Plan:** Plan 02-03 complete (3/6 plans complete)
+**Active Plan:** Plan 02-04 complete (4/6 plans complete)
 
 **Status:** Executing Phase 2 plans
 
 **Progress:**
 ```
 Phase 1: Core Protocol & Configuration         ██████████████ 100% (4/4 plans complete)
-Phase 2: Connection Daemon & Cross-Platform IPC ████████████▓▓  50% (3/6 plans complete)
+Phase 2: Connection Daemon & Cross-Platform IPC █████████████▓  66% (4/6 plans complete)
 Phase 3: Performance & Reliability             ░░░░░░░░░░░ 0%
 Phase 4: Tool Filtering & Cross-Platform Validation ░░░░░░░░░░░ 0%
 ```
@@ -78,7 +78,9 @@ Phase 4: Tool Filtering & Cross-Platform Validation ░░░░░░░░░�
 
 12. **Config Fingerprinting:** SHA256-based fingerprint calculation for config validation, enabling CLI to detect configuration changes and restart daemon when needed.
 
-13. **Stub Implementation Strategy:** Implemented stub handlers for ExecuteTool, ListTools, ListServers returning Error::NotImplemented. Full implementation deferred to plan 02-04 (connection pool integration).
+13. **Stub Implementation Strategy:** Implemented stub handlers for ExecuteTool, ListTools, ListServers returning Error::NotImplemented. Full implementation deferred to plan 02-05 (connection pool CLI integration).
+
+14. **Connection Pool with Health Checks:** Implemented connection pool caching transport connections with MCP ping health checks. Connections are validated before reuse, and automatically recreated after 3 consecutive health check failures. Thread-safe pool enables concurrent access from multiple client handlers.
 
 ### Technical Decisions Made
 
@@ -94,6 +96,7 @@ Phase 4: Tool Filtering & Cross-Platform Validation ░░░░░░░░░�
 | IPC abstraction using interprocess crate | Provides unified IPC support across platforms with tokio async features |
 | IPC error categorization (IpcError variants) | Enables precise error handling and better error messages for IPC failures |
 | tokio::named_pipe instead of interprocess | Better tokio integration, same SECURITY_IDENTIFICATION protection, cleaner async patterns |
+| Connection pool with health checks | Thread-safe caching of transport connections, MCP ping validation, automatic recreation on failures |
 
 ### Known Pitfalls to Avoid
 
@@ -143,7 +146,7 @@ From research/PITFALLS.md:
 
 2. **Daemon Connection Pool Scaling:** Test with 100+ server connections during Phase 2 implementation. Add TTL or eviction if memory usage is excessive (not blocking for MVP).
 
-3. **Connection Health Checks:** Implement connection reuse validation to prevent stale connections (planned for Phase 2 daemon pool).
+3. ~~Connection Health Checks~~ ✅ **RESOLVED in plan 02-04:** Implemented connection pool with MCP ping health checks; connections validated before reuse, recreated after 3 failures.
 
 ---
 
@@ -168,7 +171,7 @@ From research/PITFALLS.md:
 
 ---
 
-**Last updated:** 2026-02-07 - Completed plans 02-01 (IPC abstraction), 02-02 (Windows named pipes), 02-03 (daemon binary)
+**Last updated:** 2026-02-07 - Completed plans 02-01 (IPC abstraction), 02-02 (Windows named pipes), 02-03 (daemon binary), 02-04 (connection pool)
 **Mode:** yolo
 **Depth:** standard
-**Plan completed:** 02-01-SUMMARY.md, 02-02-SUMMARY.md, 02-03-SUMMARY.md
+**Plan completed:** 02-01-SUMMARY.md, 02-02-SUMMARY.md, 02-03-SUMMARY.md, 02-04-SUMMARY.md
