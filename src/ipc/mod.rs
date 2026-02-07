@@ -3,7 +3,9 @@
 use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncWrite};
 use std::path::Path;
+use std::sync::Arc;
 use crate::error::McpError;
+use crate::config::Config;
 
 #[cfg(unix)]
 pub mod unix;
@@ -33,12 +35,159 @@ pub trait IpcServer: Send + Sync {
 /// Client trait for connecting to IPC servers
 ///
 /// Implementations provide platform-specific connection logic
+/// Note: This trait is not object-safe due to generic protocol communication requirements
 #[async_trait]
 pub trait IpcClient: Send + Sync {
     /// Connect to an IPC server at the given path
     ///
     /// Returns a boxed stream for communication
     async fn connect(&self, path: &Path) -> Result<Box<dyn IpcStream>, McpError>;
+
+    /// Get the configuration associated with this client
+    ///
+    /// Returns the Config for validation and server listing
+    fn config(&self) -> Arc<Config>;
+
+    /// Send a daemon protocol request and receive response
+    ///
+    /// Generic method for NDJSON communication
+    async fn send_request(&mut self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError>;
+}
+
+/// Wrapper struct that implements concrete protocol methods using a generic IpcClient
+///
+/// This allows Box<dyn IpcClient> to have protocol-specific methods added to it
+#[derive(Clone)]
+pub struct IpcClientWrapper<T: Clone> {
+    client: T,
+    config: Arc<Config>,
+}
+
+impl<T: Clone + IpcClient> IpcClientWrapper<T> {
+    pub fn new(client: T, config: Arc<Config>) -> Self {
+        Self { client, config }
+    }
+
+    /// Create wrapper with config (convenience method for wrapped clients)
+    pub fn with_config(client: T, config: Arc<Config>) -> Self {
+        Self { client, config }
+    }
+
+    /// Get the configuration associated with this client
+    fn config(&self) -> Arc<Config> {
+        Arc::clone(&self.config)
+    }
+
+    /// List all configured servers
+    pub async fn list_servers(&mut self) -> Result<Vec<String>, McpError> {
+        let response = self.client.send_request(&crate::daemon::protocol::DaemonRequest::ListServers).await?;
+        match response {
+            crate::daemon::protocol::DaemonResponse::ServerList(servers) => Ok(servers),
+            _ => Err(crate::error::McpError::InvalidProtocol {
+                message: format!("Expected ServerList response, got {:?}", response),
+            }),
+        }
+    }
+
+    /// List tools for a specific server
+    pub async fn list_tools(&mut self, server_name: &str) -> Result<Vec<crate::daemon::protocol::ToolInfo>, McpError> {
+        let response = self.client.send_request(&crate::daemon::protocol::DaemonRequest::ListTools {
+            server_name: server_name.to_string(),
+        }).await?;
+        match response {
+            crate::daemon::protocol::DaemonResponse::ToolList(tools) => Ok(tools),
+            _ => Err(crate::error::McpError::InvalidProtocol {
+                message: format!("Expected ToolList response for '{}', got {:?}", server_name, response),
+            }),
+        }
+    }
+
+    /// Execute a tool on a server
+    pub async fn execute_tool(&mut self, server_name: &str, tool_name: &str, arguments: serde_json::Value) -> Result<serde_json::Value, McpError> {
+        let response = self.client.send_request(&crate::daemon::protocol::DaemonRequest::ExecuteTool {
+            server_name: server_name.to_string(),
+            tool_name: tool_name.to_string(),
+            arguments,
+        }).await?;
+        match response {
+            crate::daemon::protocol::DaemonResponse::ToolResult(result) => Ok(result),
+            _ => Err(crate::error::McpError::InvalidProtocol {
+                message: format!("Expected ToolResult for '{}.{}', got {:?}", server_name, tool_name, response),
+            }),
+        }
+    }
+}
+
+/// Trait for protocol-specific client methods
+///
+/// This trait wraps the IpcClient trait to provide protocol methods as a trait object
+#[async_trait]
+pub trait ProtocolClient: Send + Sync {
+    fn config(&self) -> Arc<Config>;
+    async fn list_servers(&mut self) -> Result<Vec<String>, McpError>;
+    async fn list_tools(&mut self, server_name: &str) -> Result<Vec<crate::daemon::protocol::ToolInfo>, McpError>;
+    async fn execute_tool(&mut self, server_name: &str, tool_name: &str, arguments: serde_json::Value) -> Result<serde_json::Value, McpError>;
+}
+
+#[async_trait]
+impl<T: IpcClient + Send + Sync + Clone> ProtocolClient for IpcClientWrapper<T> {
+    fn config(&self) -> Arc<Config> {
+        Arc::clone(&self.config)
+    }
+
+    async fn list_servers(&mut self) -> Result<Vec<String>, McpError> {
+        let response = self.client.send_request(&crate::daemon::protocol::DaemonRequest::ListServers).await?;
+        match response {
+            crate::daemon::protocol::DaemonResponse::ServerList(servers) => Ok(servers),
+            _ => Err(crate::error::McpError::InvalidProtocol {
+                message: format!("Expected ServerList response, got {:?}", response),
+            }),
+        }
+    }
+
+    async fn list_tools(&mut self, server_name: &str) -> Result<Vec<crate::daemon::protocol::ToolInfo>, McpError> {
+        let response = self.client.send_request(&crate::daemon::protocol::DaemonRequest::ListTools {
+            server_name: server_name.to_string(),
+        }).await?;
+        match response {
+            crate::daemon::protocol::DaemonResponse::ToolList(tools) => Ok(tools),
+            _ => Err(crate::error::McpError::InvalidProtocol {
+                message: format!("Expected ToolList response for '{}', got {:?}", server_name, response),
+            }),
+        }
+    }
+
+    async fn execute_tool(&mut self, server_name: &str, tool_name: &str, arguments: serde_json::Value) -> Result<serde_json::Value, McpError> {
+        let response = self.client.send_request(&crate::daemon::protocol::DaemonRequest::ExecuteTool {
+            server_name: server_name.to_string(),
+            tool_name: tool_name.to_string(),
+            arguments,
+        }).await?;
+        match response {
+            crate::daemon::protocol::DaemonResponse::ToolResult(result) => Ok(result),
+            _ => Err(crate::error::McpError::InvalidProtocol {
+                message: format!("Expected ToolResult for '{}.{}', got {:?}", server_name, tool_name, response),
+            }),
+        }
+    }
+}
+
+/// Factory function to create platform-specific IPC client wrapper
+///
+/// Returns Box<dyn ProtocolClient> with platform-specific implementation
+#[cfg(unix)]
+pub fn create_ipc_client(config: Arc<Config>) -> Result<Box<dyn ProtocolClient>, McpError> {
+    let client = crate::ipc::UnixIpcClient::new(config.clone());
+    Ok(Box::new(crate::ipc::IpcClientWrapper::with_config(client, config)))
+}
+
+/// Factory function to create platform-specific IPC client wrapper
+///
+/// Returns Box<dyn ProtocolClient> with platform-specific implementation
+#[cfg(windows)]
+pub fn create_ipc_client(config: Arc<Config>) -> Result<Box<dyn ProtocolClient>, McpError> {
+    let client = crate::ipc::NamedPipeIpcClient::with_config(config.clone());
+    Ok(Box::new(crate::ipc::IpcClientWrapper::with_config(client, config)))
 }
 
 /// Factory function to create platform-specific IPC server
@@ -64,22 +213,6 @@ pub fn get_socket_path() -> std::path::PathBuf {
         std::path::PathBuf::from(format!("/tmp/mcp-cli-{}", uid))
             .join("daemon.sock")
     }
-}
-
-/// Factory function to create platform-specific IPC client
-///
-/// Returns Box<dyn IpcClient> with platform-specific implementation
-#[cfg(unix)]
-pub fn create_ipc_client(path: &Path) -> Result<Box<dyn IpcClient>, McpError> {
-    Ok(Box::new(crate::ipc::unix::UnixIpcClient))
-}
-
-/// Factory function to create platform-specific IPC client
-///
-/// Returns Box<dyn IpcClient> with platform-specific implementation
-#[cfg(windows)]
-pub fn create_ipc_client(path: &Path) -> Result<Box<dyn IpcClient>, McpError> {
-    Ok(Box::new(crate::ipc::windows::NamedPipeIpcClient))
 }
 
 /// Get platform-specific socket path for IPC communication

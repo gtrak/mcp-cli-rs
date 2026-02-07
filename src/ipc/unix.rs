@@ -2,11 +2,13 @@
 
 use async_trait::async_trait;
 use std::path::Path;
+use std::sync::Arc;
 use tokio::net::UnixListener;
 use tokio::net::UnixStream;
 
 use crate::ipc::IpcServer;
-use crate::error::{McpError};
+use crate::error::McpError;
+use crate::config::Config;
 
 /// Unix socket implementation of IPC server
 ///
@@ -66,10 +68,37 @@ impl IpcServer for UnixIpcServer {
 /// Unix socket implementation of IPC client
 ///
 /// Connects to IPC servers via Unix domain sockets on Unix-like systems
-pub struct UnixIpcClient;
+#[derive(Clone)]
+pub struct UnixIpcClient {
+    config: Arc<Config>,
+}
+
+impl UnixIpcClient {
+    /// Create a new UnixIpcClient with a config reference
+    pub fn new(config: Arc<Config>) -> Self {
+        Self { config }
+    }
+}
 
 #[async_trait]
 impl crate::ipc::IpcClient for UnixIpcClient {
+    /// Get the configuration associated with this client
+    fn config(&self) -> Arc<Config> {
+        Arc::clone(&self.config)
+    }
+
+    /// Send a daemon protocol request and receive response
+    async fn send_request(&self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
+        // TODO: Implement NDJSON protocol for Unix socket communication
+        // For now, we'll return an error since this is a placeholder
+        // The actual implementation will need to:
+        // 1. Serialize request to JSON
+        // 2. Write to Unix socket with newline delimiter
+        // 3. Read response with newline delimiter
+        // 4. Parse JSON response
+        Err(crate::error::McpError::NotImplemented)
+    }
+
     /// Connect to an IPC server at the given path
     ///
     /// Returns a boxed stream for communication

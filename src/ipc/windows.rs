@@ -4,10 +4,12 @@
 
 use async_trait::async_trait;
 use std::path::Path;
+use std::sync::Arc;
 use tokio::net::windows::named_pipe::{NamedPipeClient, ClientOptions};
 
 use crate::ipc::IpcServer;
 use crate::error::McpError;
+use crate::config::Config;
 
 /// Windows named pipe implementation of IPC server
 ///
@@ -72,10 +74,37 @@ impl IpcServer for NamedPipeIpcServer {
 /// Windows named pipe implementation of IPC client
 ///
 /// Connects to IPC servers via named pipes on Windows systems
-pub struct NamedPipeIpcClient;
+#[derive(Clone)]
+pub struct NamedPipeIpcClient {
+    config: Arc<Config>,
+}
+
+impl NamedPipeIpcClient {
+    /// Create a new NamedPipeIpcClient with a config reference (convenience method)
+    pub fn with_config(config: Arc<Config>) -> Self {
+        Self { config }
+    }
+}
 
 #[async_trait]
 impl crate::ipc::IpcClient for NamedPipeIpcClient {
+    /// Get the configuration associated with this client
+    fn config(&self) -> Arc<Config> {
+        Arc::clone(&self.config)
+    }
+
+    /// Send a daemon protocol request and receive response
+    async fn send_request(&self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
+        // TODO: Implement NDJSON protocol for named pipe communication
+        // For now, we'll return an error since this is a placeholder
+        // The actual implementation will need to:
+        // 1. Serialize request to JSON
+        // 2. Write to named pipe with newline delimiter
+        // 3. Read response with newline delimiter
+        // 4. Parse JSON response
+        Err(crate::error::McpError::NotImplemented)
+    }
+
     /// Connect to an IPC server at the given path
     ///
     /// Returns a boxed stream for communication
@@ -99,6 +128,7 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
         Ok(Box::new(client) as Box<dyn crate::ipc::IpcStream>)
     }
 }
+
 
 /// Manual implementation of IpcStream for NamedPipeClient
 impl crate::ipc::IpcStream for NamedPipeClient {}
