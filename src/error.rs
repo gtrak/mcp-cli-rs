@@ -72,6 +72,7 @@ pub enum McpError {
     #[error("IPC error: {}", message)]
     IpcError { message: String },
 
+    #[cfg(unix)]
     #[error("Socket bind failed at '{}': {}", path, source)]
     SocketBindError {
         path: String,
@@ -79,14 +80,29 @@ pub enum McpError {
         source: std::io::Error,
     },
 
+    #[cfg(unix)]
     #[error("Connection refused to socket '{}'", path)]
     ConnectionRefused { path: String },
 
+    #[cfg(unix)]
     #[error("Stale socket file found at '{}'", path)]
     StaleSocket { path: String },
+
+    #[cfg(windows)]
+    #[error("Pipe creation failed at '{}': {}", name, source)]
+    PipeCreationError {
+        name: String,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[cfg(windows)]
+    #[error("Named pipe instance busy at '{}'", path)]
+    PipeBusy { path: String },
 }
 
 /// Exit codes (ERR-03)
+#[cfg(unix)]
 pub fn exit_code(error: &McpError) -> i32 {
     match error {
         McpError::ServerNotFound { .. }
@@ -107,6 +123,29 @@ pub fn exit_code(error: &McpError) -> i32 {
         | McpError::SocketBindError { .. }
         | McpError::ConnectionRefused { .. }
         | McpError::StaleSocket { .. } => 1,
+    }
+}
+
+#[cfg(windows)]
+pub fn exit_code(error: &McpError) -> i32 {
+    match error {
+        McpError::ServerNotFound { .. }
+        | McpError::ToolNotFound { .. }
+        | McpError::ConfigReadError { .. }
+        | McpError::ConfigParseError { .. }
+        | McpError::MissingRequiredField { .. }
+        | McpError::InvalidJson { .. }
+        | McpError::AmbiguousCommand { .. }
+        | McpError::UsageError { .. } => 1, // Client error
+
+        McpError::InvalidProtocol { .. } => 2, // Server error
+
+        McpError::ConnectionError { .. } | McpError::Timeout { .. } | McpError::IOError { .. } => 3, // Network or IO error
+
+        // IPC errors also return client error code
+        McpError::IpcError { .. }
+        | McpError::PipeCreationError { .. }
+        | McpError::PipeBusy { .. } => 1,
     }
 }
 
@@ -156,6 +195,7 @@ impl McpError {
         }
     }
 
+    #[cfg(unix)]
     pub fn socket_bind_error(path: impl Into<String>, source: std::io::Error) -> Self {
         Self::SocketBindError {
             path: path.into(),
@@ -163,12 +203,27 @@ impl McpError {
         }
     }
 
+    #[cfg(unix)]
     pub fn connection_refused(path: impl Into<String>) -> Self {
         Self::ConnectionRefused { path: path.into() }
     }
 
+    #[cfg(unix)]
     pub fn stale_socket(path: impl Into<String>) -> Self {
         Self::StaleSocket { path: path.into() }
+    }
+
+    #[cfg(windows)]
+    pub fn pipe_creation_error(name: impl Into<String>, source: std::io::Error) -> Self {
+        Self::PipeCreationError {
+            name: name.into(),
+            source,
+        }
+    }
+
+    #[cfg(windows)]
+    pub fn pipe_busy(path: impl Into<String>) -> Self {
+        Self::PipeBusy { path: path.into() }
     }
 }
 
