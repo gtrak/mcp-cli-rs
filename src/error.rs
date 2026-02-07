@@ -67,6 +67,23 @@ pub enum McpError {
         #[source]
         source: std::io::Error,
     },
+
+    // IPC errors (IPC-01, IPC-02, IPC-03)
+    #[error("IPC error: {}", message)]
+    IpcError { message: String },
+
+    #[error("Socket bind failed at '{}': {}", path, source)]
+    SocketBindError {
+        path: String,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("Connection refused to socket '{}'", path)]
+    ConnectionRefused { path: String },
+
+    #[error("Stale socket file found at '{}'", path)]
+    StaleSocket { path: String },
 }
 
 /// Exit codes (ERR-03)
@@ -84,6 +101,12 @@ pub fn exit_code(error: &McpError) -> i32 {
         McpError::InvalidProtocol { .. } => 2, // Server error
 
         McpError::ConnectionError { .. } | McpError::Timeout { .. } | McpError::IOError { .. } => 3, // Network or IO error
+
+        // IPC errors also return client error code
+        McpError::IpcError { .. }
+        | McpError::SocketBindError { .. }
+        | McpError::ConnectionRefused { .. }
+        | McpError::StaleSocket { .. } => 1,
     }
 }
 
@@ -125,6 +148,34 @@ impl McpError {
         Self::UsageError {
             message: message.into(),
         }
+    }
+
+    pub fn ipc_error(message: impl Into<String>) -> Self {
+        Self::IpcError {
+            message: message.into(),
+        }
+    }
+
+    pub fn socket_bind_error(path: impl Into<String>, source: std::io::Error) -> Self {
+        Self::SocketBindError {
+            path: path.into(),
+            source,
+        }
+    }
+
+    pub fn connection_refused(path: impl Into<String>) -> Self {
+        Self::ConnectionRefused { path: path.into() }
+    }
+
+    pub fn stale_socket(path: impl Into<String>) -> Self {
+        Self::StaleSocket { path: path.into() }
+    }
+}
+
+// From implementations for error conversion
+impl From<std::io::Error> for McpError {
+    fn from(error: std::io::Error) -> Self {
+        Self::IOError { source: error }
     }
 }
 
