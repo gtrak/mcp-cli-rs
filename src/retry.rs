@@ -3,8 +3,7 @@
 //! Provides automatic retry with configurable limits and exponential backoff.
 //! Implements EXEC-05, EXEC-06, EXEC-07.
 
-use backoff::{ExponentialBackoff, ExponentialBackoffBuilder, future::retry};
-use backoff::Error as BackoffError;
+use backoff::{ExponentialBackoff, ExponentialBackoffBuilder, future::retry, Error as BackoffError};
 use std::time::Duration;
 use tokio::time::timeout;
 use crate::error::McpError;
@@ -57,7 +56,7 @@ impl Default for RetryConfig {
 ///
 /// Transient errors: Timeout, ConnectionError, IOError (EXEC-05).
 /// Permanent errors: InvalidJson, InvalidProtocol, ToolNotFound, ServerNotFound.
-fn is_transient_error(error: &McpError) -> bool {
+pub fn is_transient_error(error: &McpError) -> bool {
     matches!(
         error,
         McpError::Timeout { .. }
