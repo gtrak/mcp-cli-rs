@@ -111,10 +111,38 @@ impl ServerConfig {
 /// Overall MCP configuration containing multiple server definitions.
 ///
 /// This is the root config structure parsed from TOML files.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct Config {
     /// List of MCP servers to configure.
     pub servers: Vec<ServerConfig>,
+
+    /// Maximum number of concurrent server operations.
+    ///
+    /// Default value of 5 ensures stable operation and avoids resource exhaustion
+    /// on constrained systems. This implements DISC-05 requirement.
+    #[serde(default = "default_concurrency_limit")]
+    pub concurrency_limit: usize,
+
+    /// Maximum number of retry attempts for failed operations.
+    ///
+    /// Default value of 3 provides reasonable reliability while avoiding infinite loops.
+    /// This implements EXEC-07 requirement for exponential backoff retry behavior.
+    #[serde(default = "default_retry_max")]
+    pub retry_max: u32,
+
+    /// Initial delay between retries in milliseconds.
+    ///
+    /// Default value of 1000ms (1 second) provides adequate recovery time for transient failures.
+    /// Combined with retry_max, this implements EXEC-07's exponential backoff requirement.
+    #[serde(default = "default_retry_delay_ms")]
+    pub retry_delay_ms: u64,
+
+    /// Timeout for server operations in seconds.
+    ///
+    /// Default value of 1800s (30 minutes) provides generous timeout for resource-intensive operations.
+    /// This implements EXEC-06 requirement for operation timeout.
+    #[serde(default = "default_timeout_secs")]
+    pub timeout_secs: u64,
 }
 
 impl Config {
@@ -141,6 +169,25 @@ impl Config {
     pub fn is_empty(&self) -> bool {
         self.servers.is_empty()
     }
+}
+
+/// Default values for Config performance fields.
+///
+/// These implement EXEC-07, DISC-05, and EXEC-06 requirements.
+fn default_concurrency_limit() -> usize {
+    5
+}
+
+fn default_retry_max() -> u32 {
+    3
+}
+
+fn default_retry_delay_ms() -> u64 {
+    1000
+}
+
+fn default_timeout_secs() -> u64 {
+    1800
 }
 
 impl ServerTransport {
