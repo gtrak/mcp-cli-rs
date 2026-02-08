@@ -31,5 +31,8 @@ pub use parallel::{ParallelExecutor, list_tools_parallel};
 pub mod retry;
 pub use retry::{RetryConfig, retry_with_backoff, timeout_wrapper};
 
+// Graceful shutdown (Phase 3)
+pub mod shutdown;
+
 pub mod pool;
 pub use pool::{ConnectionPoolInterface, DummyConnectionPool};
