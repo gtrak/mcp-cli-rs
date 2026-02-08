@@ -41,11 +41,45 @@ pub async fn ensure_daemon(daemon_config: Arc<Config>) -> Result<Box<dyn Protoco
     // Try to connect to existing daemon
     tracing::debug!("Attempting to connect to daemon...");
     match connect_to_daemon(daemon_config.clone(), &socket_path).await {
-        Ok(client) => {
+        Ok(mut client) => {
             tracing::info!("Daemon already running, checking config...");
-            // TODO: Request fingerprint from daemon and compare
-            // For now, assume existing daemon is good
-            Ok(client)
+
+            // Request fingerprint from existing daemon
+            let request = crate::daemon::protocol::DaemonRequest::GetConfigFingerprint;
+            match client.send_request(&request).await {
+                Ok(crate::daemon::protocol::DaemonResponse::ConfigFingerprint(daemon_fingerprint)) => {
+                    tracing::debug!("Daemon fingerprint: {}", daemon_fingerprint);
+                    tracing::debug!("Local fingerprint: {}", fingerprint);
+
+                    // Compare fingerprints
+                    if daemon_fingerprint == fingerprint {
+                        tracing::info!("Config fingerprints match - reusing existing daemon");
+                        Ok(client)
+                    } else {
+                        tracing::info!("Config fingerprints differ - restarting daemon");
+                        // Shutdown stale daemon first
+                        if let Err(e) = shutdown_daemon(daemon_config.clone()).await {
+                            tracing::warn!("Failed to shutdown stale daemon: {}", e);
+                        }
+                        // Spawn new daemon and wait for startup
+                        let new_client = spawn_daemon_and_wait(daemon_config.clone(), &fingerprint).await?;
+                        // Connect to newly spawned daemon
+                        connect_to_daemon(daemon_config, &socket_path).await
+                    }
+                }
+                Ok(other_response) => {
+                    tracing::warn!("Unexpected response from daemon: {:?}", other_response);
+                    // Treat as stale, spawn new daemon
+                    let new_client = spawn_daemon_and_wait(daemon_config.clone(), &fingerprint).await?;
+                    connect_to_daemon(daemon_config, &socket_path).await
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to get fingerprint from daemon: {}, spawning new daemon", e);
+                    // Treat as stale, spawn new daemon
+                    let new_client = spawn_daemon_and_wait(daemon_config.clone(), &fingerprint).await?;
+                    connect_to_daemon(daemon_config, &socket_path).await
+                }
+            }
         }
         Err(_) => {
             tracing::info!("Daemon not running, spawning new daemon...");
@@ -155,16 +189,27 @@ pub async fn shutdown_daemon(daemon_config: Arc<Config>) -> Result<()> {
     let socket_path = crate::ipc::get_socket_path();
 
     // Connect to daemon
-    let client = connect_to_daemon(daemon_config.clone(), &socket_path).await?;
+    let mut client = connect_to_daemon(daemon_config.clone(), &socket_path).await?;
 
     // Send shutdown request
     tracing::info!("Sending shutdown request to daemon");
-
-    // TODO: Send DaemonRequest::Shutdown through client
-    // For now, just disconnect - the daemon will idle timeout
-
-    tracing::info!("Daemon shutdown request sent");
-    Ok(())
+    let request = crate::daemon::protocol::DaemonRequest::Shutdown;
+    match client.send_request(&request).await {
+        Ok(crate::daemon::protocol::DaemonResponse::ShutdownAck) => {
+            tracing::info!("Daemon acknowledged shutdown");
+            Ok(())
+        }
+        Ok(other_response) => {
+            tracing::warn!("Unexpected response to shutdown: {:?}", other_response);
+            // Treat as success - daemon will likely shut down on its own
+            Ok(())
+        }
+        Err(e) => {
+            // If daemon is already dead or connection fails, that's okay
+            tracing::warn!("Failed to send shutdown request (daemon may already be gone): {}", e);
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]

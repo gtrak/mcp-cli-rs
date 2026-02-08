@@ -124,6 +124,7 @@ impl<T: Clone + IpcClient> IpcClientWrapper<T> {
 #[async_trait]
 pub trait ProtocolClient: Send + Sync {
     fn config(&self) -> Arc<Config>;
+    async fn send_request(&mut self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError>;
     async fn list_servers(&mut self) -> Result<Vec<String>, McpError>;
     async fn list_tools(&mut self, server_name: &str) -> Result<Vec<crate::daemon::protocol::ToolInfo>, McpError>;
     async fn execute_tool(&mut self, server_name: &str, tool_name: &str, arguments: serde_json::Value) -> Result<serde_json::Value, McpError>;
@@ -133,6 +134,10 @@ pub trait ProtocolClient: Send + Sync {
 impl<T: IpcClient + Send + Sync + Clone> ProtocolClient for IpcClientWrapper<T> {
     fn config(&self) -> Arc<Config> {
         Arc::clone(&self.config)
+    }
+
+    async fn send_request(&mut self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
+        self.client.send_request(request).await
     }
 
     async fn list_servers(&mut self) -> Result<Vec<String>, McpError> {
