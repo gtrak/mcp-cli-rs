@@ -143,6 +143,15 @@ Plans:
 - Blocking the async executor with retry delays (tokio::time::sleep)
 - Orphaned resources on signal (proper cleanup in signal handler)
 
+**Plans:** 5 plans in 4 waves
+
+Plans:
+- [ ] 03-01-PLAN.md — Configuration extensions & colored output infrastructure
+- [ ] 03-02-PLAN.md — Parallel server discovery infrastructure
+- [ ] 03-03-PLAN.md — Retry logic & signal handling infrastructure
+- [ ] 03-04-PLAN.md — CLI integration: discovery (parallel execution, colored output)
+- [ ] 03-05-PLAN.md — CLI integration: execution (retry, timeout, signal handling)
+
 ---
 
 ## Phase 4: Tool Filtering & Cross-Platform Validation
