@@ -24,5 +24,8 @@ pub mod ipc;
 pub use ipc::{create_ipc_server, get_socket_path};
 
 // Connection pool (stub, full impl in 02-04)
+pub mod parallel;
+pub use parallel::{ParallelExecutor, list_tools_parallel};
+
 pub mod pool;
 pub use pool::{ConnectionPoolInterface, DummyConnectionPool};
