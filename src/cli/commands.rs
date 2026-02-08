@@ -4,12 +4,17 @@ use crate::config::{Config, ServerConfig, ServerTransport};
 use crate::error::{McpError, Result};
 use crate::transport::Transport;
 use std::io::{self, Read, IsTerminal};
+use std::sync::{Arc, Mutex};
 use crate::ipc::ProtocolClient;
+use crate::parallel::{ParallelExecutor, list_tools_parallel};
+use crate::output::{print_error, print_warning, print_info};
 
 /// Execute the list servers command.
 ///
 /// Lists all configured MCP servers and their tool availability.
 /// Implements DISC-01: discovery of available tools.
+/// Implements DISC-05: parallel server discovery with configurable concurrency.
+/// Implements ERR-07: partial failure warnings.
 ///
 /// # Arguments
 /// * `daemon` - Daemon IPC client
@@ -19,42 +24,84 @@ use crate::ipc::ProtocolClient;
 /// Returns McpError::ConfigParseError if config file is invalid
 pub async fn cmd_list_servers(mut daemon: Box<dyn crate::ipc::ProtocolClient>, with_descriptions: bool) -> Result<()> {
     if daemon.config().is_empty() {
-        println!("No servers configured. Please create a config file.");
+        print_error("No servers configured. Please create a config file.");
         return Ok(());
     }
 
-    println!("Configured servers:");
+    print_info("Configured servers:");
     println!();
 
-    let _servers_by_name = daemon.config().servers_by_name();
-
-    for server in &daemon.config().servers {
-        println!("{}. {} ({})", server.name, server.description.as_deref().unwrap_or(""), server.transport.type_name());
-
-        // Send ListServers request to daemon
-        match daemon.list_servers().await {
-            Ok(server_names) => {
-                for server_name in &server_names {
-                    println!("  - Server: {}", server_name);
-
-                    // Send ListTools request for each server
-                    match daemon.list_tools(server_name).await {
-                        Ok(tools) => {
-                            println!("    Tools:");
-                            if with_descriptions && !tools.is_empty() {
-                                for tool in &tools {
-                                    println!("      - {}: {}", tool.name, tool.description);
-                                }
-                            } else {
-                                println!("      - {} tool(s)", tools.len());
-                            }
-                        }
-                        Err(e) => println!("      - Failed to list tools: {}", e),
-                    }
-                }
-            }
-            Err(e) => println!("  - Failed to get servers list: {}", e),
+    // Get server names from daemon
+    let server_names = match daemon.list_servers().await {
+        Ok(names) => names,
+        Err(e) => {
+            print_error(&format!("Failed to get servers list: {}", e));
+            return Err(e);
         }
+    };
+
+    // Create Arc<Mutex<>> for shared mutable access across threads
+    let daemon_arc = std::sync::Arc::new(Mutex::new(daemon));
+
+    // Create parallel executor with concurrency limit from config
+    let executor = ParallelExecutor::new(daemon.config().concurrency_limit);
+
+    // List tools from all servers in parallel using list_tools_parallel
+    let (successes, failures) = list_tools_parallel(
+        server_names,
+        // Closure that lists tools for a single server (using Arc<Mutex<>>)
+        |server: String| async move {
+            let daemon = daemon_arc.lock();
+            daemon.list_tools(&server).await
+                .map_err(|e| {
+                    // Log individual failures but continue with other servers
+                    tracing::warn!("Failed to list tools for {}: {}", server, e);
+                    e
+                })
+                .map(|protocol_tools| {
+                    // Convert protocol::ToolInfo to client::ToolInfo
+                    protocol_tools
+                        .into_iter()
+                        .map(|protocol_tool| {
+                            crate::client::ToolInfo {
+                                name: protocol_tool.name,
+                                description: Some(protocol_tool.description),
+                                input_schema: protocol_tool.input_schema,
+                            }
+                        })
+                        .collect()
+                })
+        },
+        &executor,
+    )
+    .await?;
+
+    // Display successful results
+    for (server_name, tools) in successes {
+        // Get server info from config for display
+        if let Some(server_config) = daemon.config().get_server(&server_name) {
+            println!("{} {} ({})", server_name, server_config.description.as_deref().unwrap_or(""), server_config.transport.type_name());
+        } else {
+            println!("{} (unknown)", server_name);
+        }
+
+        print_info(&format!("    Tools: {}", tools.len()));
+        if with_descriptions && !tools.is_empty() {
+            for tool in &tools {
+                println!("      - {}: {}", tool.name, tool.description.as_deref().unwrap_or(""));
+            }
+        }
+        println!();
+    }
+
+    // Warn about partial failures (ERR-07)
+    if !failures.is_empty() {
+        print_warning(&format!(
+            "Failed to connect to {} of {} servers: {}",
+            failures.len(),
+            successes.len() + failures.len(),
+            failures.join(", ")
+        ));
         println!();
     }
 
