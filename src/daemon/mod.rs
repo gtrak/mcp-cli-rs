@@ -214,7 +214,7 @@ pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, sta
             tracing::info!("ExecuteTool: server={}, tool={}", server_name, tool_name);
 
             // Get transport from connection pool
-            let mut transport = match state.connection_pool.get(&server_name).await {
+            let mut transport: Box<dyn crate::transport::Transport + Send + Sync> = match state.connection_pool.get(&server_name).await {
                 Ok(t) => t,
                 Err(e) => {
                     tracing::error!("Failed to get transport for {}: {}", server_name, e);
@@ -246,11 +246,11 @@ pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, sta
                     } else if let Some(error) = response.get("error") {
                         // MCP server returned error
                         let message = error.get("message")
-                            .and_then(|m| m.as_str())
+                            .and_then(|m: &serde_json::Value| m.as_str())
                             .unwrap_or("Unknown error");
                         tracing::error!("Tool execution failed: {}", message);
                         crate::daemon::protocol::DaemonResponse::Error {
-                            code: error.get("code").and_then(|c| c.as_u64()).unwrap_or(3) as u32,
+                            code: error.get("code").and_then(|c: &serde_json::Value| c.as_u64()).unwrap_or(3) as u32,
                             message: message.to_string(),
                         }
                     } else {
@@ -276,7 +276,7 @@ pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, sta
             tracing::info!("ListTools: server={}", server_name);
 
             // Get transport from connection pool
-            let mut transport = match state.connection_pool.get(&server_name).await {
+            let mut transport: Box<dyn crate::transport::Transport + Send + Sync> = match state.connection_pool.get(&server_name).await {
                 Ok(t) => t,
                 Err(e) => {
                     tracing::error!("Failed to get transport for {}: {}", server_name, e);
@@ -300,15 +300,15 @@ pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, sta
                     // Parse JSON-RPC response
                     if let Some(result) = response.get("result") {
                         // Extract tools array from result
-                        let tools = if let Some(tools_array) = result.get("tools").and_then(|t| t.as_array()) {
-                            tools_array.iter().filter_map(|tool| {
+                        let tools = if let Some(tools_array) = result.get("tools").and_then(|t: &serde_json::Value| t.as_array()) {
+                            tools_array.iter().filter_map(|tool: &serde_json::Value| {
                                 Some(crate::daemon::protocol::ToolInfo {
                                     name: tool.get("name")
-                                        .and_then(|n| n.as_str())
+                                        .and_then(|n: &serde_json::Value| n.as_str())
                                         .unwrap_or("unknown")
                                         .to_string(),
                                     description: tool.get("description")
-                                        .and_then(|d| d.as_str())
+                                        .and_then(|d: &serde_json::Value| d.as_str())
                                         .unwrap_or("")
                                         .to_string(),
                                     input_schema: tool.get("inputSchema")
@@ -324,11 +324,11 @@ pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, sta
                     } else if let Some(error) = response.get("error") {
                         // MCP server returned error
                         let message = error.get("message")
-                            .and_then(|m| m.as_str())
+                            .and_then(|m: &serde_json::Value| m.as_str())
                             .unwrap_or("Unknown error");
                         tracing::error!("List tools failed: {}", message);
                         crate::daemon::protocol::DaemonResponse::Error {
-                            code: error.get("code").and_then(|c| c.as_u64()).unwrap_or(3) as u32,
+                            code: error.get("code").and_then(|c: &serde_json::Value| c.as_u64()).unwrap_or(3) as u32,
                             message: message.to_string(),
                         }
                     } else {
@@ -431,7 +431,7 @@ mod tests {
         let state = DaemonState {
             config: Arc::new(config),
             config_fingerprint: String::new(),
-            lifecycle,
+            lifecycle: lifecycle.clone(),
             connection_pool: Arc::new(crate::daemon::pool::ConnectionPool::new(Arc::new(Config { servers: vec![] }))),
         };
 

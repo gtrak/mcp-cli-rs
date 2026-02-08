@@ -246,12 +246,15 @@ mod tests {
     #[tokio::test]
     async fn test_write_json() {
         let mock_reader = MockAsyncReader::new(Vec::new());
+        let mut child = tokio::process::Command::new("echo")
+            .spawn()
+            .unwrap();
+        let stdin = child.stdin.take().unwrap();
+        let stdout_buf = BufReader::new(mock_reader);
         let mut transport = StdioTransport {
-            child: tokio::process::Command::new("echo")
-                .spawn()
-                .unwrap(),
-            stdin: vec![].into(),
-            stdout: BufReader::new(mock_reader),
+            child,
+            stdin,
+            stdout: stdout_buf,
         };
 
         let request = json!({ "test": "data" });
