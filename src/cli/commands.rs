@@ -1,6 +1,6 @@
 //! CLI commands for MCP CLI tool.
 
-use crate::config::{ServerConfig, ServerTransport};
+use crate::config::{ServerConfig, ServerTransport, Config};
 use crate::error::{McpError, Result};
 use crate::transport::Transport;
 use crate::client::ToolInfo;
@@ -9,7 +9,8 @@ use std::sync::Arc;
 use crate::ipc::ProtocolClient;
 use crate::parallel::{ParallelExecutor, list_tools_parallel};
 use crate::output::{print_error, print_warning, print_info, print_success};
-use crate::retry::{retry_with_backoff, timeout_wrapper};
+use crate::retry::{retry_with_backoff, timeout_wrapper, RetryConfig, is_transient_error};
+use backoff::Error as BackoffError;
 use tokio::sync::Mutex;
 
 /// Execute the list servers command.
@@ -222,13 +223,13 @@ pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str) -
 
 /// Execute tool call command.
 ///
-/// Executes a tool with JSON arguments.
+/// Executes a tool with JSON arguments, retrying on transient failures.
 /// Implements EXEC-01, EXEC-02, EXEC-04, EXEC-06.
 /// Implements EXEC-05, EXEC-07: retry logic with exponential backoff.
 /// Implements TASK-03: colored output for stdin and error cases.
 ///
 /// # Arguments
-/// * `daemon` - Daemon IPC client
+/// * `daemon` - Daemon IPC client (will be wrapped in Arc<Mutex>)
 /// * `tool_id` - Tool identifier in format "server/tool" or "server tool"
 /// * `args_json` - JSON arguments as a string, or None to read from stdin
 ///
@@ -241,56 +242,102 @@ pub async fn cmd_call_tool(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, a
 
     // Check if server exists
     let config = daemon.config();
-    let server = config.get_server(&server_name).ok_or_else(|| {
+    let _server = config.get_server(&server_name).ok_or_else(|| {
         print_error(&format!("Server '{}' not found", server_name));
         McpError::ServerNotFound {
             server: server_name.clone(),
         }
     })?;
 
-    // Execute tool with retry logic and timeout enforcement
-    let result = retry_with_backoff(
-        || {
-            // Wrap execution in timeout with config timeout
-            let config_clone = config.clone();
-            async move {
-                let arguments = if let Some(args) = args_json {
-                    serde_json::from_str(args)
-                        .map_err(|e| {
-                            print_error(&format!("Invalid JSON arguments: {}", e));
-                            McpError::InvalidJson { source: e }
-                        })?
-                } else {
-                    // Read from stdin if not provided
-                    if io::stdin().is_terminal() {
-                        return Err(McpError::usage_error("No arguments provided. Pass JSON arguments as a command-line argument, or pipe JSON to stdin."));
+    // Parse arguments (inline or from stdin)
+    let arguments: serde_json::Value = match args_json {
+        Some(args) => {
+            serde_json::from_str(args).map_err(|e| McpError::InvalidJson { source: e })?
+        }
+        None => {
+            // Read from stdin if not provided (EXEC-02)
+            if std::io::stdin().is_terminal() {
+                print_error("No arguments provided. Pass JSON arguments as a command-line argument, or pipe JSON to stdin.");
+                let available_tools = match daemon.list_tools(&server_name).await {
+                    Ok(tools) => {
+                        let names: Vec<String> = tools.iter().map(|t| t.name.clone()).collect();
+                        names.join(", ")
                     }
-
-                    let input = read_stdin_async()?;
-
-                    serde_json::from_str(&input)
-                        .map_err(|e| {
-                            print_error(&format!("Invalid JSON in stdin: {}", e));
-                            McpError::InvalidJson { source: e }
-                        })?
+                    Err(_) => "(unavailable)".to_string(),
                 };
-
-                timeout_wrapper(
-                    || daemon.execute_tool(&server_name, &tool_name, arguments.clone()),
-                    server.timeout_secs as u64
-                ).await
+                println!();
+                print_info(&format!("Available tools on '{}': {}", server_name, available_tools));
+                return Ok(());
             }
+
+            let input = read_stdin_async()?;
+            serde_json::from_str(&input).map_err(|e| McpError::InvalidJson { source: e })?
+        }
+    };
+
+    // Execute tool with retry logic (EXEC-05, EXEC-07)
+    let retry_config = RetryConfig::from_config(&config);
+    let timeout_secs = config.timeout_secs;
+
+    // Create shared access for retry closure
+    let daemon_shared = Arc::new(tokio::sync::Mutex::new(daemon));
+
+    // Wrap execution with both retry logic and overall timeout
+    let result = timeout_wrapper(
+        || async {
+            retry_with_backoff(
+                || {
+                    let daemon_shared = daemon_shared.clone();
+                    let server_name_clone = server_name.clone();
+                    let tool_name_clone = tool_name.clone();
+                    let arguments_clone = arguments.clone();
+
+                    async move {
+                        let mut daemon_guard = daemon_shared.lock().await;
+                        daemon_guard
+                            .execute_tool(&server_name_clone, &tool_name_clone, arguments_clone)
+                            .await
+                    }
+                },
+                &retry_config,
+            )
+            .await
         },
-        &RetryConfig::from_config(&config)
-    ).await?;
+        timeout_secs,
+    )
+    .await;
 
-    // Format the result and display success message
-    format_and_display_result(&result, server_name.as_str());
+    match result {
+        Ok(result) => {
+            // Format and display the result (EXEC-03)
+            format_and_display_result(&result, &server_name);
 
-    // Print success message with colored output (TASK-03)
-    print_success(&format!("Tool '{}' on server '{}' executed successfully", tool_name, server_name));
+            // Print success message with colored output (TASK-03)
+            println!();
+            print_info(&format!("Tool '{}' executed successfully on server '{}'", tool_name, server_name));
 
-    Ok(())
+            Ok(())
+        }
+        Err(McpError::MaxRetriesExceeded { attempts }) => {
+            print_error(&format!(
+                "Tool execution failed after {} retry attempts. Last error: {}",
+                attempts,
+                "No additional information available"
+            ));
+            Err(McpError::MaxRetriesExceeded { attempts })
+        }
+        Err(McpError::OperationCancelled { timeout }) => {
+            print_error(&format!(
+                "Tool execution cancelled after {}s timeout",
+                timeout
+            ));
+            Err(McpError::OperationCancelled { timeout })
+        }
+        Err(e) => {
+            print_error(&format!("Tool execution failed: {}", e));
+            Err(e)
+        }
+    }
 }
 
 /// Execute search tools command.
