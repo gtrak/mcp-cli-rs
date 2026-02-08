@@ -409,8 +409,8 @@ mod tests {
         assert!(!fp.is_empty());
     }
 
-    #[test]
-    fn test_handle_request_ping() {
+    #[tokio::test]
+    async fn test_handle_request_ping() {
         let lifecycle = DaemonLifecycle::new(30);
         let config = Config { servers: vec![] };
         let state = DaemonState {
@@ -420,12 +420,12 @@ mod tests {
             connection_pool: Arc::new(crate::daemon::pool::ConnectionPool::new(Arc::new(Config { servers: vec![] }))),
         };
 
-        let response = handle_request(DaemonRequest::Ping, &state);
+        let response = handle_request(DaemonRequest::Ping, &state).await;
         assert!(matches!(response, DaemonResponse::Pong));
     }
 
-    #[test]
-    fn test_handle_request_shutdown() {
+    #[tokio::test]
+    async fn test_handle_request_shutdown() {
         let lifecycle = DaemonLifecycle::new(30);
         let config = Config { servers: vec![] };
         let state = DaemonState {
@@ -435,7 +435,7 @@ mod tests {
             connection_pool: Arc::new(crate::daemon::pool::ConnectionPool::new(Arc::new(Config { servers: vec![] }))),
         };
 
-        let response = handle_request(DaemonRequest::Shutdown, &state);
+        let response = handle_request(DaemonRequest::Shutdown, &state).await;
         assert!(matches!(response, DaemonResponse::ShutdownAck));
         assert!(!lifecycle.is_running());
     }
