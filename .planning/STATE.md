@@ -1,7 +1,7 @@
 # State: MCP CLI Rust Rewrite
 
 **Created:** 2025-02-06
-**Last updated:** 2026-02-08 - Completed parallel execution and colored output (plan 03-04), Phase 3 at 67%
+**Last updated:** 2026-02-08 - Completed graceful shutdown infrastructure (plan 03-06), Phase 3 at 83%
 **Mode:** yolo
 **Depth:** standard
 
@@ -21,13 +21,13 @@ Executing Phase 3: Performance & Reliability (Wave 1)
 
 **Active Phase:** 03-performance-reliability
 
-**Status:** Plan 03-04 completed (parallel execution with colored CLI output)
+**Status:** Plan 03-06 completed (graceful shutdown infrastructure)
 
 **Progress:**
 ```
 Phase 1: Core Protocol & Configuration         ██████████████ 100% (4/4 plans complete)
 Phase 2: Connection Daemon & Cross-Platform IPC ██████████████ 100% (11/11 plans complete, 5 gap closure)
-Phase 3: Performance & Reliability             ████████░░░░░░ 67% (4/6 plans complete, 1 wave)
+Phase 3: Performance & Reliability             █████████████░ 83% (5/6 plans complete, 1 wave)
 Phase 4: Tool Filtering & Cross-Platform Validation ░░░░░░░░░░░ 0%
 ```
 
@@ -92,6 +92,8 @@ Phase 4: Tool Filtering & Cross-Platform Validation ░░░░░░░░░�
 
 18. **CLI Colored Output Integration (plan 03-04):** All CLI error/warning/info messages now use print_error/print_warning/print_info functions from output.rs. cmd_server_info uses print_error for ServerNotFound, cmd_tool_info uses print_error for ToolNotFound, cmd_call_tool uses print_error for stdin JSON errors. NO_COLOR environment variable respected for terminal compatibility. Provides consistent visual feedback across entire CLI interface.
 
+19. **Graceful Shutdown Infrastructure (plan 03-06):** Created shutdown.rs module with GracefulShutdown struct and run_with_graceful_shutdown() wrapper function. Implements cross-platform signal handling (SIGINT/SIGTERM on Unix, Ctrl+C on Windows) using tokio::signal::unix::Signal and tokio::process::Command. Uses broadcast channel for shutdown notifications to support multiple subscribers. Provides configurable 3-second default shutdown timeout for graceful operation completion.
+
 ### Technical Decisions Made
 
 | Decision | Rationale |
@@ -118,6 +120,7 @@ Phase 4: Tool Filtering & Cross-Platform Validation ░░░░░░░░░�
 | Closure cloning requirement in list_tools_parallel | Required by tokio::stream::Stream for ownership transfer across threads |
 | Colored output pattern (plan 03-04) | Consistent visual feedback using print_error/print_warning/print_info with NO_COLOR support |
 | Glob pattern matching (plan 03-04) | Flexible tool name searching with fallback to substring matching |
+| Graceful shutdown with broadcast channels (plan 03-06) | Cross-platform signal handling (SIGINT/SIGTERM/Ctrl+C) with tokio::sync::broadcast for multi-subscriber notifications |
 
 ### Known Pitfalls to Avoid
 
@@ -178,6 +181,7 @@ From research/PITFALLS.md:
 
 **Next Steps:**
 - Execute Phase 3 plan 03-05 to optimize execution pipeline for CLI-04
+- Plan 03-06 completed: graceful shutdown infrastructure with cross-platform signal handling
 - Plan 03-04 completed: parallel execution with colored CLI output and glob pattern matching
 - Plan 03-03 completed: retry logic with exponential backoff and timeout enforcement ready for CLI integration
 - Plan 03-01 completed: performance config fields added (concurrency_limit, retry_max, retry_delay_ms, timeout_secs) and colored output utilities created
@@ -196,12 +200,12 @@ From research/PITFALLS.md:
 - IPC abstraction layer complete: Unix socket implementation + Windows named pipe backend
 - Daemon layer complete: binary with IPC communication, idle timeout, lifecycle management
 - Phase 2 complete: daemon lifecycle, cross-platform IPC, connection pools, health checks, all tests compile successfully
-- Phase 3 in progress: performance configuration fields and colored output utilities (plan 03-01 complete), parallel execution (plan 03-02 complete), retry logic (plan 03-03 complete), parallel CLI commands (plan 03-04 complete)
+- Phase 3 in progress: performance configuration fields and colored output utilities (plan 03-01 complete), parallel execution (plan 03-02 complete), retry logic (plan 03-03 complete), parallel CLI commands (plan 03-04 complete), graceful shutdown (plan 03-06 complete)
 
 ---
 
-**Last updated:** 2026-02-08 - Plan 03-04 completed (parallel execution with colored CLI output), Phase 3 progress 4/6 plans (67%)
+**Last updated:** 2026-02-08 - Plan 03-06 completed (graceful shutdown infrastructure), Phase 3 progress 5/6 plans (83%)
 **Mode:** yolo
 **Depth:** standard
-**Plans completed:** 01-01 through 01-04 (Phase 1), 02-01 through 02-11 (Phase 2), 03-01 through 03-04 (Phase 3 Wave 1)
+**Plans completed:** 01-01 through 01-04 (Phase 1), 02-01 through 02-11 (Phase 2), 03-01 through 03-06 (Phase 3 Wave 1)
 **Planning docs committed:** true
