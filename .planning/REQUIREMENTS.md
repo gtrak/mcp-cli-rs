@@ -32,7 +32,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **DISC-02**: Display server details including transport type, connection information, tool count, and server instructions
 - [ ] **DISC-03**: Display tool details (name, description, input JSON Schema) for inspection
 - [ ] **DISC-04**: Search tool names (not server names) using glob patterns with wildcards (*, ?, etc.)
-- [ ] **DISC-05**: Process servers in parallel with configurable concurrency limits (default 5)
+- [x] **DISC-05**: Process servers in parallel with configurable concurrency limits (default 5)
 - [ ] **DISC-06**: Support optional display of descriptions via -d/--with-descriptions flag
 
 ### Tool Execution
@@ -41,9 +41,9 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **EXEC-02**: Automatically detect stdin input when TTY is not present (pipe redirection)
 - [ ] **EXEC-03**: Format tool call results to extract text content for CLI-friendly display
 - [ ] **EXEC-04**: Validate JSON tool arguments and display parse errors with context
-- [ ] **EXEC-05**: Implement automatic retry logic with exponential backoff for transient errors (network timeouts, HTTP 502/503/504/429)
-- [ ] **EXEC-06**: Respect overall operation timeout (default 1800s) and stop retries if budget exhausted
-- [ ] **EXEC-07**: Configure retry limits (max 3 attempts, base 1000ms delay)
+- [x] **EXEC-05**: Implement automatic retry logic with exponential backoff for transient errors (network timeouts, HTTP 502/503/504/429)
+- [x] **EXEC-06**: Respect overall operation timeout (default 1800s) and stop retries if budget exhausted
+- [x] **EXEC-07**: Configure retry limits (max 3 attempts, base 1000ms delay)
 
 ### Tool Filtering
 
@@ -58,17 +58,17 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **ERR-01**: Provide structured error messages with error type, message, details, and actionable recovery suggestions
 - [ ] **ERR-02**: Display context-aware error suggestions (e.g., list available servers when server not found)
 - [ ] **ERR-03**: Implement exit code conventions: 0 for success, 1 for client errors, 2 for server errors, 3 for network errors
-- [ ] **ERR-04**: Display colored terminal output when stdout is a TTY and NO_COLOR is not set
+- [x] **ERR-04**: Display colored terminal output when stdout is a TTY and NO_COLOR is not set
 - [ ] **ERR-05**: Capture and forward stderr output from stdio-based MCP servers to the user
 - [ ] **ERR-06**: Handle ambiguous commands (e.g., "server tool" without subcommand) and prompt user to specify info vs call
-- [ ] **ERR-07**: Warn when some servers fail to connect during parallel operations
+- [x] **ERR-07**: Warn when some servers fail to connect during parallel operations
 
 ### CLI Support
 
 - [ ] **CLI-01**: Display help information when -h/--help flag is provided
 - [ ] **CLI-02**: Display version information when -v/--version flag is provided
 - [ ] **CLI-03**: Support custom config file path via -c/--config command line option
-- [ ] **CLI-04**: Gracefully handle signals (SIGINT, SIGTERM) with proper cleanup of connections and resources
+- [x] **CLI-04**: Gracefully handle signals (SIGINT, SIGTERM) with proper cleanup of connections and resources
 - [ ] **CLI-05**: Support both space-separated (server tool) and slash-separated (server/tool) argument formats for info, grep, and call commands
 
 ### Cross-Platform Support
@@ -126,15 +126,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DISC-02 | Phase 1 | Pending |
 | DISC-03 | Phase 1 | Pending |
 | DISC-04 | Phase 1 | Pending |
-| DISC-05 | Phase 3 | Pending |
+| DISC-05 | Phase 3 | Complete |
 | DISC-06 | Phase 1 | Pending |
 | EXEC-01 | Phase 1 | Pending |
 | EXEC-02 | Phase 1 | Pending |
 | EXEC-03 | Phase 1 | Pending |
 | EXEC-04 | Phase 1 | Pending |
-| EXEC-05 | Phase 3 | Pending |
-| EXEC-06 | Phase 1 | Pending |
-| EXEC-07 | Phase 3 | Pending |
+| EXEC-05 | Phase 3 | Complete |
+| EXEC-06 | Phase 3 | Complete |
+| EXEC-07 | Phase 3 | Complete |
 | FILT-01 | Phase 4 | Pending |
 | FILT-02 | Phase 4 | Pending |
 | FILT-03 | Phase 4 | Pending |
@@ -143,14 +143,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ERR-01 | Phase 1 | Pending |
 | ERR-02 | Phase 1 | Pending |
 | ERR-03 | Phase 1 | Pending |
-| ERR-04 | Phase 3 | Pending |
+| ERR-04 | Phase 3 | Complete |
 | ERR-05 | Phase 1 | Pending |
 | ERR-06 | Phase 1 | Pending |
-| ERR-07 | Phase 3 | Pending |
+| ERR-07 | Phase 3 | Complete |
 | CLI-01 | Phase 1 | Pending |
 | CLI-02 | Phase 1 | Pending |
 | CLI-03 | Phase 1 | Pending |
-| CLI-04 | Phase 3 | Pending |
+| CLI-04 | Phase 3 | Complete |
 | CLI-05 | Phase 4 | Pending |
 | XP-01 | Phase 4 | Pending |
 | XP-02 | Phase 4 | Pending |
