@@ -131,7 +131,10 @@ mod tests {
         }));
         // Permanent error - should not be transient
         assert!(!is_transient_error(&McpError::InvalidJson {
-            source: std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid json"),
+            source: serde_json::Error::io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "invalid json"
+            )),
         }));
     }
 
