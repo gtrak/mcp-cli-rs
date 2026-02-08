@@ -6,6 +6,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use crate::config::Config;
+use crate::daemon::protocol::{DaemonRequest, DaemonResponse};
 use crate::ipc::{create_ipc_server, IpcServer};
 use crate::daemon::lifecycle::DaemonLifecycle;
 use crate::daemon::pool::ConnectionPool;

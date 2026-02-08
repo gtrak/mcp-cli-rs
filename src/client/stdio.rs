@@ -13,8 +13,35 @@ use crate::client::http::HttpTransport;
 use crate::config::ServerTransport;
 use crate::error::{McpError, Result};
 use crate::transport::{Transport, TransportFactory};
-use tokio::io::{BufReader, AsyncBufReadExt};
+use tokio::io::{BufReader, AsyncBufReadExt, AsyncRead};
 use tokio::process::Command;
+
+/// Mock reader for testing that wraps Vec<u8> with AsyncRead
+struct MockAsyncReader {
+    data: Vec<u8>,
+}
+
+impl MockAsyncReader {
+    fn new(data: Vec<u8>) -> Self {
+        Self { data }
+    }
+}
+
+impl AsyncRead for MockAsyncReader {
+    fn poll_read(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf,
+    ) -> std::task::Poll<std::result::Result<(), std::io::Error>> {
+        if self.data.is_empty() {
+            return std::task::Poll::Ready(Ok(()));
+        }
+        let bytes = &self.data[..];
+        let len = buf.remaining().min(bytes.len());
+        buf.put_slice(&bytes[..len]);
+        std::task::Poll::Ready(Ok(()))
+    }
+}
 
 /// Stdio transport for local process communication.
 ///
@@ -218,14 +245,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_write_json() {
-        let mut stdout = Vec::new();
-        let mock_reader = BufReader::new(&mut stdout as &mut dyn BufRead);
+        let mock_reader = MockAsyncReader::new(Vec::new());
         let mut transport = StdioTransport {
             child: tokio::process::Command::new("echo")
                 .spawn()
                 .unwrap(),
             stdin: vec![].into(),
-            stdout: mock_reader,
+            stdout: BufReader::new(mock_reader),
         };
 
         let request = json!({ "test": "data" });
