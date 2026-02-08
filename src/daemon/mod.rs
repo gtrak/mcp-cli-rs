@@ -28,8 +28,8 @@ pub struct DaemonState {
     pub config_fingerprint: ConfigFingerprint,
     /// Lifecycle manager for idle timeout
     pub lifecycle: DaemonLifecycle,
-    /// Connection pool (stub for now, full impl in 02-04)
-    pub connection_pool: Arc<Mutex<dyn crate::daemon::pool::ConnectionPoolInterface>>,
+    /// Connection pool for persistent MCP server connections
+    pub connection_pool: Arc<crate::daemon::pool::ConnectionPool>,
 }
 
 impl DaemonState {
@@ -91,7 +91,7 @@ pub async fn run_daemon(config: Config, socket_path: PathBuf) -> Result<()> {
     });
 
     // Initialize connection pool
-    let connection_pool = Arc::new(Mutex::new(ConnectionPool::new(Arc::new(config.clone()))));
+    let connection_pool = Arc::new(ConnectionPool::new(Arc::new(config.clone())));
 
     let state = DaemonState {
         config: Arc::new(config),
@@ -213,7 +213,7 @@ pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, sta
             tracing::info!("ExecuteTool: server={}, tool={}", server_name, tool_name);
 
             // Get transport from connection pool
-            let mut transport = match state.connection_pool.lock().unwrap().get(&server_name).await {
+            let mut transport = match state.connection_pool.get(&server_name).await {
                 Ok(t) => t,
                 Err(e) => {
                     tracing::error!("Failed to get transport for {}: {}", server_name, e);
@@ -275,7 +275,7 @@ pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, sta
             tracing::info!("ListTools: server={}", server_name);
 
             // Get transport from connection pool
-            let mut transport = match state.connection_pool.lock().unwrap().get(&server_name).await {
+            let mut transport = match state.connection_pool.get(&server_name).await {
                 Ok(t) => t,
                 Err(e) => {
                     tracing::error!("Failed to get transport for {}: {}", server_name, e);
@@ -416,7 +416,7 @@ mod tests {
             config: Arc::new(config),
             config_fingerprint: String::new(),
             lifecycle,
-            connection_pool: Arc::new(Mutex::new(crate::pool::ConnectionPool::new())),
+            connection_pool: Arc::new(crate::daemon::pool::ConnectionPool::new(Arc::new(Config { servers: vec![] }))),
         };
 
         let response = handle_request(DaemonRequest::Ping, &state);
@@ -431,7 +431,7 @@ mod tests {
             config: Arc::new(config),
             config_fingerprint: String::new(),
             lifecycle,
-            connection_pool: Arc::new(Mutex::new(crate::pool::ConnectionPool::new())),
+            connection_pool: Arc::new(crate::daemon::pool::ConnectionPool::new(Arc::new(Config { servers: vec![] }))),
         };
 
         let response = handle_request(DaemonRequest::Shutdown, &state);

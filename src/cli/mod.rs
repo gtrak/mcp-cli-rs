@@ -7,7 +7,6 @@ pub mod commands;
 pub mod daemon;
 
 pub use commands::{
-    AppContext,
     cmd_list_servers,
     cmd_server_info,
     cmd_tool_info,
