@@ -177,7 +177,7 @@ pub async fn handle_client(
     };
 
     // Handle request
-    let response = handle_request(request, &state);
+    let response = handle_request(request, &state).await;
 
     // Send response
     if let Err(e) = crate::daemon::protocol::send_response(&mut writer, &response).await {
@@ -190,7 +190,7 @@ pub async fn handle_client(
 }
 
 /// Handle daemon request and return response
-pub fn handle_request(request: crate::daemon::protocol::DaemonRequest, state: &DaemonState)
+pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, state: &DaemonState)
     -> crate::daemon::protocol::DaemonResponse
 {
     match request {
@@ -210,30 +210,154 @@ pub fn handle_request(request: crate::daemon::protocol::DaemonRequest, state: &D
         }
 
         crate::daemon::protocol::DaemonRequest::ExecuteTool { server_name, tool_name, arguments } => {
-            // Stub implementation - will be completed in 02-04
-            tracing::warn!("ExecuteTool stub: server={server_name}, tool={tool_name}");
-            crate::daemon::protocol::DaemonResponse::Error {
-                code: 1,
-                message: "ExecuteTool not yet implemented".to_string(),
+            tracing::info!("ExecuteTool: server={}, tool={}", server_name, tool_name);
+
+            // Get transport from connection pool
+            let mut transport = match state.connection_pool.lock().unwrap().get(&server_name).await {
+                Ok(t) => t,
+                Err(e) => {
+                    tracing::error!("Failed to get transport for {}: {}", server_name, e);
+                    return crate::daemon::protocol::DaemonResponse::Error {
+                        code: 2,
+                        message: format!("Server not found or connection failed: {}", e),
+                    };
+                }
+            };
+
+            // Build MCP tools/call JSON-RPC request
+            let mcp_request = serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": tool_name,
+                    "arguments": arguments
+                }
+            });
+
+            // Send request and get response
+            match transport.send(mcp_request).await {
+                Ok(response) => {
+                    // Parse JSON-RPC response
+                    if let Some(result) = response.get("result") {
+                        // Success - return tool result
+                        crate::daemon::protocol::DaemonResponse::ToolResult(result.clone())
+                    } else if let Some(error) = response.get("error") {
+                        // MCP server returned error
+                        let message = error.get("message")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("Unknown error");
+                        tracing::error!("Tool execution failed: {}", message);
+                        crate::daemon::protocol::DaemonResponse::Error {
+                            code: error.get("code").and_then(|c| c.as_u64()).unwrap_or(3) as u32,
+                            message: message.to_string(),
+                        }
+                    } else {
+                        // Invalid response format
+                        tracing::error!("Invalid MCP response: missing result and error fields");
+                        crate::daemon::protocol::DaemonResponse::Error {
+                            code: 3,
+                            message: "Invalid MCP response format".to_string(),
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Tool execution failed: {}", e);
+                    crate::daemon::protocol::DaemonResponse::Error {
+                        code: 3,
+                        message: format!("Tool execution failed: {}", e),
+                    }
+                }
             }
         }
 
         crate::daemon::protocol::DaemonRequest::ListTools { server_name } => {
-            // Stub implementation - will be completed in 02-04
-            tracing::warn!("ListTools stub: server={server_name}");
-            crate::daemon::protocol::DaemonResponse::Error {
-                code: 1,
-                message: "ListTools not yet implemented".to_string(),
+            tracing::info!("ListTools: server={}", server_name);
+
+            // Get transport from connection pool
+            let mut transport = match state.connection_pool.lock().unwrap().get(&server_name).await {
+                Ok(t) => t,
+                Err(e) => {
+                    tracing::error!("Failed to get transport for {}: {}", server_name, e);
+                    return crate::daemon::protocol::DaemonResponse::Error {
+                        code: 2,
+                        message: format!("Server not found or connection failed: {}", e),
+                    };
+                }
+            };
+
+            // Build MCP tools/list JSON-RPC request
+            let mcp_request = serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/list"
+            });
+
+            // Send request and get response
+            match transport.send(mcp_request).await {
+                Ok(response) => {
+                    // Parse JSON-RPC response
+                    if let Some(result) = response.get("result") {
+                        // Extract tools array from result
+                        let tools = if let Some(tools_array) = result.get("tools").and_then(|t| t.as_array()) {
+                            tools_array.iter().filter_map(|tool| {
+                                Some(crate::daemon::protocol::ToolInfo {
+                                    name: tool.get("name")
+                                        .and_then(|n| n.as_str())
+                                        .unwrap_or("unknown")
+                                        .to_string(),
+                                    description: tool.get("description")
+                                        .and_then(|d| d.as_str())
+                                        .unwrap_or("")
+                                        .to_string(),
+                                    input_schema: tool.get("inputSchema")
+                                        .cloned()
+                                        .unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
+                                })
+                            }).collect()
+                        } else {
+                            Vec::new()
+                        };
+
+                        crate::daemon::protocol::DaemonResponse::ToolList(tools)
+                    } else if let Some(error) = response.get("error") {
+                        // MCP server returned error
+                        let message = error.get("message")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("Unknown error");
+                        tracing::error!("List tools failed: {}", message);
+                        crate::daemon::protocol::DaemonResponse::Error {
+                            code: error.get("code").and_then(|c| c.as_u64()).unwrap_or(3) as u32,
+                            message: message.to_string(),
+                        }
+                    } else {
+                        // Invalid response format
+                        tracing::error!("Invalid MCP response: missing result and error fields");
+                        crate::daemon::protocol::DaemonResponse::Error {
+                            code: 3,
+                            message: "Invalid MCP response format".to_string(),
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("List tools failed: {}", e);
+                    crate::daemon::protocol::DaemonResponse::Error {
+                        code: 3,
+                        message: format!("List tools failed: {}", e),
+                    }
+                }
             }
         }
 
         crate::daemon::protocol::DaemonRequest::ListServers => {
-            // Stub implementation - will be completed in 02-04
-            tracing::warn!("ListServers stub");
-            crate::daemon::protocol::DaemonResponse::Error {
-                code: 1,
-                message: "ListServers not yet implemented".to_string(),
-            }
+            tracing::info!("ListServers requested");
+
+            // Get list of configured server names from config
+            let servers: Vec<String> = state.config.servers.iter()
+                .map(|s| s.name.clone())
+                .collect();
+
+            crate::daemon::protocol::DaemonResponse::ServerList(servers)
         }
     }
 }
