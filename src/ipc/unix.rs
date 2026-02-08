@@ -89,28 +89,28 @@ impl crate::ipc::IpcClient for UnixIpcClient {
 
     /// Send a daemon protocol request and receive response
     async fn send_request(&self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
-        // TODO: Implement NDJSON protocol for Unix socket communication
-        // For now, we'll return an error since this is a placeholder
-        // The actual implementation will need to:
-        // 1. Serialize request to JSON
-        // 2. Write to Unix socket with newline delimiter
-        // 3. Read response with newline delimiter
-        // 4. Parse JSON response
-        Err(crate::error::McpError::IpcError {
-            message: "NDJSON protocol not implemented for Unix sockets yet".to_string(),
-        })
-    }
+        // Get daemon socket path
+        let socket_path = crate::ipc::get_socket_path();
 
-    /// Send a daemon protocol request and receive response
-    async fn send_request(&self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
-        // TODO: Implement NDJSON protocol for Unix socket communication
-        // For now, we'll return an error since this is a placeholder
-        // The actual implementation will need to:
-        // 1. Serialize request to JSON
-        // 2. Write to Unix socket with newline delimiter
-        // 3. Read response with newline delimiter
-        // 4. Parse JSON response
-        Err(crate::error::McpError::NotImplemented)
+        // Connect to daemon
+        let mut stream = self.connect(&socket_path).await?;
+
+        // Split stream for reading and writing
+        use tokio::io::{BufReader};
+        let (reader, mut writer) = tokio::io::split(stream);
+        let mut buf_reader = BufReader::new(reader);
+
+        // Send request using NDJSON protocol
+        crate::daemon::protocol::send_request(&mut writer, request).await
+            .map_err(|e| McpError::IpcError {
+                message: format!("Failed to send IPC request: {}", e),
+            })?;
+
+        // Receive response using NDJSON protocol
+        crate::daemon::protocol::receive_response(&mut buf_reader).await
+            .map_err(|e| McpError::IpcError {
+                message: format!("Failed to receive IPC response: {}", e),
+            })
     }
 
     /// Connect to an IPC server at the given path
