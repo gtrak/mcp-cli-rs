@@ -9,6 +9,9 @@ pub mod config;
 pub mod error;
 pub use error::{exit_code, McpError, Result as DaemonResult};
 
+// Output module (Phase 3)
+pub mod output;
+
 // Re-export modules for easy access
 pub mod transport;
 pub use transport::{Transport, TransportFactory};
