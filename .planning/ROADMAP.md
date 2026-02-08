@@ -194,6 +194,13 @@ Plans:
 - Platform-specific behavior differences (comprehensive cross-platform testing)
 - Incomplete glob pattern matching (standard glob crate usage)
 
+**Plans:** 3 plans in 1 wave
+
+Plans:
+- [ ] 04-01-PLAN.md — Tool filtering features (FILT-01 through FILT-05)
+- [ ] 04-02-PLAN.md — Windows process spawning validation (XP-01)
+- [ ] 04-03-PLAN.md — Cross-platform daemon validation (XP-04)
+
 ---
 
 ## Progress
