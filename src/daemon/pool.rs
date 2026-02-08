@@ -362,7 +362,7 @@ mod tests {
 
     #[test]
     fn test_connection_pool_new() {
-        let config = Arc::new(Config { servers: vec![] });
+        let config = Arc::new(Config::default());
         let pool = ConnectionPool::new(config);
         assert_eq!(pool.count(), 0);
     }

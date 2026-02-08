@@ -27,5 +27,9 @@ pub use ipc::{create_ipc_server, get_socket_path};
 pub mod parallel;
 pub use parallel::{ParallelExecutor, list_tools_parallel};
 
+// Retry logic (Phase 3)
+pub mod retry;
+pub use retry::{RetryConfig, retry_with_backoff, timeout_wrapper};
+
 pub mod pool;
 pub use pool::{ConnectionPoolInterface, DummyConnectionPool};

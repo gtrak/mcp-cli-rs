@@ -402,9 +402,7 @@ mod tests {
 
     #[test]
     fn test_config_fingerprint() {
-        let config = Config {
-            servers: vec![],
-        };
+        let config = Config::default();
         let fp = config_fingerprint(&config);
         assert!(!fp.is_empty());
     }
@@ -412,12 +410,12 @@ mod tests {
     #[tokio::test]
     async fn test_handle_request_ping() {
         let lifecycle = DaemonLifecycle::new(30);
-        let config = Config { servers: vec![] };
+        let config = Config::default();
         let state = DaemonState {
             config: Arc::new(config),
             config_fingerprint: String::new(),
             lifecycle,
-            connection_pool: Arc::new(crate::daemon::pool::ConnectionPool::new(Arc::new(Config { servers: vec![] }))),
+            connection_pool: Arc::new(crate::daemon::pool::ConnectionPool::new(Arc::new(Config::default()))),
         };
 
         let response = handle_request(DaemonRequest::Ping, &state).await;
@@ -427,12 +425,12 @@ mod tests {
     #[tokio::test]
     async fn test_handle_request_shutdown() {
         let lifecycle = DaemonLifecycle::new(30);
-        let config = Config { servers: vec![] };
+        let config = Config::default();
         let state = DaemonState {
             config: Arc::new(config),
             config_fingerprint: String::new(),
             lifecycle: lifecycle.clone(),
-            connection_pool: Arc::new(crate::daemon::pool::ConnectionPool::new(Arc::new(Config { servers: vec![] }))),
+            connection_pool: Arc::new(crate::daemon::pool::ConnectionPool::new(Arc::new(Config::default()))),
         };
 
         let response = handle_request(DaemonRequest::Shutdown, &state).await;
