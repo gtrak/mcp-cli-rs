@@ -9,6 +9,7 @@ use std::sync::Arc;
 use crate::ipc::ProtocolClient;
 use crate::parallel::{ParallelExecutor, list_tools_parallel};
 use crate::output::{print_error, print_warning, print_info};
+use crate::retry::{retry_with_backoff, timeout_wrapper};
 use tokio::sync::Mutex;
 
 /// Execute the list servers command.
@@ -223,6 +224,7 @@ pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str) -
 ///
 /// Executes a tool with JSON arguments.
 /// Implements EXEC-01, EXEC-02, EXEC-04, EXEC-06.
+/// Implements EXEC-05, EXEC-07: retry logic with exponential backoff.
 /// Implements TASK-03: colored output for stdin and error cases.
 ///
 /// # Arguments
@@ -233,44 +235,60 @@ pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str) -
 /// # Errors
 /// Returns McpError::InvalidProtocol for malformed response
 /// Returns McpError::Timeout if timeout exceeded (EXEC-06)
+/// Returns McpError::MaxRetriesExceeded if max retries exceeded (EXEC-07)
 pub async fn cmd_call_tool(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, args_json: Option<&str>) -> Result<()> {
     let (server_name, tool_name) = parse_tool_id(tool_id)?;
 
     // Check if server exists
-    daemon.config().get_server(&server_name).ok_or_else(|| {
+    let config = daemon.config();
+    let server = config.get_server(&server_name).ok_or_else(|| {
         print_error(&format!("Server '{}' not found", server_name));
         McpError::ServerNotFound {
             server: server_name.clone(),
         }
     })?;
 
-    // Send ExecuteTool request to daemon
-    let result = match args_json {
-        Some(args) => {
-            let arguments = serde_json::from_str(args)
-                .map_err(|e| McpError::InvalidJson { source: e })?;
-            daemon.execute_tool(&server_name, &tool_name, arguments).await?
-        }
-        None => {
-            // Read from stdin if not provided
-            if io::stdin().is_terminal() {
-                print_error("No arguments provided. Pass JSON arguments as a command-line argument, or pipe JSON to stdin.");
-                return Ok(());
+    // Execute tool with retry logic and timeout enforcement
+    let result = retry_with_backoff(
+        || {
+            // Wrap execution in timeout with config timeout
+            let config_clone = config.clone();
+            async move {
+                let arguments = if let Some(args) = args_json {
+                    serde_json::from_str(args)
+                        .map_err(|e| {
+                            print_error(&format!("Invalid JSON arguments: {}", e));
+                            McpError::InvalidJson { source: e }
+                        })?
+                } else {
+                    // Read from stdin if not provided
+                    if io::stdin().is_terminal() {
+                        return Err(McpError::usage_error("No arguments provided. Pass JSON arguments as a command-line argument, or pipe JSON to stdin."));
+                    }
+
+                    let input = read_stdin_async()?;
+
+                    serde_json::from_str(&input)
+                        .map_err(|e| {
+                            print_error(&format!("Invalid JSON in stdin: {}", e));
+                            McpError::InvalidJson { source: e }
+                        })?
+                };
+
+                timeout_wrapper(
+                    || daemon.execute_tool(&server_name, &tool_name, arguments.clone()),
+                    server.timeout_secs as u64
+                ).await
             }
+        },
+        &RetryConfig::from_config(&config)
+    ).await?;
 
-            let input = read_stdin_async()?;
-
-            let arguments = serde_json::from_str(&input)
-                .map_err(|e| {
-                    print_error(&format!("Invalid JSON in stdin: {}", e));
-                    McpError::InvalidJson { source: e }
-                })?;
-            daemon.execute_tool(&server_name, &tool_name, arguments).await?
-        }
-    };
-
-    // Format the result (EXEC-03)
+    // Format the result and display success message
     format_and_display_result(&result, server_name.as_str());
+
+    // Print success message with colored output (TASK-03)
+    print_info(&format!("Tool '{}' on server '{}' executed successfully", tool_name, server_name));
 
     Ok(())
 }
