@@ -8,7 +8,7 @@ use std::io::{self, Read, IsTerminal};
 use std::sync::Arc;
 use crate::ipc::ProtocolClient;
 use crate::parallel::{ParallelExecutor, list_tools_parallel};
-use crate::output::{print_error, print_warning, print_info};
+use crate::output::{print_error, print_warning, print_info, print_success};
 use crate::retry::{retry_with_backoff, timeout_wrapper};
 use tokio::sync::Mutex;
 
@@ -288,7 +288,7 @@ pub async fn cmd_call_tool(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, a
     format_and_display_result(&result, server_name.as_str());
 
     // Print success message with colored output (TASK-03)
-    print_info(&format!("Tool '{}' on server '{}' executed successfully", tool_name, server_name));
+    print_success(&format!("Tool '{}' on server '{}' executed successfully", tool_name, server_name));
 
     Ok(())
 }
