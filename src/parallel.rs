@@ -3,7 +3,7 @@
 //! Provides concurrent processing of multiple servers with configurable
 //! concurrency limits. Implements DISC-05: parallel server discovery.
 
-use futures::stream::{self, StreamExt};
+use futures_util::stream::{self, StreamExt};
 use tokio::sync::Semaphore;
 use std::sync::Arc;
 use crate::client::ToolInfo;
@@ -73,17 +73,17 @@ pub async fn list_tools_parallel<F, Fut>(
     executor: &ParallelExecutor,
 ) -> Result<(Vec<(String, Vec<ToolInfo>)>, Vec<String>)>
 where
-    F: Fn(String) -> Fut + Send + Sync,
+    F: Fn(String) -> Fut + Send + Sync + Clone,
     Fut: std::future::Future<Output = Result<Vec<ToolInfo>>> + Send,
 {
     // Create semaphore to limit concurrent operations (research: buffer_unordered pattern)
     let semaphore = Arc::new(Semaphore::new(executor.concurrency_limit()));
 
     // Process each server with concurrency control using stream combinators
-    let results = stream::iter(server_names)
-        .map(move |server_name| {
+    let results: Vec<_> = stream::iter(server_names)
+        .map(move |server_name: String| {
             let semaphore = semaphore.clone();
-            let list_fn = &list_fn;
+            let list_fn = list_fn.clone();
 
             async move {
                 // Acquire permit before starting operation (prevents resource exhaustion)
@@ -92,12 +92,12 @@ where
                 // Execute the list function for this server
                 match list_fn(server_name.clone()).await {
                     Ok(tools) => Ok((server_name, tools)),
-                    Err(_) => Err(server_name), // Return failed server name
+                    Err(_) => Err(server_name.to_string()), // Return failed server name as string
                 }
             }
         })
         .buffer_unordered(executor.concurrency_limit()) // Enforce concurrency limit
-        .collect::<Vec<Result<(String, Vec<ToolInfo>)>>>()
+        .collect()
         .await;
 
     // Separate successes and failures for error reporting (ERR-07 preparation)
@@ -107,7 +107,7 @@ where
     for result in results {
         match result {
             Ok(success) => successes.push(success),
-            Err(server_name) => failures.push(server_name),
+            Err(server_name) => failures.push(server_name), // server_name is now String
         }
     }
 

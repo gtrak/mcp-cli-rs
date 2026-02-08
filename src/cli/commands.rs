@@ -1,13 +1,15 @@
 //! CLI commands for MCP CLI tool.
 
-use crate::config::{Config, ServerConfig, ServerTransport};
+use crate::config::{ServerConfig, ServerTransport};
 use crate::error::{McpError, Result};
 use crate::transport::Transport;
+use crate::client::ToolInfo;
 use std::io::{self, Read, IsTerminal};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use crate::ipc::ProtocolClient;
 use crate::parallel::{ParallelExecutor, list_tools_parallel};
 use crate::output::{print_error, print_warning, print_info};
+use tokio::sync::Mutex;
 
 /// Execute the list servers command.
 ///
@@ -22,72 +24,77 @@ use crate::output::{print_error, print_warning, print_info};
 ///
 /// # Errors
 /// Returns McpError::ConfigParseError if config file is invalid
-pub async fn cmd_list_servers(mut daemon: Box<dyn crate::ipc::ProtocolClient>, with_descriptions: bool) -> Result<()> {
-    if daemon.config().is_empty() {
+pub async fn cmd_list_servers(mut daemon: Box<dyn ProtocolClient>, with_descriptions: bool) -> Result<()> {
+    let config = daemon.config();
+
+    if config.is_empty() {
         print_error("No servers configured. Please create a config file.");
         return Ok(());
     }
 
-    print_info("Configured servers:");
+    print_info(&format!("Configured servers:"));
     println!();
 
     // Get server names from daemon
-    let server_names = match daemon.list_servers().await {
-        Ok(names) => names,
-        Err(e) => {
+    let server_names = daemon.list_servers().await
+        .map_err(|e| {
             print_error(&format!("Failed to get servers list: {}", e));
-            return Err(e);
-        }
-    };
-
-    // Create Arc<Mutex<>> for shared mutable access across threads
-    let daemon_arc = std::sync::Arc::new(Mutex::new(daemon));
+            e
+        })?;
 
     // Create parallel executor with concurrency limit from config
-    let executor = ParallelExecutor::new(daemon.config().concurrency_limit);
+    let executor = ParallelExecutor::new(config.concurrency_limit);
 
-    // List tools from all servers in parallel using list_tools_parallel
-    let (successes, failures) = list_tools_parallel(
-        server_names,
-        // Closure that lists tools for a single server (using Arc<Mutex<>>)
-        |server: String| async move {
-            let daemon = daemon_arc.lock();
-            daemon.list_tools(&server).await
-                .map_err(|e| {
-                    // Log individual failures but continue with other servers
-                    tracing::warn!("Failed to list tools for {}: {}", server, e);
-                    e
-                })
-                .map(|protocol_tools| {
-                    // Convert protocol::ToolInfo to client::ToolInfo
-                    protocol_tools
-                        .into_iter()
-                        .map(|protocol_tool| {
-                            crate::client::ToolInfo {
-                                name: protocol_tool.name,
-                                description: Some(protocol_tool.description),
-                                input_schema: protocol_tool.input_schema,
-                            }
+    // Create daemon client for parallel execution (daemon is moved here and not used again)
+    let daemon_arc = Arc::new(Mutex::new(daemon));
+
+    // List tools from all servers in parallel
+    let (successes, failures): (Vec<(String, Vec<ToolInfo>)>, Vec<String>) = {
+        list_tools_parallel(
+            server_names,
+            // Closure that lists tools for a single server
+            |server| {
+                let daemon_arc = daemon_arc.clone();
+                async move {
+                    let mut daemon_guard = daemon_arc.lock().await;
+                    daemon_guard.list_tools(&server).await
+                        .map_err(|e| {
+                            tracing::warn!("Failed to list tools for {}: {}", server, e);
+                            e
                         })
-                        .collect()
-                })
-        },
-        &executor,
-    )
-    .await?;
+                        .map(|protocol_tools| {
+                            protocol_tools
+                                .into_iter()
+                                .map(|protocol_tool| {
+                                    crate::client::ToolInfo {
+                                        name: protocol_tool.name,
+                                        description: Some(protocol_tool.description),
+                                        input_schema: protocol_tool.input_schema,
+                                    }
+                                })
+                                .collect()
+                        })
+                }
+            },
+            &executor,
+        )
+        .await?
+    };
 
     // Display successful results
-    for (server_name, tools) in successes {
+    for (server_name, tools) in &successes {
         // Get server info from config for display
-        if let Some(server_config) = daemon.config().get_server(&server_name) {
-            println!("{} {} ({})", server_name, server_config.description.as_deref().unwrap_or(""), server_config.transport.type_name());
-        } else {
-            println!("{} (unknown)", server_name);
+        {
+            let daemon_guard = daemon_arc.lock().await;
+            if let Some(server_config) = daemon_guard.config().get_server(&server_name) {
+                println!("{} {} ({})", server_name, server_config.description.as_deref().unwrap_or(""), server_config.transport.type_name());
+            } else {
+                println!("{} (unknown)", server_name);
+            }
         }
-
         print_info(&format!("    Tools: {}", tools.len()));
         if with_descriptions && !tools.is_empty() {
-            for tool in &tools {
+            for tool in tools {
                 println!("      - {}: {}", tool.name, tool.description.as_deref().unwrap_or(""));
             }
         }
@@ -112,6 +119,7 @@ pub async fn cmd_list_servers(mut daemon: Box<dyn crate::ipc::ProtocolClient>, w
 ///
 /// Displays detailed information about a specific server.
 /// Implements DISC-02: inspection of server details.
+/// Implements TASK-03: colored output for error cases.
 ///
 /// # Arguments
 /// * `daemon` - Daemon IPC client
@@ -119,14 +127,17 @@ pub async fn cmd_list_servers(mut daemon: Box<dyn crate::ipc::ProtocolClient>, w
 ///
 /// # Errors
 /// Returns McpError::ServerNotFound if server doesn't exist (ERR-02)
-pub async fn cmd_server_info(daemon: Box<dyn crate::ipc::ProtocolClient>, server_name: &str) -> Result<()> {
+pub async fn cmd_server_info(daemon: Box<dyn ProtocolClient>, server_name: &str) -> Result<()> {
     let config = daemon.config();
     let server = config.get_server(server_name)
-        .ok_or_else(|| McpError::ServerNotFound {
-            server: server_name.to_string(),
+        .ok_or_else(|| {
+            print_error(&format!("Server '{}' not found", server_name));
+            McpError::ServerNotFound {
+                server: server_name.to_string(),
+            }
         })?;
 
-    println!("Server: {}", server.name);
+    print_info(&format!("Server: {}", server.name));
     if let Some(desc) = &server.description {
         println!("Description: {}", desc);
     }
@@ -166,6 +177,7 @@ pub async fn cmd_server_info(daemon: Box<dyn crate::ipc::ProtocolClient>, server
 ///
 /// Displays detailed information about a specific tool including its JSON Schema.
 /// Implements DISC-03: inspection of tool details.
+/// Implements TASK-03: colored output for error cases.
 ///
 /// # Arguments
 /// * `daemon` - Daemon IPC client
@@ -174,12 +186,16 @@ pub async fn cmd_server_info(daemon: Box<dyn crate::ipc::ProtocolClient>, server
 /// # Errors
 /// Returns McpError::ToolNotFound if tool doesn't exist (ERR-02)
 /// Returns McpError::AmbiguousCommand if tool_id format is unclear (ERR-06)
-pub async fn cmd_tool_info(mut daemon: Box<dyn crate::ipc::ProtocolClient>, tool_id: &str) -> Result<()> {
+pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str) -> Result<()> {
     let (server_name, tool_name) = parse_tool_id(tool_id)?;
 
-    let server = daemon.config().get_server(&server_name)
-        .ok_or_else(|| McpError::ServerNotFound {
-            server: server_name.clone(),
+    let _server = daemon.config().get_server(&server_name)
+        .ok_or_else(|| {
+            print_error(&format!("Tool '{}' not found on server '{}'", tool_name, server_name));
+            McpError::ToolNotFound {
+                tool: tool_name.clone(),
+                server: server_name.clone(),
+            }
         })?;
 
     // Send ListTools request to daemon
@@ -187,12 +203,15 @@ pub async fn cmd_tool_info(mut daemon: Box<dyn crate::ipc::ProtocolClient>, tool
 
     let tool = tools.iter()
         .find(|t| t.name == tool_name)
-        .ok_or_else(|| McpError::ToolNotFound {
-            tool: tool_name.clone(),
-            server: server_name.clone(),
+        .ok_or_else(|| {
+            print_error(&format!("Tool '{}' not found on server '{}'", tool_name, server_name));
+            McpError::ToolNotFound {
+                tool: tool_name.clone(),
+                server: server_name.clone(),
+            }
         })?;
 
-    println!("Tool: {}", tool.name);
+    print_info(&format!("Tool: {}", tool.name));
     println!("Description: {}", tool.description);
     println!("Input schema (JSON Schema):");
     println!("{}", serde_json::to_string_pretty(&tool.input_schema)?);
@@ -204,6 +223,7 @@ pub async fn cmd_tool_info(mut daemon: Box<dyn crate::ipc::ProtocolClient>, tool
 ///
 /// Executes a tool with JSON arguments.
 /// Implements EXEC-01, EXEC-02, EXEC-04, EXEC-06.
+/// Implements TASK-03: colored output for stdin and error cases.
 ///
 /// # Arguments
 /// * `daemon` - Daemon IPC client
@@ -213,13 +233,16 @@ pub async fn cmd_tool_info(mut daemon: Box<dyn crate::ipc::ProtocolClient>, tool
 /// # Errors
 /// Returns McpError::InvalidProtocol for malformed response
 /// Returns McpError::Timeout if timeout exceeded (EXEC-06)
-pub async fn cmd_call_tool(mut daemon: Box<dyn crate::ipc::ProtocolClient>, tool_id: &str, args_json: Option<&str>) -> Result<()> {
+pub async fn cmd_call_tool(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, args_json: Option<&str>) -> Result<()> {
     let (server_name, tool_name) = parse_tool_id(tool_id)?;
 
-    let _server = daemon.config().get_server(&server_name)
-        .ok_or_else(|| McpError::ServerNotFound {
+    // Check if server exists
+    daemon.config().get_server(&server_name).ok_or_else(|| {
+        print_error(&format!("Server '{}' not found", server_name));
+        McpError::ServerNotFound {
             server: server_name.clone(),
-        })?;
+        }
+    })?;
 
     // Send ExecuteTool request to daemon
     let result = match args_json {
@@ -231,14 +254,17 @@ pub async fn cmd_call_tool(mut daemon: Box<dyn crate::ipc::ProtocolClient>, tool
         None => {
             // Read from stdin if not provided
             if io::stdin().is_terminal() {
-                println!("No arguments provided. Pass JSON arguments as a command-line argument, or pipe JSON to stdin.");
+                print_error("No arguments provided. Pass JSON arguments as a command-line argument, or pipe JSON to stdin.");
                 return Ok(());
             }
 
             let input = read_stdin_async()?;
 
             let arguments = serde_json::from_str(&input)
-                .map_err(|e| McpError::InvalidJson { source: e })?;
+                .map_err(|e| {
+                    print_error(&format!("Invalid JSON in stdin: {}", e));
+                    McpError::InvalidJson { source: e }
+                })?;
             daemon.execute_tool(&server_name, &tool_name, arguments).await?
         }
     };
@@ -251,67 +277,117 @@ pub async fn cmd_call_tool(mut daemon: Box<dyn crate::ipc::ProtocolClient>, tool
 
 /// Execute search tools command.
 ///
-/// Search for tools using glob patterns.
+/// Search for tools using glob patterns with parallel server discovery.
 /// Implements DISC-04: search of tools using glob patterns.
+/// Implements TASK-02: parallel server discovery for cmd_search_tools.
+/// Implements TASK-03: colored output for error cases.
 ///
 /// # Arguments
-/// * `daemon` - Daemon IPC client
+/// * `daemon` - Daemon IPC client (IpcClientWrapper<UnixIpcClient>)
 /// * `pattern` - Glob pattern to search for (e.g., "*", "search*", "tool-*")
 ///
 /// # Errors
 /// Returns empty result if no tools match
-pub async fn cmd_search_tools(mut daemon: Box<dyn crate::ipc::ProtocolClient>, pattern: &str) -> Result<()> {
-    if daemon.config().is_empty() {
-        println!("No servers configured. Please create a config file.");
+pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str) -> Result<()> {
+    let config = daemon.config();
+
+    if config.is_empty() {
+        print_error("No servers configured. Please create a config file.");
         return Ok(());
     }
 
-    println!("Searching for tools matching '{}':", pattern);
+    print_info(&format!("Searching for tools matching '{}':", pattern));
 
-    let mut matches_found = false;
+    let executor = ParallelExecutor::new(config.concurrency_limit);
 
-    for server in &daemon.config().servers {
-        println!("Server: {} ({}):", server.name, server.transport.type_name());
+    // Get server names from daemon
+    let server_names = daemon.list_servers().await
+        .map_err(|e| {
+            print_error(&format!("Failed to get servers list: {}", e));
+            e
+        })?;
 
-        // Send ListServers request to daemon
-        match daemon.list_servers().await {
-            Ok(server_names) => {
-                for server_name in &server_names {
-                    println!("Server: {}:", server_name);
+    // Create daemon client for parallel execution (daemon is moved here and not used again)
+    let daemon_arc = Arc::new(Mutex::new(daemon));
 
-                    // Send ListTools request for each server
-                    match daemon.list_tools(server_name).await {
-                        Ok(tools) => {
-                            // Match tool names against the glob pattern
-                            let matched_tools: Vec<_> = tools.iter()
-                                .filter(|tool| {
-                                    let tool_name = &tool.name;
-                                    // Use globset for pattern matching instead of glob
-                                    match glob::Pattern::new(pattern) {
-                                        Ok(pattern_obj) => pattern_obj.matches(tool_name),
-                                        Err(_) => tool_name.contains(pattern),
+    // List tools from all servers in parallel
+    let (successes, failures): (Vec<(String, Vec<ToolInfo>)>, Vec<String>) = {
+        list_tools_parallel(
+            server_names,
+            // Closure that lists tools for a single server
+            |server| {
+                let daemon_arc = daemon_arc.clone();
+                async move {
+                    let mut daemon_guard = daemon_arc.lock().await;
+                    daemon_guard.list_tools(&server).await
+                        .map_err(|e| {
+                            tracing::warn!("Failed to list tools for {}: {}", server, e);
+                            e
+                        })
+                        .map(|protocol_tools| {
+                            protocol_tools
+                                .into_iter()
+                                .map(|protocol_tool| {
+                                    crate::client::ToolInfo {
+                                        name: protocol_tool.name,
+                                        description: Some(protocol_tool.description),
+                                        input_schema: protocol_tool.input_schema,
                                     }
                                 })
-                                .collect();
-
-                            if !matched_tools.is_empty() {
-                                matches_found = true;
-                                println!("  - {} tool(s):", matched_tools.len());
-                                for tool in matched_tools {
-                                    println!("      - {}: {}", tool.name, tool.description);
-                                }
-                            }
-                        }
-                        Err(_) => {}
-                    }
+                                .collect()
+                        })
                 }
+            },
+            &executor,
+        )
+        .await?
+    };
+
+    let mut matches_found = false;
+    let pattern_obj = match glob::Pattern::new(pattern) {
+        Ok(p) => p,
+        Err(_) => {
+            print_warning(&format!("Invalid glob pattern '{}': {}", pattern, "Using substring matching instead"));
+            glob::Pattern::new("*").unwrap()
+        }
+    };
+
+    // Display successful matches
+    for (server_name, tools) in &successes {
+        // Match tool names against the glob pattern
+        let matched_tools: Vec<_> = tools.iter()
+            .filter(|tool| {
+                let tool_name = &tool.name;
+                pattern_obj.matches(tool_name)
+            })
+            .collect();
+
+        if !matched_tools.is_empty() {
+            matches_found = true;
+            print_info(&format!("Server: {}:", server_name));
+            println!("  - {} tool(s) match '{}':", matched_tools.len(), pattern);
+            for tool in matched_tools {
+                println!("      - {}: {}", tool.name, tool.description.as_deref().unwrap_or(""));
             }
-            Err(_) => {}
         }
     }
 
+    // Warn about partial failures
+    if !failures.is_empty() {
+        print_warning(&format!(
+            "Search limited to {} servers ({} failed): {}",
+            successes.len(),
+            failures.len(),
+            failures.join(", ")
+        ));
+        println!();
+    }
+
     if !matches_found {
-        println!("No matching tools found.");
+        print_error("No matching tools found.");
+    } else {
+        println!();
+        print_info(&format!("Total matches: {}", successes.iter().filter(|(_, t)| !t.is_empty()).count()));
     }
 
     Ok(())
