@@ -18,7 +18,7 @@ struct Cli {
     command: Option<Commands>,
 }
 
-#[derive(Subcommand)]
+#[derive(Clone, Subcommand)]
 enum Commands {
     /// List all servers and their available tools (CLI-01, DISC-01)
     List {
@@ -89,35 +89,43 @@ async fn run(cli: Cli) -> Result<()> {
     let shutdown = GracefulShutdown::new();
     shutdown.spawn_signal_listener();
 
-    // Ensure daemon is running with fresh config
-    let daemon_client = ensure_daemon(Arc::clone(&daemon_config)).await
-        .map_err(|e| mcp_cli_rs::error::McpError::io_error(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
-
     // Subscribe to shutdown notifications
     let shutdown_rx = shutdown.subscribe();
 
     // Run CLI operations with graceful shutdown support
     let result = run_with_graceful_shutdown(
         || async {
-            // Use daemon client for all operations
-            match cli.command {
+            // Ensure daemon is running with fresh config
+            let daemon_config = Arc::clone(&daemon_config);
+            let daemon_client = match ensure_daemon(daemon_config).await {
+                Ok(client) => client,
+                Err(e) => {
+                    return Err(mcp_cli_rs::error::McpError::io_error(
+                        std::io::Error::new(std::io::ErrorKind::Other, e)
+                    ));
+                }
+            };
+
+             // Use daemon client for all operations
+            let command = cli.command.clone();
+            match command {
                 Some(Commands::List { with_descriptions }) => {
-                    cmd_list_servers(daemon_client.clone(), with_descriptions).await
+                    cmd_list_servers(daemon_client, with_descriptions).await
                 }
                 Some(Commands::Info { name }) => {
-                    cmd_server_info(daemon_client.clone(), &name).await
+                    cmd_server_info(daemon_client, &name).await
                 }
                 Some(Commands::Tool { tool }) => {
-                    cmd_tool_info(daemon_client.clone(), &tool).await
+                    cmd_tool_info(daemon_client, &tool).await
                 }
                 Some(Commands::Call { tool, args }) => {
-                    cmd_call_tool(daemon_client.clone(), &tool, args.as_deref()).await
+                    cmd_call_tool(daemon_client, &tool, args.as_deref()).await
                 }
                 Some(Commands::Search { pattern }) => {
-                    cmd_search_tools(daemon_client.clone(), &pattern).await
+                    cmd_search_tools(daemon_client, &pattern).await
                 }
                 None => {
-                    cmd_list_servers(daemon_client.clone(), false).await
+                    cmd_list_servers(daemon_client, false).await
                 }
             }
         },
@@ -125,5 +133,5 @@ async fn run(cli: Cli) -> Result<()> {
     ).await?;
 
     // Return the result (or ShutdownError if shutdown was requested)
-    result
+    Ok(result)
 }
