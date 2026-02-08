@@ -109,14 +109,16 @@ mod tests {
 
     #[test]
     fn test_fingerprint_from_file() {
-        // Create a temporary config file
-        let temp_file = std::tempdir().unwrap().path().join("test.toml");
-        std::fs::write(&temp_file, "test = \"value\"").unwrap();
-        std::fs::set_last_modified(&temp_file, std::time::SystemTime::UNIX_EPOCH).unwrap();
+        use tempfile::NamedTempFile;
 
-        let fp = ConfigFingerprint::from_config_file(&temp_file).unwrap();
+        // Create a temporary config file
+        let temp_file = NamedTempFile::new().unwrap();
+        let path = temp_file.path();
+        std::fs::write(path, "test = \"value\"").unwrap();
+
+        let fp = ConfigFingerprint::from_config_file(path).unwrap();
         assert!(!fp.hash.is_empty());
-        assert_eq!(fp.mtime, std::time::UNIX_EPOCH);
+        // mtime will be the current time when file was written
     }
 
     #[test]

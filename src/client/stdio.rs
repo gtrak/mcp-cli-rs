@@ -6,6 +6,7 @@
 
 use async_trait::async_trait;
 use std::collections::HashMap;
+use std::io::BufRead;
 use std::time::Duration;
 
 use crate::client::http::HttpTransport;
@@ -215,8 +216,8 @@ mod tests {
         println!("StdioTransport creation works");
     }
 
-    #[test]
-    fn test_write_json() {
+    #[tokio::test]
+    async fn test_write_json() {
         let mut stdout = Vec::new();
         let mock_reader = BufReader::new(&mut stdout as &mut dyn BufRead);
         let mut transport = StdioTransport {

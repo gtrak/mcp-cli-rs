@@ -194,27 +194,3 @@ mod tests {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn test_http_transport_creation() {
-        let headers = HashMap::new();
-        let transport = HttpTransport::new("http://example.com", headers);
-        assert_eq!(transport.base_url, "http://example.com");
-    }
-
-    #[test]
-    fn test_http_send() {
-        let headers = HashMap::new();
-        let mut transport = HttpTransport::new("http://example.com", headers);
-
-        let request = serde_json::json!({ "test": "data" });
-        // This would need a real server to test properly
-        // transport.send(request).await.unwrap();
-        println!("HttpTransport send structure works");
-    }
-}
-
