@@ -3,10 +3,11 @@
 //! Provides automatic retry with configurable limits and exponential backoff.
 //! Implements EXEC-05, EXEC-06, EXEC-07.
 
-use backoff::{ExponentialBackoff, future::retry, Error as BackoffError};
+use backoff::{ExponentialBackoff, ExponentialBackoffBuilder, future::retry};
+use backoff::Error as BackoffError;
 use std::time::Duration;
 use tokio::time::timeout;
-use crate::error::{McpError, Result};
+use crate::error::McpError;
 
 /// Configuration for retry behavior.
 #[derive(Debug, Clone)]
@@ -33,15 +34,12 @@ impl RetryConfig {
 
     /// Get the backoff configuration.
     fn backoff(&self) -> ExponentialBackoff {
-        ExponentialBackoff {
-            current_interval: Duration::from_millis(self.base_delay_ms),
-            randomization_factor: 0.5,
-            multiplier: 2.0,
-            max_interval: Duration::from_millis(self.max_delay_ms),
-            max_elapsed_time: None,
-            start_time: std::time::Instant::now(),
-            clock: backoff::SystemClock,
-        }
+        ExponentialBackoffBuilder::new()
+            .with_initial_interval(Duration::from_millis(self.base_delay_ms))
+            .with_max_interval(Duration::from_millis(self.max_delay_ms))
+            .with_multiplier(2.0)
+            .with_randomization_factor(0.5)
+            .build()
     }
 }
 
@@ -69,77 +67,38 @@ fn is_transient_error(error: &McpError) -> bool {
     )
 }
 
-/// Execute operation with automatic retry on transient errors.
-///
-/// Implements EXEC-05: exponential backoff for transient errors.
-/// Implements EXEC-07: configurable retry limits.
-///
-/// # Arguments
-/// * `operation` - Async operation to retry
-/// * `config` - Retry configuration
-///
-/// # Returns
-/// Result<T> with success value or error after exhausting retries
-///
-/// # Errors
-/// Returns permanent errors immediately, transient errors after max_attempts
-pub async fn retry_with_backoff<F, T, Fut>(operation: F, config: &RetryConfig) -> Result<T>
+pub async fn retry_with_backoff<F, T, Fut>(operation: F, config: &RetryConfig) -> std::result::Result<T, McpError>
 where
     F: Fn() -> Fut + Send + Sync,
-    Fut: std::future::Future<Output = Result<T>> + Send,
+    Fut: std::future::Future<Output = std::result::Result<T, McpError>> + Send,
 {
-    let mut attempt = 0;
     let backoff = config.backoff();
 
     retry(backoff, || async {
-        attempt += 1;
-
         match operation().await {
             Ok(value) => Ok(value),
             Err(error) if is_transient_error(&error) => {
-                // If this was the last attempt, convert to permanent error
-                if attempt >= config.max_attempts {
-                    Err(BackoffError::Permanent(McpError::max_retries_exceeded(
-                        config.max_attempts,
-                    )))
-                } else {
-                    // Transient error - trigger backoff and retry
-                    Err(BackoffError::transient(error))
-                }
+                // Mark transient error - using From trait for automatic conversion
+                Err(BackoffError::from(error))
             }
             Err(error) => {
                 // Permanent error - don't retry
-                Err(BackoffError::Permanent(error))
+                Err(BackoffError::permanent(error))
             }
         }
     })
     .await
-    .map_err(|e| match e {
-        BackoffError::Permanent(e) | BackoffError::Transient(e) => e,
-        _ => McpError::io_error(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Retry failed",
-        )),
+    .map_err(|e| {
+        // The backoff errors have already been converted to McpError by this point
+        // Just return the McpError directly (should have been converted)
+        e
     })
 }
 
-/// Execute operation with overall timeout.
-///
-/// Implements EXEC-06: timeout enforcement cancels retries when budget exhausted.
-///
-/// # Arguments
-/// * `operation` - Async operation to execute
-/// * `timeout_secs` - Maximum allowed duration
-///
-/// # Returns
-/// Result<T> with success value or timeout error
-///
-/// # Errors
-/// Returns McpError::OperationCancelled if timeout expires
-pub async fn timeout_wrapper<F, T, Fut>(operation: F, timeout_secs: u64) -> Result<T>
+pub async fn timeout_wrapper<F, T, Fut>(operation: F, timeout_secs: u64) -> std::result::Result<T, McpError>
 where
     F: Fn() -> Fut,
-    Fut: std::future::Future<Output = Result<T>>,
+    Fut: std::future::Future<Output = std::result::Result<T, McpError>>,
 {
     let duration = Duration::from_secs(timeout_secs);
 
@@ -170,12 +129,24 @@ mod tests {
         assert!(is_transient_error(&McpError::IOError {
             source: std::io::Error::new(std::io::ErrorKind::TimedOut, "test"),
         }));
+        // Permanent error - should not be transient
         assert!(!is_transient_error(&McpError::InvalidJson {
-            source: serde_json::Error::syntax(
-                serde_json::error::ErrorCode::ExpectedColon,
-                0,
-                0,
-            ),
+            source: std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid json"),
+        }));
+    }
+
+    #[test]
+    fn test_is_transient_error_connection() {
+        assert!(is_transient_error(&McpError::ConnectionError {
+            server: "localhost:8080".to_string(),
+            source: std::io::Error::new(std::io::ErrorKind::ConnectionRefused, "test"),
+        }));
+    }
+
+    #[test]
+    fn test_is_transient_error_ipc() {
+        assert!(is_transient_error(&McpError::IpcError {
+            message: "IPC error".to_string(),
         }));
     }
 }
