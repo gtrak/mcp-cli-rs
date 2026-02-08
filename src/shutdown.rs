@@ -81,10 +81,9 @@ impl GracefulShutdown {
     ///
     /// Returns true if shutdown signal was sent.
     pub fn is_shutdown_requested(&mut self) -> bool {
-        if let Ok(Ok(_)) = self.shutdown_rx.try_recv() {
-            true
-        } else {
-            false
+        match self.shutdown_rx.try_recv() {
+            Ok(value) => value,
+            Err(_) => false,
         }
     }
 }
@@ -103,7 +102,7 @@ impl Default for GracefulShutdown {
 /// * `op` - Async operation to run
 ///
 /// # Returns
-/// Result<T> from the operation or Ok(()) if shutdown occurred
+/// Result<T, Error> from the operation or Err(Error) if shutdown occurred
 ///
 /// # Example
 /// ```rust,ignore
@@ -118,7 +117,7 @@ impl Default for GracefulShutdown {
 ///     shutdown.subscribe(),
 /// ).await?;
 /// ```
-pub async fn run_with_graceful_shutdown<F, T, Fut>(op: F, mut shutdown_rx: broadcast::Receiver<bool>) -> Result<T>
+pub async fn run_with_graceful_shutdown<F, T, Fut>(op: F, mut shutdown_rx: broadcast::Receiver<bool>) -> crate::error::Result<T>
 where
     F: Fn() -> Fut,
     Fut: std::future::Future<Output = crate::error::Result<T>>,
@@ -127,7 +126,7 @@ where
         result = op() => result,
         _ = shutdown_rx.recv() => {
             println!("Shutting down gracefully...");
-            // Return success on shutdown (user initiated)
+            // Return shutdown error on termination
             Err(crate::error::McpError::io_error(
                 std::io::Error::new(std::io::ErrorKind::Interrupted, "Shutdown requested")
             ))
