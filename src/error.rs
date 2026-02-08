@@ -99,6 +99,13 @@ pub enum McpError {
     #[cfg(windows)]
     #[error("Named pipe instance busy at '{}'", path)]
     PipeBusy { path: String },
+
+    // Retry and timeout errors (EXEC-05, EXEC-06, EXEC-07)
+    #[error("Operation cancelled (timeout: {}s)", timeout)]
+    OperationCancelled { timeout: u64 },
+
+    #[error("Max retry attempts ({}) exceeded", attempts)]
+    MaxRetriesExceeded { attempts: u32 },
 }
 
 /// Exit codes (ERR-03)
@@ -112,7 +119,9 @@ pub fn exit_code(error: &McpError) -> i32 {
         | McpError::MissingRequiredField { .. }
         | McpError::InvalidJson { .. }
         | McpError::AmbiguousCommand { .. }
-        | McpError::UsageError { .. } => 1, // Client error
+        | McpError::UsageError { .. }
+        | McpError::OperationCancelled { .. }
+        | McpError::MaxRetriesExceeded { .. } => 1, // Client error
 
         McpError::InvalidProtocol { .. } => 2, // Server error
 
@@ -136,7 +145,9 @@ pub fn exit_code(error: &McpError) -> i32 {
         | McpError::MissingRequiredField { .. }
         | McpError::InvalidJson { .. }
         | McpError::AmbiguousCommand { .. }
-        | McpError::UsageError { .. } => 1, // Client error
+        | McpError::UsageError { .. }
+        | McpError::OperationCancelled { .. }
+        | McpError::MaxRetriesExceeded { .. } => 1, // Client error
 
         McpError::InvalidProtocol { .. } => 2, // Server error
 
@@ -224,6 +235,14 @@ impl McpError {
     #[cfg(windows)]
     pub fn pipe_busy(path: impl Into<String>) -> Self {
         Self::PipeBusy { path: path.into() }
+    }
+
+    pub fn operation_cancelled(timeout: u64) -> Self {
+        Self::OperationCancelled { timeout }
+    }
+
+    pub fn max_retries_exceeded(attempts: u32) -> Self {
+        Self::MaxRetriesExceeded { attempts }
     }
 }
 
