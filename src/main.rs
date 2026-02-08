@@ -3,6 +3,7 @@ use mcp_cli_rs::cli::commands::{cmd_list_servers, cmd_server_info, cmd_tool_info
 use mcp_cli_rs::cli::daemon::ensure_daemon;
 use mcp_cli_rs::config::loader::{find_and_load, load_config};
 use mcp_cli_rs::error::{exit_code, Result};
+use mcp_cli_rs::shutdown::{GracefulShutdown, run_with_graceful_shutdown};
 use std::sync::Arc;
 
 #[derive(Parser)]
@@ -84,29 +85,45 @@ async fn run(cli: Cli) -> Result<()> {
     // Wrap config in Arc for shared ownership
     let daemon_config = Arc::new(config);
 
+    // Initialize GracefulShutdown for clean shutdown on signals
+    let shutdown = GracefulShutdown::new();
+    shutdown.spawn_signal_listener();
+
     // Ensure daemon is running with fresh config
     let daemon_client = ensure_daemon(Arc::clone(&daemon_config)).await
         .map_err(|e| mcp_cli_rs::error::McpError::io_error(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
-    // Use daemon client for all operations
-    match cli.command {
-        Some(Commands::List { with_descriptions }) => {
-            cmd_list_servers(daemon_client, with_descriptions).await
-        }
-        Some(Commands::Info { name }) => {
-            cmd_server_info(daemon_client, &name).await
-        }
-        Some(Commands::Tool { tool }) => {
-            cmd_tool_info(daemon_client, &tool).await
-        }
-        Some(Commands::Call { tool, args }) => {
-            cmd_call_tool(daemon_client, &tool, args.as_deref()).await
-        }
-        Some(Commands::Search { pattern }) => {
-            cmd_search_tools(daemon_client, &pattern).await
-        }
-        None => {
-            cmd_list_servers(daemon_client, false).await
-        }
-    }
+    // Subscribe to shutdown notifications
+    let shutdown_rx = shutdown.subscribe();
+
+    // Run CLI operations with graceful shutdown support
+    let result = run_with_graceful_shutdown(
+        || async {
+            // Use daemon client for all operations
+            match cli.command {
+                Some(Commands::List { with_descriptions }) => {
+                    cmd_list_servers(daemon_client.clone(), with_descriptions).await
+                }
+                Some(Commands::Info { name }) => {
+                    cmd_server_info(daemon_client.clone(), &name).await
+                }
+                Some(Commands::Tool { tool }) => {
+                    cmd_tool_info(daemon_client.clone(), &tool).await
+                }
+                Some(Commands::Call { tool, args }) => {
+                    cmd_call_tool(daemon_client.clone(), &tool, args.as_deref()).await
+                }
+                Some(Commands::Search { pattern }) => {
+                    cmd_search_tools(daemon_client.clone(), &pattern).await
+                }
+                None => {
+                    cmd_list_servers(daemon_client.clone(), false).await
+                }
+            }
+        },
+        shutdown_rx,
+    ).await?;
+
+    // Return the result (or ShutdownError if shutdown was requested)
+    result
 }
