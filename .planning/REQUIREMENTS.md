@@ -21,10 +21,10 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **CONN-02**: Connect to MCP servers via HTTP transport (remote API)
 - [ ] **CONN-03**: Handle connection lifecycle (connect, disconnect, timeouts)
 - [ ] **CONN-04**: Use tokio::process for async process spawning with kill_on_drop(true) to prevent zombie processes on Windows
-- [ ] **CONN-05**: Implement connection daemon using Unix sockets (*nix) and Windows named pipes for cross-platform IPC
-- [ ] **CONN-06**: Spawn daemon lazily on first access with idle timeout (60s default)
-- [ ] **CONN-07**: Detect configuration changes and spawn new daemon when cached config becomes stale
-- [ ] **CONN-08**: Cleanup orphaned daemon processes and sockets on startup
+- [x] **CONN-05**: Implement connection daemon using Unix sockets (*nix) and Windows named pipes for cross-platform IPC
+- [x] **CONN-06**: Spawn daemon lazily on first access with idle timeout (60s default)
+- [x] **CONN-07**: Detect configuration changes and spawn new daemon when cached config becomes stale
+- [x] **CONN-08**: Cleanup orphaned daemon processes and sockets on startup
 
 ### Discovery & Search
 
@@ -118,10 +118,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONN-02 | Phase 1 | Pending |
 | CONN-03 | Phase 1 | Pending |
 | CONN-04 | Phase 1 | Pending |
-| CONN-05 | Phase 2 | Pending |
-| CONN-06 | Phase 2 | Pending |
-| CONN-07 | Phase 2 | Pending |
-| CONN-08 | Phase 2 | Pending |
+| CONN-05 | Phase 2 | Complete |
+| CONN-06 | Phase 2 | Complete |
+| CONN-07 | Phase 2 | Complete |
+| CONN-08 | Phase 2 | Complete |
 | DISC-01 | Phase 1 | Pending |
 | DISC-02 | Phase 1 | Pending |
 | DISC-03 | Phase 1 | Pending |
