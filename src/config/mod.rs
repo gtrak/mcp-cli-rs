@@ -156,11 +156,11 @@ pub struct Config {
     #[serde(default = "default_timeout_secs")]
     pub timeout_secs: u64,
 
-    /// Timeout for idle daemon sessions in seconds.
+    /// Daemon idle timeout in seconds (TTL).
     ///
-    /// Default value of 60s provides reasonable balance between resource usage and usability.
-    /// When exceeded, daemon shuts down automatically unless explicitly terminated by user.
-    /// This implements PLAN-03: TTL configuration for daemon idle timeout.
+    /// After this period of inactivity, the daemon will shut down.
+    /// Default value of 60s provides automatic cleanup of idle daemons.
+    /// This implements DAEMON-03, DAEMON-10, and DAEMON-11 requirements.
     #[serde(default = "default_daemon_ttl")]
     pub daemon_ttl: u64,
 }
