@@ -8,15 +8,16 @@
 #[cfg(test)]
 #[cfg(windows)]
 mod windows_process_tests {
-    use super::mcp_cli_rs::client::stdio::StdioTransport;
+    use mcp_cli_rs::client::stdio::StdioTransport;
     use std::collections::HashMap;
     use std::time::Duration;
     use tokio::time::timeout;
+    use tokio::io::{AsyncBufReadExt, AsyncReadExt};
 
     /// Helper to wait for process termination and verify via tasklist
-    async fn verify_process_terminated(child: &tokio::process::Child) -> Result<bool> {
+    async fn verify_process_terminated(child: &tokio::process::Child) -> Result<bool, Box<dyn std::error::Error>> {
         // Wait up to 5 seconds for process to terminate
-        timeout(Duration::from_secs(5), async {
+        let result = timeout(Duration::from_secs(5), async {
             loop {
                 match child.kill().await {
                     Ok(()) => {
@@ -26,7 +27,8 @@ mod windows_process_tests {
                         match child.stdout.take() {
                             Some(stdout) => {
                                 let mut buffer = Vec::new();
-                                let _ = stdout.read_to_end(&mut buffer).await;
+                                let stdout_reader = tokio::io::BufReader::new(stdout);
+                                let _ = stdout_reader.read_to_end(&mut buffer).await;
                                 // If we can get stdout, process is still running
                                 return Ok(false);
                             }
@@ -42,7 +44,14 @@ mod windows_process_tests {
                     }
                 }
             }
-        }).await
+        }).await;
+
+        // Extract the inner Result from the timeout Result
+        match result {
+            Ok(inner) => inner,
+            Err(_) => Err("timeout".into()),
+        }
+    }
     }
 
     /// Test normal process lifecycle
@@ -62,7 +71,7 @@ mod windows_process_tests {
         assert!(transport.is_ok(), "StdioTransport creation should succeed");
 
         // Drop the StdioTransport
-        let mut transport = transport.unwrap();
+        let transport = transport.unwrap();
 
         // Verify process terminates when dropped
         // We're dropping the StdioTransport struct, which holds the child process handle
@@ -104,7 +113,7 @@ mod windows_process_tests {
     #[ignore]
     async fn test_kill_on_drop_early_drop() {
         // Spawn a process that would run indefinitely
-        let mut child = tokio::process::Command::new("cmd.exe")
+        let child = tokio::process::Command::new("cmd.exe")
             .args(&["/c", "timeout", "60"])
             .kill_on_drop(true)
             .stdout(std::process::Stdio::null())
@@ -130,7 +139,7 @@ mod windows_process_tests {
 
         // Create 10 sequential spawns
         for i in 0..10 {
-            let mut child = tokio::process::Command::new("cmd.exe")
+            let child = tokio::process::Command::new("cmd.exe")
                 .args(&["/c", "echo", &format!("test{}", i)])
                 .kill_on_drop(true)
                 .stdout(std::process::Stdio::piped())
@@ -178,9 +187,10 @@ mod windows_process_tests {
         // Verify no partial process handles remain
         // The error should have cleaned up properly
 
-        // Clean error message
+        // Clean error message - just check it's an error
         let error = transport_result.unwrap_err();
-        assert!(error.to_string().contains("Failed to spawn") || error.to_string().contains("spawn"));
+        let error_msg = error.to_string();
+        assert!(error_msg.contains("Failed to spawn") || error_msg.contains("spawn"), "Error message should contain spawn information");
     }
 
     /// Test stdout buffering doesn't prevent cleanup
@@ -200,7 +210,7 @@ mod windows_process_tests {
 
         // Read all output
         let mut output = String::new();
-        reader.read_to_string(&mut output).await.expect("Failed to read");
+        reader.read_to_end(&mut output).await.expect("Failed to read");
 
         assert!(output.contains("buffered_output"));
 
@@ -223,11 +233,11 @@ mod windows_process_tests {
                 .spawn()
                 .expect("Failed to spawn");
 
-            // Read stdout
-            let stdout = child.stdout.take().expect("No stdout handle");
-            let mut reader = tokio::io::BufReader::new(stdout);
-            let mut line = String::new();
-            reader.read_line(&mut line).await.expect("Failed to read");
+        // Read stdout
+        let stdout = child.stdout.take().expect("No stdout handle");
+        let mut reader = tokio::io::BufReader::new(stdout);
+        let mut line = String::new();
+        let _ = reader.read_line(&mut line).await;
 
             assert!(line.contains(&format!("iteration {}", iteration)));
 
