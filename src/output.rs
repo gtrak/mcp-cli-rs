@@ -128,14 +128,18 @@ mod tests {
 
     #[test]
     fn test_use_color_with_no_color() {
-        std::env::set_var("NO_COLOR", "1");
-        assert_eq!(use_color(), false);
-        std::env::remove_var("NO_COLOR");
+        unsafe {
+            std::env::set_var("NO_COLOR", "1");
+            assert_eq!(use_color(), false);
+            std::env::remove_var("NO_COLOR");
+        }
     }
 
     #[test]
     fn test_use_color_without_no_color() {
-        std::env::remove_var("NO_COLOR");
-        assert_eq!(use_color(), true);
+        unsafe {
+            std::env::remove_var("NO_COLOR");
+            assert_eq!(use_color(), true);
+        }
     }
 }

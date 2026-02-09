@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt};
 
 /// Request types sent from CLI to daemon
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum DaemonRequest {
     /// Keep daemon alive
@@ -27,7 +27,7 @@ pub enum DaemonRequest {
 }
 
 /// Response types sent from daemon to CLI
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum DaemonResponse {
     /// Acknowledge ping
@@ -50,7 +50,7 @@ pub enum DaemonResponse {
 }
 
 /// Tool information returned by daemon
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ToolInfo {
     pub name: String,
     pub description: String,

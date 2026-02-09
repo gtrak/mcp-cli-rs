@@ -123,6 +123,20 @@ pub fn validate_server_config(server: &ServerConfig, config_path: &str) -> Resul
             debug!("Server '{}' HTTP config validated (url: {})", server.name, url);
         }
     }
+
+    // Phase 4: Validate tool filtering configuration
+    // Ensure at least one of allowed_tools or disabled_tools is provided
+    let has_allowed = server.allowed_tools.as_ref().map_or(false, |tools| !tools.is_empty());
+    let has_disabled = server.disabled_tools.as_ref().map_or(false, |tools| !tools.is_empty());
+
+    if !has_allowed && !has_disabled {
+        debug!(
+            "Server '{}' has no tool filtering specified (both allowedTools and disabledTools empty)",
+            server.name
+        );
+        // This is not an error - allows backward compatibility with no filtering
+    }
+
     Ok(())
 }
 

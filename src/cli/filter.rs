@@ -181,7 +181,11 @@ mod tests {
 fn test_password_pattern_direct() {
     use glob::Pattern;
     let p = Pattern::new("password_*").unwrap();
-    println!("Pattern valid: {}", p.is_valid());
-    println!("password_secret: {}", p.matches("password_secret"));
-    println!("password_generate_abc: {}", p.matches("password_generate_abc"));
+    println!("Password pattern matches:");
+    println!("  password_a: {}", p.matches("password_a"));
+    println!("  password_abc: {}", p.matches("password_abc"));
+    println!(
+        "  password_generate_xyz: {}",
+        p.matches("password_generate_xyz")
+    );
 }

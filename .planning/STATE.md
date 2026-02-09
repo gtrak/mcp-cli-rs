@@ -26,7 +26,4 @@
 - Daemon IPC and lifecycle testing infrastructure established for client CLI development
 - All XP-04 requirements validated: daemon starts and connects on Linux, macOS, and Windows
 
-**Issues:**
-- [2026-02-09] Fixed cleanup_orphaned_daemon type mismatch (Arc<Config> vs &Config) in daemon lifecycle tests
-- [2026-02-09] Fixed syntax error and missing mut keyword in daemon lifecycle tests (3 compilation errors fixed)
 **Planning docs committed:** true
