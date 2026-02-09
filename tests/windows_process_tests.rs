@@ -8,16 +8,15 @@
 #[cfg(test)]
 #[cfg(windows)]
 mod windows_process_tests {
-    use mcp_cli_rs::client::stdio::StdioTransport;
+    use super::mcp_cli_rs::client::stdio::StdioTransport;
     use std::collections::HashMap;
     use std::time::Duration;
     use tokio::time::timeout;
-    use tokio::io::{AsyncBufReadExt, AsyncReadExt};
 
     /// Helper to wait for process termination and verify via tasklist
-    async fn verify_process_terminated(mut child: tokio::process::Child) -> Result<bool, Box<dyn std::error::Error>> {
+    async fn verify_process_terminated(child: &tokio::process::Child) -> Result<bool> {
         // Wait up to 5 seconds for process to terminate
-        let mut result = timeout(Duration::from_secs(5), async {
+        timeout(Duration::from_secs(5), async {
             loop {
                 match child.kill().await {
                     Ok(()) => {
@@ -27,8 +26,7 @@ mod windows_process_tests {
                         match child.stdout.take() {
                             Some(stdout) => {
                                 let mut buffer = Vec::new();
-                                let mut stdout_reader = tokio::io::BufReader::new(stdout);
-                                let _ = stdout_reader.read_to_end(&mut buffer).await;
+                                let _ = stdout.read_to_end(&mut buffer).await;
                                 // If we can get stdout, process is still running
                                 return Ok(false);
                             }
@@ -44,13 +42,7 @@ mod windows_process_tests {
                     }
                 }
             }
-        }).await;
-
-        // Extract the inner Result from the timeout Result
-        match result {
-            Ok(inner) => inner,
-            Err(_) => Err("timeout".into()),
-        }
+        }).await
     }
 
     /// Test normal process lifecycle
@@ -61,7 +53,7 @@ mod windows_process_tests {
         let env = HashMap::new();
         let transport = StdioTransport::new(
             "cmd.exe",
-            &["/c".to_string(), "echo".to_string(), "test".to_string()],
+            &["/c", "echo", "test"],
             &env,
             None
         );
@@ -70,15 +62,11 @@ mod windows_process_tests {
         assert!(transport.is_ok(), "StdioTransport creation should succeed");
 
         // Drop the StdioTransport
-        let transport = transport.unwrap();
+        let mut transport = transport.unwrap();
 
         // Verify process terminates when dropped
         // We're dropping the StdioTransport struct, which holds the child process handle
         // The kill_on_drop(true) should handle cleanup
-
-        // Add Debug trait requirement to StdioTransport
-        #[derive(Debug)]
-        struct TestTransport;
     }
 
     /// Test normal process lifecycle with mock reader
@@ -116,7 +104,7 @@ mod windows_process_tests {
     #[ignore]
     async fn test_kill_on_drop_early_drop() {
         // Spawn a process that would run indefinitely
-        let child = tokio::process::Command::new("cmd.exe")
+        let mut child = tokio::process::Command::new("cmd.exe")
             .args(&["/c", "timeout", "60"])
             .kill_on_drop(true)
             .stdout(std::process::Stdio::null())
@@ -143,19 +131,16 @@ mod windows_process_tests {
         // Create 10 sequential spawns
         for i in 0..10 {
             let mut child = tokio::process::Command::new("cmd.exe")
-                .args(&["/c".to_string(), "echo".to_string(), format!("test{}", i)])
+                .args(&["/c", "echo", &format!("test{}", i)])
                 .kill_on_drop(true)
                 .stdout(std::process::Stdio::piped())
                 .spawn()
                 .expect(&format!("Failed to spawn process {}", i));
 
-            // Take stdout handle before pushing child to vector
-            let stdout = child.stdout.take().expect("No stdout handle");
-
-            // Push child to vector (Child is movable, doesn't implement Clone)
             processes.push(child);
 
-            // Read stdout while child is still alive
+            // Read each response
+            let stdout = child.stdout.take().expect("No stdout handle");
             let mut reader = tokio::io::BufReader::new(stdout);
             let mut line = String::new();
             reader.read_line(&mut line).await.expect("Failed to read");
@@ -180,12 +165,9 @@ mod windows_process_tests {
         // Try to spawn with invalid command
         let env = HashMap::new();
 
-        #[derive(Debug)]
-        struct DebugTransport;
-
         let transport_result = StdioTransport::new(
             "nonexistent_command_that_doesnt_exist_12345.exe",
-            &["".to_string()],
+            &[],
             &env,
             None
         );
@@ -196,13 +178,9 @@ mod windows_process_tests {
         // Verify no partial process handles remain
         // The error should have cleaned up properly
 
-        // Clean error message - just check it's an error
-        // Use match to avoid Debug requirement on StdioTransport
-        let error_msg = match transport_result {
-            Ok(_) => panic!("Expected error"),
-            Err(e) => format!("{:?}", e),
-        };
-        assert!(error_msg.contains("Failed to spawn") || error_msg.contains("spawn"), "Error message should contain spawn information");
+        // Clean error message
+        let error = transport_result.unwrap_err();
+        assert!(error.to_string().contains("Failed to spawn") || error.to_string().contains("spawn"));
     }
 
     /// Test stdout buffering doesn't prevent cleanup
@@ -210,7 +188,7 @@ mod windows_process_tests {
     #[ignore]
     async fn test_stdout_buffering_cleanup() {
         let mut child = tokio::process::Command::new("cmd.exe")
-            .args(&["/c".to_string(), "echo".to_string(), "buffered_output".to_string()])
+            .args(&["/c", "echo", "buffered_output"])
             .kill_on_drop(true)
             .stdout(std::process::Stdio::piped())
             .spawn()
@@ -221,10 +199,10 @@ mod windows_process_tests {
         let mut reader = tokio::io::BufReader::new(stdout);
 
         // Read all output
-        let mut output = Vec::new();
-        reader.read_to_end(&mut output).await.expect("Failed to read");
+        let mut output = String::new();
+        reader.read_to_string(&mut output).await.expect("Failed to read");
 
-        assert!(String::from_utf8(output).unwrap_or_default().contains("buffered_output"));
+        assert!(output.contains("buffered_output"));
 
         // Drop child - should be cleaned up
         drop(child);
@@ -239,7 +217,7 @@ mod windows_process_tests {
     async fn test_spawn_multiple_times() {
         for iteration in 0..5 {
             let mut child = tokio::process::Command::new("cmd.exe")
-                .args(&["/c".to_string(), "echo".to_string(), format!("iteration {}", iteration)])
+                .args(&["/c", "echo", &format!("iteration {}", iteration)])
                 .kill_on_drop(true)
                 .stdout(std::process::Stdio::piped())
                 .spawn()
@@ -249,23 +227,23 @@ mod windows_process_tests {
             let stdout = child.stdout.take().expect("No stdout handle");
             let mut reader = tokio::io::BufReader::new(stdout);
             let mut line = String::new();
-            let _ = reader.read_line(&mut line).await;
+            reader.read_line(&mut line).await.expect("Failed to read");
 
             assert!(line.contains(&format!("iteration {}", iteration)));
 
             // Kill explicitly to demonstrate control
-            let _ = child.kill().await.expect("Failed to kill");
+            child.kill().await.expect("Failed to kill");
 
             // Drop
             drop(child);
         }
     }
 
-    /// Final verification for no zombie processes
+    /// Verify no zombie processes remain after all tests
     /// This must be run manually after all tests complete
     #[test]
     #[ignore]
-    fn verify_no_zombie_processes_final() {
+    fn verify_no_zombie_processes() {
         // Manual verification: Run tasklist on Windows to check for zombies
         // Use: tasklist | findstr "nonexistent" to check for lingering processes
         // If no output, all processes were cleaned up
@@ -280,35 +258,9 @@ mod windows_process_tests {
         let mut parent = tokio::process::Command::new("cmd.exe")
             .args(&["/c", "cmd.exe", "/c", "echo", "parent", "&&", "echo", "child"])
             .kill_on_drop(true)
-            .spawn()
-            .expect("Failed to spawn");
-
-        // Get child stdout
-        let stdout = parent.stdout.take().expect("No stdout handle");
-        let mut reader = tokio::io::BufReader::new(stdout);
-        let mut line = String::new();
-        let _ = reader.read_line(&mut line).await.expect("Failed to read");
-
-        // Should see both parent and child output
-        assert!(line.contains("parent") || line.contains("child"));
-
-        // Drop parent - both should be cleaned
-        drop(parent);
-
-        tokio::time::sleep(Duration::from_millis(500)).await;
-    }
-
-    /// Windows-specific test for process tree cleanup
-    #[tokio::test]
-    #[ignore]
-    async fn test_process_tree_cleanup_unique() {
-        // Spawn a process that spawns another
-        let mut parent = tokio::process::Command::new("cmd.exe")
-            .args(&["/c".to_string(), "cmd.exe".to_string(), "/c".to_string(), "echo".to_string(), "parent".to_string(), "&&".to_string(), "echo".to_string(), "child".to_string()])
-            .kill_on_drop(true)
             .stdout(std::process::Stdio::piped())
             .spawn()
-            .expect("Failed to spawn");
+            .expect("Failed to spawn parent process");
 
         // Read output
         let stdout = parent.stdout.take().expect("No stdout handle");

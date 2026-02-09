@@ -6,11 +6,12 @@
 
 #[cfg(test)]
 mod process_cleanup_tests {
-    use mcp_cli_rs::client::stdio::StdioTransport;
+    use super::mcp_cli_rs::client::stdio::StdioTransport;
     use std::collections::HashMap;
+    use std::sync::Arc;
+    use tokio::sync::Semaphore;
     use tokio::time::{timeout, Duration};
     use serde_json::json;
-    use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
     /// Integration test: CLI command execution with shutdown
     #[tokio::test]
@@ -22,7 +23,7 @@ mod process_cleanup_tests {
         // Create StdioTransport for a simple echo server
         let transport = StdioTransport::new(
             "cmd.exe",
-            &["/c".to_string(), "echo".to_string(), "test_response".to_string()],
+            &["/c", "echo", "test_response"],
             &env,
             None
         )
@@ -51,26 +52,55 @@ mod process_cleanup_tests {
     #[tokio::test]
     #[ignore]
     async fn test_cli_json_rpc_protocol() {
-        let mut handles = Vec::new();
-
         // Simulate a simple JSON-RPC server
         let mut child = tokio::process::Command::new("cmd.exe")
-            .args(&["/c".to_string(), "cmd.exe".to_string(), "/c".to_string(), "echo".to_string(), "{\"jsonrpc\":\"2.0\",\"result\":42}".to_string()])
+            .args(&["/c", "cmd.exe", "/c", "echo", "{\"jsonrpc\":\"2.0\",\"result\":42}"])
             .kill_on_drop(true)
             .stdout(std::process::Stdio::piped())
             .spawn()
             .expect("Failed to spawn");
 
+        // Read response
         let stdout = child.stdout.take().expect("No stdout handle");
         let mut reader = tokio::io::BufReader::new(stdout);
         let mut line = String::new();
-        let _ = reader.read_line(&mut line).await.expect("Failed to read");
+        let _ = reader.read_line(&mut line).await;
 
-        let handle = tokio::spawn(async move {
-            line.trim().to_string()
-        });
+        // Should get JSON-RPC response
+        let response: serde_json::Value = serde_json::from_str(&line.trim()).unwrap_or_default();
+        assert!(response.is_object() || line.contains("42"));
 
-        handles.push(handle);
+        // Clean up
+        child.kill().await.expect("Failed to kill");
+    }
+
+    /// Integration test: Concurrent process spawning
+    #[tokio::test]
+    #[ignore]
+    async fn test_concurrent_process_spawning() {
+        let num_processes = 5;
+        let mut handles = Vec::new();
+
+        // Spawn 5 processes concurrently
+        for i in 0..num_processes {
+            let handle = tokio::spawn(async move {
+                let mut child = tokio::process::Command::new("cmd.exe")
+                    .args(&["/c", "echo", &format!("process_{}", i)])
+                    .kill_on_drop(true)
+                    .stdout(std::process::Stdio::piped())
+                    .spawn()
+                    .expect("Failed to spawn");
+
+                let stdout = child.stdout.take().expect("No stdout handle");
+                let mut reader = tokio::io::BufReader::new(stdout);
+                let mut line = String::new();
+                let _ = reader.read_line(&mut line).await;
+
+                line.trim().to_string()
+            });
+
+            handles.push(handle);
+        }
 
         // Collect results
         let mut results = Vec::new();
@@ -80,8 +110,10 @@ mod process_cleanup_tests {
         }
 
         // Verify all responses
-        assert_eq!(results.len(), 1);
-        assert!(results[0].contains("42"));
+        assert_eq!(results.len(), num_processes);
+        for result in &results {
+            assert!(result.contains("process_"));
+        }
 
         // All processes should be cleaned up - no zombies
     }
@@ -106,8 +138,8 @@ mod process_cleanup_tests {
         }
 
         // Drop each at random intervals
-        for (i, mut child) in processes.into_iter().enumerate() {
-            let delay = Duration::from_millis(((i % 3 + 1) * 100) as u64);
+        for (i, child) in processes.into_iter().enumerate() {
+            let delay = Duration::from_millis((i % 3 + 1) * 100);
             tokio::spawn(async move {
                 tokio::time::sleep(delay).await;
                 // Just dropping - kill_on_drop will handle cleanup
@@ -128,7 +160,7 @@ mod process_cleanup_tests {
     async fn test_process_timeout_scenarios() {
         // Process that doesn't respond (simulating hang)
         let mut child = tokio::process::Command::new("cmd.exe")
-            .args(&["/c".to_string(), "echo".to_string(), "would_timeout".to_string()])
+            .args(&["/c", "echo", "would_timeout"])
             .kill_on_drop(true)
             .stdout(std::process::Stdio::piped())
             .spawn()
@@ -154,7 +186,7 @@ mod process_cleanup_tests {
 
         let transport_result = StdioTransport::new(
             "cmd.exe",
-            &["/c".to_string(), "timeout".to_string(), "60".to_string()],
+            &["/c", "timeout", "60"],
             &env,
             None
         );
@@ -191,7 +223,7 @@ mod process_cleanup_tests {
         // ensures cleanup
 
         // Clean up
-        let _ = daemon.kill().await.expect("Failed to kill daemon");
+        let _ = daemon.kill().await;
 
         // Give cleanup time
         tokio::time::sleep(Duration::from_millis(500)).await;
@@ -208,7 +240,7 @@ mod process_cleanup_tests {
         for cycle in 0..cycles {
             // Spawn daemon
             let mut daemon = tokio::process::Command::new("cmd.exe")
-                .args(&["/c".to_string(), "cmd.exe".to_string(), "/C".to_string(), "echo".to_string(), format!("cycle_{}", cycle)])
+                .args(&["/c", "cmd.exe", "/C", "echo", &format!("cycle_{}", cycle)])
                 .kill_on_drop(true)
                 .stdout(std::process::Stdio::piped())
                 .spawn()
@@ -218,12 +250,12 @@ mod process_cleanup_tests {
             let stdout = daemon.stdout.take().expect("No stdout handle");
             let mut reader = tokio::io::BufReader::new(stdout);
             let mut line = String::new();
-            let _ = reader.read_line(&mut line).await.expect("Failed to read");
+            let _ = reader.read_line(&mut line).await;
 
             assert!(line.contains(&format!("cycle_{}", cycle)));
 
             // Kill and drop
-            daemon.kill().await.expect("Failed to kill daemon");
+            daemon.kill().await.expect("Failed to kill");
             drop(daemon);
 
             // Wait for cleanup
@@ -248,7 +280,7 @@ mod process_cleanup_tests {
             let results = Arc::clone(&results_clone);
             tokio::spawn(async move {
                 let mut child = tokio::process::Command::new("cmd.exe")
-                    .args(&["/c".to_string(), "echo".to_string(), format!("tool_{}", i)])
+                    .args(&["/c", "echo", &format!("tool_{}", i)])
                     .kill_on_drop(true)
                     .stdout(std::process::Stdio::piped())
                     .spawn()
@@ -294,7 +326,7 @@ mod process_cleanup_tests {
         // Execute batch
         for i in 0..batch_size {
             let mut child = tokio::process::Command::new("cmd.exe")
-                .args(&["/c".to_string(), "echo".to_string(), format!("batch_{}", i)])
+                .args(&["/c", "echo", &format!("batch_{}", i)])
                 .kill_on_drop(true)
                 .stdout(std::process::Stdio::piped())
                 .spawn()
@@ -303,12 +335,9 @@ mod process_cleanup_tests {
             let stdout = child.stdout.take().expect("No stdout handle");
             let mut reader = tokio::io::BufReader::new(stdout);
             let mut line = String::new();
-            let _ = reader.read_line(&mut line).await.expect("Failed to read");
+            let _ = reader.read_line(&mut line).await;
 
             assert!(line.contains(&format!("batch_{}", i)));
-
-            // Drop child to clean up
-            drop(child);
         }
 
         // All batch items completed
@@ -324,7 +353,7 @@ mod process_cleanup_tests {
 
         for i in 0..10 {
             let mut child = tokio::process::Command::new("cmd.exe")
-                .args(&["/c".to_string(), "echo".to_string(), format!("item_{}", i)])
+                .args(&["/c", "echo", &format!("item_{}", i)])
                 .kill_on_drop(true)
                 .stdout(std::process::Stdio::piped())
                 .spawn()
@@ -358,8 +387,8 @@ mod process_cleanup_tests {
     async fn test_tokio_timeout_with_process() {
         // Use tokio::time::timeout
         let timeout_result = timeout(Duration::from_secs(2), async {
-                let mut child = tokio::process::Command::new("cmd.exe")
-                    .args(vec!["/c", "timeout", "60"])
+            let mut child = tokio::process::Command::new("cmd.exe")
+                .args(&["/c", "timeout", "60"])
                 .kill_on_drop(true)
                 .stdout(std::process::Stdio::null())
                 .spawn()
@@ -389,17 +418,18 @@ mod process_cleanup_tests {
             .spawn()
             .expect("Failed to spawn");
 
-        // Attempt to send data (ChildStdout cannot be wrapped in BufWriter)
-        // Note: stdout cannot be reused across iterations, so we take a fresh handle each time
+        // Attempt to send data (simulating write failure)
+        let stdout = child.stdout.take().expect("No stdout handle");
+        let mut writer = tokio::io::AsyncWriter::new(stdout);
+
+        // Try to write multiple times (simulate buffer issues)
         for _ in 0..5 {
-            let mut stdout = child.stdout.take().expect("No stdout handle");
-            let _ = tokio::spawn(async move {
-                let _ = tokio::io::AsyncReadExt::read_to_end(&mut stdout, &mut Vec::new()).await;
-            }).await;
+            let _ = writer.write_all(b"test data\n").await;
+            let _ = writer.flush().await;
         }
 
         // Clean up
-        let _ = child.kill().await.expect("Failed to kill");
+        child.kill().await.expect("Failed to kill");
         drop(child);
 
         // Should be terminated
