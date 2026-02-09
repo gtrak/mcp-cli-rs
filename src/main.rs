@@ -93,6 +93,11 @@ async fn main() {
 }
 
 async fn run(cli: Cli) -> Result<()> {
+    // Handle daemon subcommand first (standalone mode)
+    if let Some(Commands::Daemon { ttl }) = &cli.command {
+        return run_standalone_daemon(*ttl).await;
+    }
+
     // Load configuration using the loader
     let config = if let Some(path) = &cli.config {
         // Use explicitly provided config path
@@ -112,22 +117,27 @@ async fn run(cli: Cli) -> Result<()> {
     // Subscribe to shutdown notifications
     let shutdown_rx = shutdown.subscribe();
 
-    // Run CLI operations with graceful shutdown support
-    let result = run_with_graceful_shutdown(
-        || async {
-            if cli.no_daemon {
-                // Direct mode: connect to servers without daemon
-                tracing::info!("Running in direct mode (no daemon)");
-                run_direct_mode(&cli, Arc::clone(&daemon_config)).await
-            } else {
-                // Daemon mode: use connection caching
-                run_daemon_mode(&cli, Arc::clone(&daemon_config)).await
-            }
-        },
-        shutdown_rx,
-    ).await?;
+    // Determine operational mode
+    let result = if cli.no_daemon {
+        // Direct mode (existing behavior)
+        run_with_graceful_shutdown(
+            || run_direct_mode(&cli, Arc::clone(&daemon_config)),
+            shutdown_rx,
+        ).await?
+    } else if cli.require_daemon {
+        // Require-daemon mode: fail if daemon not running
+        run_with_graceful_shutdown(
+            || run_require_daemon_mode(&cli, Arc::clone(&daemon_config)),
+            shutdown_rx,
+        ).await?
+    } else {
+        // Auto-daemon mode (default): spawn if needed, use TTL
+        run_with_graceful_shutdown(
+            || run_auto_daemon_mode(&cli, Arc::clone(&daemon_config)),
+            shutdown_rx,
+        ).await?
+    };
 
-    // Return the result (or ShutdownError if shutdown was requested)
     Ok(result)
 }
 
@@ -161,7 +171,7 @@ async fn run_direct_mode(cli: &Cli, config: Arc<mcp_cli_rs::config::Config>) -> 
 /// Execute the CLI command using the provided client
 async fn execute_command(cli: &Cli, mut client: Box<dyn mcp_cli_rs::ipc::ProtocolClient>) -> Result<()> {
     use mcp_cli_rs::cli::commands::*;
-    
+
     let command = cli.command.clone();
     match command {
         Some(Commands::List { with_descriptions }) => {
@@ -183,6 +193,150 @@ async fn execute_command(cli: &Cli, mut client: Box<dyn mcp_cli_rs::ipc::Protoco
             cmd_list_servers(client, false).await
         }
     }
+}
+
+/// Run in standalone daemon mode - starts persistent daemon with specified TTL
+async fn run_standalone_daemon(ttl: u64) -> Result<()> {
+    use mcp_cli_rs::config::loader::find_and_load;
+    use mcp_cli_rs::ipc::get_socket_path;
+    use mcp_cli_rs::daemon::run_daemon;
+
+    tracing::info!("Starting standalone daemon with TTL: {}s", ttl);
+
+    // Load configuration
+    let config = find_and_load(None)
+        .await
+        .map_err(|e| mcp_cli_rs::error::McpError::ConfigError {
+            message: format!("Failed to load configuration: {}", e),
+        })?;
+
+    // Get socket path
+    let socket_path = get_socket_path();
+    tracing::info!("Using socket path: {:?}", socket_path);
+
+    // Remove existing socket file if present
+    if let Err(e) = std::fs::remove_file(&socket_path) {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            tracing::warn!("Could not remove existing socket file: {}", e);
+        }
+    }
+
+    // Create daemon lifecycle with specified TTL
+    let lifecycle = mcp_cli_rs::daemon::lifecycle::DaemonLifecycle::new(ttl);
+
+    // Run daemon (this blocks until shutdown)
+    tracing::info!("Daemon starting...");
+    match run_daemon(config, socket_path, lifecycle).await {
+        Ok(()) => {
+            tracing::info!("Daemon exited normally");
+            Ok(())
+        }
+        Err(e) => {
+            tracing::error!("Daemon error: {}", e);
+            Err(mcp_cli_rs::error::McpError::IOError {
+                source: std::io::Error::new(std::io::ErrorKind::Other, e),
+            })
+        }
+    }
+}
+
+/// Run in auto-daemon mode: spawn if needed, execute command, daemon auto-shutdowns after TTL
+pub async fn run_auto_daemon_mode(
+    cli: &Cli,
+    config: Arc<mcp_cli_rs::config::Config>,
+) -> Result<()> {
+    // Check if daemon is running
+    let socket_path = crate::ipc::get_socket_path();
+
+    match try_connect_to_daemon(config.clone(), &socket_path).await {
+        Ok(client) => {
+            // Daemon is running, use it
+            tracing::info!("Using existing daemon");
+            execute_command(cli, client).await
+        }
+        Err(_) => {
+            // Daemon not running, spawn it
+            tracing::info!("Daemon not running, spawning...");
+
+            // Get TTL from env var or use default (60s)
+            let ttl = std::env::var("MCP_DAEMON_TTL")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(60);
+
+            // Spawn daemon as background task
+            let config_clone = Arc::clone(&config);
+            tokio::spawn(async move {
+                if let Err(e) = spawn_background_daemon(config_clone, ttl).await {
+                    tracing::error!("Failed to spawn daemon: {}", e);
+                }
+            });
+
+            // Wait for daemon to start
+            tokio::time::sleep(Duration::from_millis(500)).await;
+
+            // Connect and execute
+            let client = try_connect_to_daemon(config, &socket_path).await
+                .map_err(|e| mcp_cli_rs::error::McpError::io_error(
+                    std::io::Error::new(std::io::ErrorKind::Other, e)
+                ))?;
+
+            execute_command(cli, client).await
+        }
+    }
+}
+
+/// Run in require-daemon mode: fail if daemon not running
+pub async fn run_require_daemon_mode(
+    cli: &Cli,
+    config: Arc<mcp_cli_rs::config::Config>,
+) -> Result<()> {
+    let socket_path = crate::ipc::get_socket_path();
+
+    match try_connect_to_daemon(config.clone(), &socket_path).await {
+        Ok(client) => {
+            tracing::info!("Using existing daemon");
+            execute_command(cli, client).await
+        }
+        Err(_) => {
+            Err(mcp_cli_rs::error::McpError::DaemonNotRunning {
+                message: "Daemon is not running. Start it with 'mcp daemon' or use --auto-daemon".to_string(),
+            })
+        }
+    }
+}
+
+async fn try_connect_to_daemon(config: Arc<mcp_cli_rs::config::Config>, socket_path: &std::path::Path) -> Result<Box<dyn mcp_cli_rs::ipc::ProtocolClient>> {
+    crate::ipc::create_ipc_client(config)
+}
+
+async fn spawn_background_daemon(config: Arc<mcp_cli_rs::config::Config>, ttl: u64) -> Result<()> {
+    use mcp_cli_rs::config::loader::find_and_load;
+    use mcp_cli_rs::ipc::get_socket_path;
+    use mcp_cli_rs::daemon::run_daemon;
+
+    // Load configuration
+    let config = find_and_load(None)
+        .await
+        .map_err(|e| mcp_cli_rs::error::McpError::ConfigError {
+            message: format!("Failed to load configuration: {}", e),
+        })?;
+
+    // Get socket path
+    let socket_path = get_socket_path();
+
+    // Remove existing socket file if present
+    if let Err(e) = std::fs::remove_file(&socket_path) {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            tracing::warn!("Could not remove existing socket file: {}", e);
+        }
+    }
+
+    // Create daemon lifecycle with specified TTL
+    let lifecycle = mcp_cli_rs::daemon::lifecycle::DaemonLifecycle::new(ttl);
+
+    // Run daemon in background
+    run_daemon(config, socket_path, lifecycle).await
 }
 
 /// Direct protocol client that connects to servers without daemon
