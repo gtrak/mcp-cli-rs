@@ -63,7 +63,7 @@ impl DaemonState {
 /// 3. Spawns idle timeout monitor
 /// 4. Main loop accepts connections and handles requests
 /// 5. Removes socket file on exit
-pub async fn run_daemon(config: Config, socket_path: PathBuf) -> Result<()> {
+pub async fn run_daemon(config: Config, socket_path: PathBuf, lifecycle: DaemonLifecycle) -> Result<()> {
     tracing::info!("Starting daemon with socket: {:?}", socket_path);
 
     // Create IPC server
@@ -81,9 +81,6 @@ pub async fn run_daemon(config: Config, socket_path: PathBuf) -> Result<()> {
     // Write PID to file for orphan detection
     let _ = crate::daemon::orphan::write_daemon_pid(&socket_path, pid);
     tracing::info!("PID file written");
-
-    // Initialize lifecycle with daemon_ttl from config
-    let lifecycle = DaemonLifecycle::new(config.daemon_ttl);
 
     // Spawn idle timeout monitor
     let lifecycle_clone = lifecycle.clone();

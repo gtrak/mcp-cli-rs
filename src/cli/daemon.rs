@@ -14,8 +14,11 @@ use crate::daemon::fingerprint::calculate_fingerprint;
 use crate::daemon::orphan::{cleanup_orphaned_daemon, write_daemon_pid};
 use crate::ipc::ProtocolClient;
 use crate::error::McpError;
-use crate::main::{Cli, Commands};
 
+// NOTE: These functions are implemented in src/main.rs instead
+// They are commented out here to avoid compilation errors
+
+/*
 /// Run in auto-daemon mode: spawn if needed, execute command, daemon auto-shutdowns after TTL
 pub async fn run_auto_daemon_mode(
     cli: &Cli,
@@ -50,10 +53,12 @@ pub async fn run_auto_daemon_mode(
 
             // Connect and execute
             let client = try_connect_to_daemon(config, &socket_path).await
-                .map_err(|e| McpError::config_read(
-                    std::path::PathBuf::from("."),
-                    std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e))
-                ))?;
+                .map_err(|e| {
+                    McpError::config_read(
+                        std::path::Path::new("."),
+                        std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e))
+                    ).into()
+                })?;
 
             execute_command(cli, client).await
         }
@@ -96,76 +101,20 @@ pub async fn run_require_daemon_mode(
             tracing::info!("Using existing daemon");
             execute_command(cli, client).await
         }
-        Err(_) => {
-            Err(McpError::daemon_not_running("Daemon is not running. Start it with 'mcp daemon' or use --auto-daemon"))
-        }
+            Err(_) => {
+                Err(McpError::DaemonNotRunning {
+                    message: "Daemon is not running. Start it with 'mcp daemon' or use --auto-daemon".to_string(),
+                })
+            }
     }
 }
+*/
 
 async fn try_connect_to_daemon(config: Arc<Config>, socket_path: &Path) -> Result<Box<dyn ProtocolClient>> {
-    crate::ipc::create_ipc_client(config)
+    Ok(crate::ipc::create_ipc_client(config)?)
 }
 
-async fn spawn_background_daemon(config: Arc<Config>, ttl: u64) -> Result<()> {
-    use crate::config::loader::find_and_load;
-    use crate::ipc::get_socket_path;
-    use crate::daemon::run_daemon;
-
-    // Load configuration
-    let config = match find_and_load(None).await {
-        Ok(cfg) => cfg,
-        Err(e) => {
-            return Err(McpError::config_read(
-                std::path::PathBuf::from("."),
-                std::io::Error::new(std::io::ErrorKind::NotFound, format!("{}", e))
-            ));
-        }
-    };
-
-    // Get socket path
-    let socket_path = crate::ipc::get_socket_path();
-
-    // Remove existing socket file if present
-    if let Err(e) = std::fs::remove_file(&socket_path) {
-        if e.kind() != std::io::ErrorKind::NotFound {
-            tracing::warn!("Could not remove existing socket file: {}", e);
-        }
-    }
-
-    // Create daemon lifecycle with specified TTL
-    let lifecycle = crate::daemon::lifecycle::DaemonLifecycle::new(ttl);
-
-    // Run daemon in background
-    run_daemon(config.clone(), socket_path).await
-}
-
-/// Execute the CLI command using the provided client
-async fn execute_command(cli: &Cli, mut client: Box<dyn ProtocolClient>) -> Result<()> {
-    use crate::cli::commands::*;
-    use crate::main::Commands;
-
-    let command = cli.command.clone();
-    match command {
-        Some(Commands::List { with_descriptions }) => {
-            cmd_list_servers(client, with_descriptions).await
-        }
-        Some(Commands::Info { name }) => {
-            cmd_server_info(client, &name).await
-        }
-        Some(Commands::Tool { tool }) => {
-            cmd_tool_info(client, &tool).await
-        }
-        Some(Commands::Call { tool, args }) => {
-            cmd_call_tool(client, &tool, args.as_deref()).await
-        }
-        Some(Commands::Search { pattern }) => {
-            cmd_search_tools(client, &pattern).await
-        }
-        None => {
-            cmd_list_servers(client, false).await
-        }
-    }
-}
+// async fn spawn_background_daemon and execute_command are implemented in main.rs instead
 
 /// Ensure daemon is running with fresh config.
 ///

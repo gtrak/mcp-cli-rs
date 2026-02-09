@@ -123,7 +123,7 @@ impl ServerConfig {
 /// Overall MCP configuration containing multiple server definitions.
 ///
 /// This is the root config structure parsed from TOML files.
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     /// List of MCP servers to configure.
     pub servers: Vec<ServerConfig>,
@@ -163,6 +163,19 @@ pub struct Config {
     /// This implements DAEMON-03, DAEMON-10, and DAEMON-11 requirements.
     #[serde(default = "default_daemon_ttl")]
     pub daemon_ttl: u64,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            servers: Vec::new(),
+            concurrency_limit: default_concurrency_limit(),
+            retry_max: default_retry_max(),
+            retry_delay_ms: default_retry_delay_ms(),
+            timeout_secs: default_timeout_secs(),
+            daemon_ttl: default_daemon_ttl(),
+        }
+    }
 }
 
 impl Config {
@@ -279,3 +292,186 @@ impl ServerTransport {
 }
 
 pub mod loader;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_server_config_create_transport() {
+        let server = ServerConfig {
+            name: "test-server".to_string(),
+            transport: ServerTransport::Stdio {
+                command: "echo".to_string(),
+                args: vec!["hello".to_string()],
+                env: std::collections::HashMap::new(),
+                cwd: None,
+            },
+            description: None,
+            allowed_tools: None,
+            disabled_tools: None,
+        };
+        assert_eq!(server.name, "test-server");
+    }
+
+    #[test]
+    fn test_concurrency_limit_defaults() {
+        let config = Config::default();
+        assert_eq!(config.concurrency_limit, 5);
+    }
+
+    #[test]
+    fn test_retry_defaults() {
+        let config = Config::default();
+        assert_eq!(config.retry_max, 3);
+        assert_eq!(config.retry_delay_ms, 1000);
+    }
+
+    #[test]
+    fn test_timeout_default() {
+        let config = Config::default();
+        assert_eq!(config.timeout_secs, 1800);
+    }
+
+    #[test]
+    fn test_daemon_ttl_default() {
+        let config = Config::default();
+        assert_eq!(config.daemon_ttl, 60);
+    }
+
+    #[test]
+    fn test_daemon_ttl_custom() {
+        let config = Config {
+            daemon_ttl: 120,
+            ..Default::default()
+        };
+        assert_eq!(config.daemon_ttl, 120);
+    }
+
+    #[test]
+    fn test_servers_by_name() {
+        let config = Config {
+            servers: vec![
+                ServerConfig {
+                    name: "server1".to_string(),
+                    transport: ServerTransport::Stdio {
+                        command: "echo".to_string(),
+                        args: vec![],
+                        env: HashMap::new(),
+                        cwd: None,
+                    },
+                    description: None,
+                    allowed_tools: None,
+                    disabled_tools: None,
+                },
+                ServerConfig {
+                    name: "server2".to_string(),
+                    transport: ServerTransport::Stdio {
+                        command: "echo".to_string(),
+                        args: vec![],
+                        env: HashMap::new(),
+                        cwd: None,
+                    },
+                    description: None,
+                    allowed_tools: None,
+                    disabled_tools: None,
+                },
+            ],
+            ..Default::default()
+        };
+        let by_name = config.servers_by_name();
+        assert_eq!(by_name.len(), 2);
+        assert!(by_name.contains_key("server1"));
+        assert!(by_name.contains_key("server2"));
+    }
+
+    #[test]
+    fn test_get_server() {
+        let config = Config {
+            servers: vec![
+                ServerConfig {
+                    name: "server1".to_string(),
+                    transport: ServerTransport::Stdio {
+                        command: "echo".to_string(),
+                        args: vec![],
+                        env: HashMap::new(),
+                        cwd: None,
+                    },
+                    description: None,
+                    allowed_tools: None,
+                    disabled_tools: None,
+                },
+            ],
+            ..Default::default()
+        };
+        let server = config.get_server("server1");
+        assert!(server.is_some());
+        assert_eq!(server.unwrap().name, "server1");
+        assert!(config.get_server("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_config_fingerprint_includes_daemon_ttl() {
+        let config1 = Config {
+            daemon_ttl: 60,
+            servers: vec![
+                ServerConfig {
+                    name: "test".to_string(),
+                    transport: ServerTransport::Stdio {
+                        command: "echo".to_string(),
+                        args: vec![],
+                        env: HashMap::new(),
+                        cwd: None,
+                    },
+                    description: None,
+                    allowed_tools: None,
+                    disabled_tools: None,
+                },
+            ],
+            ..Default::default()
+        };
+
+        let config2 = Config {
+            daemon_ttl: 120,
+            servers: vec![
+                ServerConfig {
+                    name: "test".to_string(),
+                    transport: ServerTransport::Stdio {
+                        command: "echo".to_string(),
+                        args: vec![],
+                        env: HashMap::new(),
+                        cwd: None,
+                    },
+                    description: None,
+                    allowed_tools: None,
+                    disabled_tools: None,
+                },
+            ],
+            ..Default::default()
+        };
+
+        let config3 = Config {
+            daemon_ttl: 60,
+            servers: vec![
+                ServerConfig {
+                    name: "test".to_string(),
+                    transport: ServerTransport::Stdio {
+                        command: "echo".to_string(),
+                        args: vec![],
+                        env: HashMap::new(),
+                        cwd: None,
+                    },
+                    description: None,
+                    allowed_tools: None,
+                    disabled_tools: None,
+                },
+            ],
+            ..Default::default()
+        };
+
+        assert_ne!(crate::daemon::fingerprint::calculate_fingerprint(&config1),
+                   crate::daemon::fingerprint::calculate_fingerprint(&config2));
+        assert_eq!(crate::daemon::fingerprint::calculate_fingerprint(&config1),
+                   crate::daemon::fingerprint::calculate_fingerprint(&config3));
+    }
+}

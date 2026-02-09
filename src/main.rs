@@ -4,8 +4,9 @@ use mcp_cli_rs::cli::daemon::ensure_daemon;
 use mcp_cli_rs::config::loader::{find_and_load, load_config};
 use mcp_cli_rs::error::{exit_code, Result};
 use mcp_cli_rs::shutdown::{GracefulShutdown, run_with_graceful_shutdown};
-use mcp_cli_rs::ipc::ProtocolClient;
+use mcp_cli_rs::ipc::{ProtocolClient, get_socket_path, create_ipc_client};
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Parser)]
 #[command(name = "mcp")]
@@ -35,9 +36,9 @@ struct Cli {
 enum Commands {
     /// Start the connection daemon
     Daemon {
-        /// Daemon idle timeout in seconds
-        #[arg(short, long, default_value = "60")]
-        ttl: u64,
+        /// Daemon idle timeout in seconds (overrides config and env)
+        #[arg(short, long)]
+        ttl: Option<u64>,
     },
 
     /// List all servers and their available tools (CLI-01, DISC-01)
@@ -169,11 +170,15 @@ async fn run_direct_mode(cli: &Cli, config: Arc<mcp_cli_rs::config::Config>) -> 
 }
 
 /// Execute the CLI command using the provided client
-async fn execute_command(cli: &Cli, mut client: Box<dyn mcp_cli_rs::ipc::ProtocolClient>) -> Result<()> {
+async fn execute_command(cli: &Cli, mut client: Box<dyn mcp_cli_rs::ipc::ProtocolClient>) -> mcp_cli_rs::error::Result<()> {
     use mcp_cli_rs::cli::commands::*;
 
     let command = cli.command.clone();
     match command {
+        Some(Commands::Daemon { .. }) => {
+            // Daemon subcommand is handled separately in run()
+            Ok(())
+        }
         Some(Commands::List { with_descriptions }) => {
             cmd_list_servers(client, with_descriptions).await
         }
@@ -196,19 +201,23 @@ async fn execute_command(cli: &Cli, mut client: Box<dyn mcp_cli_rs::ipc::Protoco
 }
 
 /// Run in standalone daemon mode - starts persistent daemon with specified TTL
-async fn run_standalone_daemon(ttl: u64) -> Result<()> {
+async fn run_standalone_daemon(cli_ttl: Option<u64>) -> mcp_cli_rs::error::Result<()> {
     use mcp_cli_rs::config::loader::find_and_load;
-    use mcp_cli_rs::ipc::get_socket_path;
     use mcp_cli_rs::daemon::run_daemon;
-
-    tracing::info!("Starting standalone daemon with TTL: {}s", ttl);
 
     // Load configuration
     let config = find_and_load(None)
         .await
-        .map_err(|e| mcp_cli_rs::error::McpError::ConfigError {
-            message: format!("Failed to load configuration: {}", e),
-        })?;
+        .map_err(|e| mcp_cli_rs::error::McpError::usage_error(
+            format!("Failed to load configuration: {}", e)
+        ))?;
+
+    // Determine TTL: CLI flag > env var > config > default (60s)
+    let ttl = cli_ttl
+        .or_else(|| std::env::var("MCP_DAEMON_TTL").ok().and_then(|v| v.parse().ok()))
+        .unwrap_or(config.daemon_ttl);
+
+    tracing::info!("Starting standalone daemon with TTL: {}s", ttl);
 
     // Get socket path
     let socket_path = get_socket_path();
@@ -244,9 +253,9 @@ async fn run_standalone_daemon(ttl: u64) -> Result<()> {
 pub async fn run_auto_daemon_mode(
     cli: &Cli,
     config: Arc<mcp_cli_rs::config::Config>,
-) -> Result<()> {
+) -> mcp_cli_rs::error::Result<()> {
     // Check if daemon is running
-    let socket_path = crate::ipc::get_socket_path();
+    let socket_path = get_socket_path();
 
     match try_connect_to_daemon(config.clone(), &socket_path).await {
         Ok(client) => {
@@ -258,11 +267,8 @@ pub async fn run_auto_daemon_mode(
             // Daemon not running, spawn it
             tracing::info!("Daemon not running, spawning...");
 
-            // Get TTL from env var or use default (60s)
-            let ttl = std::env::var("MCP_DAEMON_TTL")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(60);
+            // Get TTL from config (includes env var override via config loader)
+            let ttl = config.daemon_ttl;
 
             // Spawn daemon as background task
             let config_clone = Arc::clone(&config);
@@ -290,8 +296,8 @@ pub async fn run_auto_daemon_mode(
 pub async fn run_require_daemon_mode(
     cli: &Cli,
     config: Arc<mcp_cli_rs::config::Config>,
-) -> Result<()> {
-    let socket_path = crate::ipc::get_socket_path();
+) -> mcp_cli_rs::error::Result<()> {
+    let socket_path = get_socket_path();
 
     match try_connect_to_daemon(config.clone(), &socket_path).await {
         Ok(client) => {
@@ -299,28 +305,27 @@ pub async fn run_require_daemon_mode(
             execute_command(cli, client).await
         }
         Err(_) => {
-            Err(mcp_cli_rs::error::McpError::DaemonNotRunning {
-                message: "Daemon is not running. Start it with 'mcp daemon' or use --auto-daemon".to_string(),
-            })
+            Err(mcp_cli_rs::error::McpError::daemon_not_running(
+                "Daemon is not running. Start it with 'mcp daemon' or use --auto-daemon"
+            ))
         }
     }
 }
 
-async fn try_connect_to_daemon(config: Arc<mcp_cli_rs::config::Config>, socket_path: &std::path::Path) -> Result<Box<dyn mcp_cli_rs::ipc::ProtocolClient>> {
-    crate::ipc::create_ipc_client(config)
+async fn try_connect_to_daemon(config: Arc<mcp_cli_rs::config::Config>, socket_path: &std::path::Path) -> mcp_cli_rs::error::Result<Box<dyn mcp_cli_rs::ipc::ProtocolClient>> {
+    create_ipc_client(config)
 }
 
-async fn spawn_background_daemon(config: Arc<mcp_cli_rs::config::Config>, ttl: u64) -> Result<()> {
+async fn spawn_background_daemon(_config: Arc<mcp_cli_rs::config::Config>, ttl: u64) -> mcp_cli_rs::error::Result<()> {
     use mcp_cli_rs::config::loader::find_and_load;
-    use mcp_cli_rs::ipc::get_socket_path;
     use mcp_cli_rs::daemon::run_daemon;
 
     // Load configuration
     let config = find_and_load(None)
         .await
-        .map_err(|e| mcp_cli_rs::error::McpError::ConfigError {
-            message: format!("Failed to load configuration: {}", e),
-        })?;
+        .map_err(|e| mcp_cli_rs::error::McpError::usage_error(
+            format!("Failed to load configuration: {}", e)
+        ))?;
 
     // Get socket path
     let socket_path = get_socket_path();
@@ -337,6 +342,9 @@ async fn spawn_background_daemon(config: Arc<mcp_cli_rs::config::Config>, ttl: u
 
     // Run daemon in background
     run_daemon(config, socket_path, lifecycle).await
+        .map_err(|e| mcp_cli_rs::error::McpError::IOError {
+            source: std::io::Error::new(std::io::ErrorKind::Other, e),
+        })
 }
 
 /// Direct protocol client that connects to servers without daemon

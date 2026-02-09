@@ -40,6 +40,10 @@ pub enum McpError {
     #[error("Tool '{}' not found in server '{}'", tool, server)]
     ToolNotFound { tool: String, server: String },
 
+    // Daemon errors (DAEMON-04)
+    #[error("Daemon not running: {}", message)]
+    DaemonNotRunning { message: String },
+
     #[error("Invalid JSON arguments: {}", source)]
     InvalidJson {
         #[from]
@@ -106,10 +110,6 @@ pub enum McpError {
 
     #[error("Max retry attempts ({}) exceeded", attempts)]
     MaxRetriesExceeded { attempts: u32 },
-
-    /// Daemon is required but not running
-    #[error("Daemon not running: {message}")]
-    DaemonNotRunning { message: String },
 }
 
 /// Exit codes (ERR-03)
@@ -125,8 +125,7 @@ pub fn exit_code(error: &McpError) -> i32 {
         | McpError::AmbiguousCommand { .. }
         | McpError::UsageError { .. }
         | McpError::OperationCancelled { .. }
-        | McpError::MaxRetriesExceeded { .. }
-        | McpError::DaemonNotRunning { .. } => 1, // Client error
+        | McpError::MaxRetriesExceeded { .. } => 1, // Client error
 
         McpError::InvalidProtocol { .. } => 2, // Server error
 
@@ -152,8 +151,7 @@ pub fn exit_code(error: &McpError) -> i32 {
         | McpError::AmbiguousCommand { .. }
         | McpError::UsageError { .. }
         | McpError::OperationCancelled { .. }
-        | McpError::MaxRetriesExceeded { .. }
-        | McpError::DaemonNotRunning { .. } => 1, // Client error
+        | McpError::MaxRetriesExceeded { .. } => 1, // Client error
 
         McpError::InvalidProtocol { .. } => 2, // Server error
 
@@ -162,7 +160,8 @@ pub fn exit_code(error: &McpError) -> i32 {
         // IPC errors also return client error code
         McpError::IpcError { .. }
         | McpError::PipeCreationError { .. }
-        | McpError::PipeBusy { .. } => 1,
+        | McpError::PipeBusy { .. }
+        | McpError::DaemonNotRunning { .. } => 1,
     }
 }
 
@@ -179,6 +178,13 @@ impl McpError {
         Self::ConfigReadError {
             path: path.to_path_buf(),
             source,
+        }
+    }
+
+    /// Error when daemon is not running (DAEMON-04)
+    pub fn daemon_not_running(message: impl Into<String>) -> Self {
+        Self::DaemonNotRunning {
+            message: message.into(),
         }
     }
 
@@ -249,12 +255,6 @@ impl McpError {
 
     pub fn max_retries_exceeded(attempts: u32) -> Self {
         Self::MaxRetriesExceeded { attempts }
-    }
-
-    pub fn daemon_not_running(message: impl Into<String>) -> Self {
-        Self::DaemonNotRunning {
-            message: message.into(),
-        }
     }
 }
 

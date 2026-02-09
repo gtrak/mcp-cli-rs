@@ -147,4 +147,51 @@ mod tests {
         let lifecycle = DaemonLifecycle::default();
         assert_eq!(lifecycle.elapsed_since_last_activity(), Duration::ZERO);
     }
+
+    #[test]
+    fn test_custom_ttl_value() {
+        let lifecycle = DaemonLifecycle::new(120);
+        assert_eq!(lifecycle.time_until_idle().unwrap(), Duration::from_secs(120));
+    }
+
+    #[test]
+    fn test_ttl_not_exceeded_immediately() {
+        let lifecycle = DaemonLifecycle::new(60);
+        // Should not shutdown immediately
+        assert!(!lifecycle.should_shutdown());
+    }
+
+    #[test]
+    fn test_ttl_after_delay() {
+        let lifecycle = DaemonLifecycle::new(10);
+        lifecycle.update_activity();
+        std::thread::sleep(Duration::from_millis(200));
+        // Should not shutdown
+        assert!(!lifecycle.should_shutdown());
+    }
+
+    #[test]
+    fn test_elapsed_since_last_activity() {
+        let lifecycle = DaemonLifecycle::new(30);
+        lifecycle.update_activity();
+        let elapsed = lifecycle.elapsed_since_last_activity();
+        assert!(elapsed < Duration::from_secs(1));
+        assert!(elapsed > Duration::from_millis(100));
+    }
+
+    #[test]
+    fn test_time_until_idle_with_activity() {
+        let lifecycle = DaemonLifecycle::new(60);
+        lifecycle.update_activity();
+        let time_until = lifecycle.time_until_idle().unwrap();
+        assert!(time_until > Duration::from_secs(59));
+        assert!(time_until < Duration::from_secs(61));
+    }
+
+    #[test]
+    fn test_time_until_idle_without_activity() {
+        let lifecycle = DaemonLifecycle::new(30);
+        std::thread::sleep(Duration::from_secs(1));
+        assert!(lifecycle.time_until_idle().is_none());
+    }
 }
