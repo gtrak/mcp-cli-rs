@@ -106,6 +106,10 @@ pub enum McpError {
 
     #[error("Max retry attempts ({}) exceeded", attempts)]
     MaxRetriesExceeded { attempts: u32 },
+
+    /// Daemon is required but not running
+    #[error("Daemon not running: {message}")]
+    DaemonNotRunning { message: String },
 }
 
 /// Exit codes (ERR-03)
@@ -121,7 +125,8 @@ pub fn exit_code(error: &McpError) -> i32 {
         | McpError::AmbiguousCommand { .. }
         | McpError::UsageError { .. }
         | McpError::OperationCancelled { .. }
-        | McpError::MaxRetriesExceeded { .. } => 1, // Client error
+        | McpError::MaxRetriesExceeded { .. }
+        | McpError::DaemonNotRunning { .. } => 1, // Client error
 
         McpError::InvalidProtocol { .. } => 2, // Server error
 
@@ -147,7 +152,8 @@ pub fn exit_code(error: &McpError) -> i32 {
         | McpError::AmbiguousCommand { .. }
         | McpError::UsageError { .. }
         | McpError::OperationCancelled { .. }
-        | McpError::MaxRetriesExceeded { .. } => 1, // Client error
+        | McpError::MaxRetriesExceeded { .. }
+        | McpError::DaemonNotRunning { .. } => 1, // Client error
 
         McpError::InvalidProtocol { .. } => 2, // Server error
 
@@ -243,6 +249,12 @@ impl McpError {
 
     pub fn max_retries_exceeded(attempts: u32) -> Self {
         Self::MaxRetriesExceeded { attempts }
+    }
+
+    pub fn daemon_not_running(message: impl Into<String>) -> Self {
+        Self::DaemonNotRunning {
+            message: message.into(),
+        }
     }
 }
 
