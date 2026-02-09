@@ -226,7 +226,7 @@ pub fn get_socket_path() -> std::path::PathBuf {
 #[cfg(windows)]
 pub fn get_socket_path() -> std::path::PathBuf {
     // Use a consistent named pipe name across all CLI and daemon processes
-    // Store just the pipe name without the UNC prefix
+    // The named pipe implementation adds the \\\\.\pipe\ prefix
     std::path::PathBuf::from("mcp-cli-daemon")
 }
 

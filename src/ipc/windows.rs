@@ -13,10 +13,6 @@ use crate::config::Config;
 
 /// Windows named pipe implementation of IPC server
 ///
-/// **XP-02 Compliance:** Uses local-only connections via `reject_remote_clients(true)`
-/// to meet Windows named pipe security requirements. This prevents privilege escalation
-/// and restricts access to the local machine's pipe namespace.
-///
 /// Accepts connections via named pipes on Windows systems
 pub struct NamedPipeIpcServer {
     pipe_name: String,
@@ -36,6 +32,8 @@ impl NamedPipeIpcServer {
             })?;
 
         let pipe_name_display = format!(r"\\.\pipe\{}", pipe_name);
+        
+        tracing::debug!("Creating NamedPipeIpcServer with pipe name: {}", pipe_name_display);
 
         Ok(Self {
             pipe_name: pipe_name_display,
@@ -54,26 +52,36 @@ impl IpcServer for NamedPipeIpcServer {
     ///
     /// Returns a boxed stream and address string for the connection
     async fn accept(&self) -> Result<(Box<dyn crate::ipc::IpcStream>, String), McpError> {
+        tracing::debug!("Creating named pipe: {}", self.pipe_name);
+        
         // Create server instance for this connection
         let server = tokio::net::windows::named_pipe::ServerOptions::new()
-            .reject_remote_clients(true) // XP-02: Windows named pipe security - local connections only
-            // XP-02 requirement: https://learn.microsoft.com/en-us/windows/win32/ipc/pipe-security-and-access-rights
-            // This prevents remote clients from connecting, protecting against privilege escalation
-            // attacks and ensuring only local clients can access the named pipe.
-            // The `\\.\pipe\` prefix restricts to the local machine's pipe namespace.
+            .reject_remote_clients(true) // Local connections only
             .create(&self.pipe_name)
-            .map_err(|e| McpError::IpcError {
-                message: format!("Failed to create named pipe {}: {}", self.pipe_name, e),
+            .map_err(|e| {
+                tracing::error!("Failed to create named pipe {}: {} (kind: {:?})", 
+                    self.pipe_name, e, e.kind());
+                McpError::IpcError {
+                    message: format!("Failed to create named pipe {}: {}", self.pipe_name, e),
+                }
             })?;
 
+        tracing::debug!("Named pipe created, waiting for connection...");
+        
         // Wait for a client connection
         server
             .connect()
             .await
-            .map_err(|e| McpError::IpcError {
-                message: format!("Failed to accept named pipe connection: {}", e),
+            .map_err(|e| {
+                tracing::error!("Failed to accept named pipe connection: {} (kind: {:?})", 
+                    e, e.kind());
+                McpError::IpcError {
+                    message: format!("Failed to accept named pipe connection: {}", e),
+                }
             })?;
 
+        tracing::debug!("Named pipe connection accepted");
+        
         // The server becomes the connected pipe for communication
         Ok((Box::new(server) as Box<dyn crate::ipc::IpcStream>, self.pipe_name.clone()))
     }
@@ -139,13 +147,21 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
             })?;
 
         let pipe_name_display = format!(r"\\.\pipe\{}", pipe_name);
+        
+        tracing::debug!("Connecting to named pipe: {}", pipe_name_display);
 
         let client = ClientOptions::new()
             .open(&pipe_name_display)
-            .map_err(|e| McpError::ConnectionError {
-                server: pipe_name_display.clone(),
-                source: e,
+            .map_err(|e| {
+                tracing::error!("Failed to connect to named pipe {}: {} (kind: {:?})", 
+                    pipe_name_display, e, e.kind());
+                McpError::ConnectionError {
+                    server: pipe_name_display.clone(),
+                    source: e,
+                }
             })?;
+        
+        tracing::debug!("Successfully connected to named pipe");
 
         Ok(Box::new(client) as Box<dyn crate::ipc::IpcStream>)
     }
