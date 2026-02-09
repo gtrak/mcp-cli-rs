@@ -82,8 +82,8 @@ pub async fn run_daemon(config: Config, socket_path: PathBuf) -> Result<()> {
     let _ = crate::daemon::orphan::write_daemon_pid(&socket_path, pid);
     tracing::info!("PID file written");
 
-    // Initialize lifecycle with 60s timeout
-    let lifecycle = DaemonLifecycle::new(60);
+    // Initialize lifecycle with daemon_ttl from config
+    let lifecycle = DaemonLifecycle::new(config.daemon_ttl);
 
     // Spawn idle timeout monitor
     let lifecycle_clone = lifecycle.clone();
