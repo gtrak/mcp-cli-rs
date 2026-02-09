@@ -13,6 +13,10 @@ use crate::config::Config;
 
 /// Windows named pipe implementation of IPC server
 ///
+/// **XP-02 Compliance:** Uses local-only connections via `reject_remote_clients(true)`
+/// to meet Windows named pipe security requirements. This prevents privilege escalation
+/// and restricts access to the local machine's pipe namespace.
+///
 /// Accepts connections via named pipes on Windows systems
 pub struct NamedPipeIpcServer {
     pipe_name: String,
