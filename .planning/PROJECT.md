@@ -8,31 +8,44 @@ A Rust rewrite of the mcp-cli tool for interacting with Model Context Protocol (
 
 Reliable cross-platform MCP server interaction without dependencies. Developers and AI agents can discover available tools, inspect schemas, and execute operations through a simple CLI that works consistently on Linux, macOS, and Windows.
 
+## Current Milestone
+
+**Milestone:** v1.1 (Not defined yet)
+**Status:** Planning
+**Started:** 2026-02-09
+
+**Goal:** To be defined based on user input
+
+**Target features:**
+- To be determined
+
+---
+
 ## Requirements
 
-### Validated
+### Validated (v1.0 — Shipped 2026-02-09)
 
-(None yet — ship to validate)
+- ✓ Connect to MCP servers via stdio and HTTP transports
+- ✓ List all configured servers and their available tools
+- ✓ Display server details (transport, connection info, tool count, instructions)
+- ✓ Display tool schemas (name, description, input JSON Schema)
+- ✓ Search tools by glob pattern across all servers
+- ✓ Execute tools with JSON arguments (inline or stdin)
+- ✓ Parse and substitute environment variables from configuration
+- ✓ Filter tools based on allowedTools/disabledPatterns
+- ✓ Implement retry logic with exponential backoff for transient errors
+- ✓ Use connection daemon for caching (configurable, optional)
+- ✓ Provide structured, actionable error messages
+- ✓ Support environment variables for configuration (timeout, concurrency, retry, etc.)
+- ✓ Handle concurrent parallel connections with configurable limits
+- ✓ Gracefully handle signals and cleanup resources
+- ✓ Format tool call results for CLI-friendly display
+- ✓ Validate JSON arguments with clear error messages
+- ✓ Auto-detect stdin input for tool arguments
 
 ### Active
 
-- [ ] Connect to MCP servers via stdio and HTTP transports
-- [ ] List all configured servers and their available tools
-- [ ] Display server details (transport, connection info, tool count, instructions)
-- [ ] Display tool schemas (name, description, input JSON Schema)
-- [ ] Search tools by glob pattern across all servers
-- [ ] Execute tools with JSON arguments (inline or stdin)
-- [ ] Parse and substitute environment variables from configuration
-- [ ] Filter tools based on allowedTools/disabledPatterns
-- [ ] Implement retry logic with exponential backoff for transient errors
-- [ ] Use connection daemon for caching (configurable, optional)
-- [ ] Provide structured, actionable error messages
-- [ ] Support environment variables for configuration (timeout, concurrency, retry, etc.)
-- [ ] Handle concurrent parallel connections with configurable limits
-- [ ] Gracefully handle signals and cleanup resources
-- [ ] Format tool call results for CLI-friendly display
-- [ ] Validate JSON arguments with clear error messages
-- [ ] Auto-detect stdin input for tool arguments
+(TBD — v1.1 scope to be defined)
 
 ### Out of Scope
 
