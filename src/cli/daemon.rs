@@ -13,6 +13,159 @@ use crate::config::Config;
 use crate::daemon::fingerprint::calculate_fingerprint;
 use crate::daemon::orphan::{cleanup_orphaned_daemon, write_daemon_pid};
 use crate::ipc::ProtocolClient;
+use crate::error::McpError;
+use crate::main::{Cli, Commands};
+
+/// Run in auto-daemon mode: spawn if needed, execute command, daemon auto-shutdowns after TTL
+pub async fn run_auto_daemon_mode(
+    cli: &Cli,
+    config: Arc<Config>,
+) -> Result<()> {
+    // Check if daemon is running
+    let socket_path = crate::ipc::get_socket_path();
+
+    match try_connect_to_daemon(config.clone(), &socket_path).await {
+        Ok(client) => {
+            // Daemon is running, use it
+            tracing::info!("Using existing daemon");
+            execute_command(cli, client).await
+        }
+        Err(_) => {
+            // Daemon not running, spawn it
+            tracing::info!("Daemon not running, spawning...");
+
+            // Resolve TTL with priority: CLI > env > config > default
+            let ttl = resolve_ttl(cli, &config);
+
+            // Spawn daemon as background task
+            let config_clone = Arc::clone(&config);
+            tokio::spawn(async move {
+                if let Err(e) = spawn_background_daemon(config_clone, ttl).await {
+                    tracing::error!("Failed to spawn daemon: {}", e);
+                }
+            });
+
+            // Wait for daemon to start
+            tokio::time::sleep(Duration::from_millis(500)).await;
+
+            // Connect and execute
+            let client = try_connect_to_daemon(config, &socket_path).await
+                .map_err(|e| McpError::config_read(
+                    std::path::PathBuf::from("."),
+                    std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e))
+                ))?;
+
+            execute_command(cli, client).await
+        }
+    }
+}
+
+/// Resolve daemon TTL with priority: CLI flag > env var > config > default
+///
+/// Priority order:
+/// 1. CLI flag (if provided by Daemon subcommand)
+/// 2. Environment variable: MCP_DAEMON_TTL
+/// 3. Configuration file: daemon_ttl field
+/// 4. Default: 60 seconds
+fn resolve_ttl(cli: &Cli, config: &Config) -> u64 {
+    // Check if TTL is specified via CLI (Daemon subcommand)
+    if let Some(Commands::Daemon { ttl }) = &cli.command {
+        return *ttl;
+    }
+
+    // Check if TTL is set via environment variable
+    if let Ok(ttl_str) = std::env::var("MCP_DAEMON_TTL") {
+        if let Ok(ttl) = ttl_str.parse::<u64>() {
+            return ttl;
+        }
+    }
+
+    // Use TTL from configuration file
+    config.daemon_ttl
+}
+
+/// Run in require-daemon mode: fail if daemon not running
+pub async fn run_require_daemon_mode(
+    cli: &Cli,
+    config: Arc<Config>,
+) -> Result<()> {
+    let socket_path = crate::ipc::get_socket_path();
+
+    match try_connect_to_daemon(config.clone(), &socket_path).await {
+        Ok(client) => {
+            tracing::info!("Using existing daemon");
+            execute_command(cli, client).await
+        }
+        Err(_) => {
+            Err(McpError::daemon_not_running("Daemon is not running. Start it with 'mcp daemon' or use --auto-daemon"))
+        }
+    }
+}
+
+async fn try_connect_to_daemon(config: Arc<Config>, socket_path: &Path) -> Result<Box<dyn ProtocolClient>> {
+    crate::ipc::create_ipc_client(config)
+}
+
+async fn spawn_background_daemon(config: Arc<Config>, ttl: u64) -> Result<()> {
+    use crate::config::loader::find_and_load;
+    use crate::ipc::get_socket_path;
+    use crate::daemon::run_daemon;
+
+    // Load configuration
+    let config = match find_and_load(None).await {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            return Err(McpError::config_read(
+                std::path::PathBuf::from("."),
+                std::io::Error::new(std::io::ErrorKind::NotFound, format!("{}", e))
+            ));
+        }
+    };
+
+    // Get socket path
+    let socket_path = crate::ipc::get_socket_path();
+
+    // Remove existing socket file if present
+    if let Err(e) = std::fs::remove_file(&socket_path) {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            tracing::warn!("Could not remove existing socket file: {}", e);
+        }
+    }
+
+    // Create daemon lifecycle with specified TTL
+    let lifecycle = crate::daemon::lifecycle::DaemonLifecycle::new(ttl);
+
+    // Run daemon in background
+    run_daemon(config.clone(), socket_path).await
+}
+
+/// Execute the CLI command using the provided client
+async fn execute_command(cli: &Cli, mut client: Box<dyn ProtocolClient>) -> Result<()> {
+    use crate::cli::commands::*;
+    use crate::main::Commands;
+
+    let command = cli.command.clone();
+    match command {
+        Some(Commands::List { with_descriptions }) => {
+            cmd_list_servers(client, with_descriptions).await
+        }
+        Some(Commands::Info { name }) => {
+            cmd_server_info(client, &name).await
+        }
+        Some(Commands::Tool { tool }) => {
+            cmd_tool_info(client, &tool).await
+        }
+        Some(Commands::Call { tool, args }) => {
+            cmd_call_tool(client, &tool, args.as_deref()).await
+        }
+        Some(Commands::Search { pattern }) => {
+            cmd_search_tools(client, &pattern).await
+        }
+        None => {
+            cmd_list_servers(client, false).await
+        }
+    }
+}
 
 /// Ensure daemon is running with fresh config.
 ///
