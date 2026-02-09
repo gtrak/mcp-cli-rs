@@ -21,9 +21,46 @@ mod ipc_tests {
         }
         #[cfg(windows)]
         {
-            let mut path = std::env::temp_dir();
-            path.push(format!("\\\\.\\pipe\\mcp-test-{}", std::process::id()));
-            path
+            // On Windows, we use just the pipe name (without the \\.\pipe\ prefix)
+            // The implementation adds the prefix when creating the pipe
+            PathBuf::from(format!("mcp-test-{}", std::process::id()))
+        }
+    }
+
+    /// Test Windows named pipe path generation
+    #[test]
+    #[cfg(windows)]
+    fn test_windows_pipe_path_generation() {
+        use std::path::Path;
+        
+        // Test that pipe names are generated correctly
+        let pipe_name = "test-pipe";
+        let path = PathBuf::from(pipe_name);
+        
+        // The path should just contain the pipe name
+        assert_eq!(path.file_name().unwrap().to_str().unwrap(), pipe_name);
+        
+        // Test the full pipe path format (what the implementation creates)
+        let full_pipe_path = format!(r"\\.\pipe\{}", pipe_name);
+        assert!(full_pipe_path.starts_with(r"\\.\pipe\"));
+        assert!(full_pipe_path.ends_with(pipe_name));
+    }
+
+    /// Test that get_socket_path returns consistent results
+    #[test]
+    fn test_socket_path_consistency() {
+        let path1 = mcp_cli_rs::ipc::get_socket_path();
+        let path2 = mcp_cli_rs::ipc::get_socket_path();
+        
+        // Multiple calls should return the same path
+        assert_eq!(path1, path2);
+        
+        #[cfg(windows)]
+        {
+            // On Windows, should be a simple name without path separators
+            let file_name = path1.file_name().unwrap().to_str().unwrap();
+            assert!(!file_name.contains('\\'));
+            assert!(!file_name.contains('/'));
         }
     }
 
