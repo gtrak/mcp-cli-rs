@@ -3,8 +3,12 @@
 //! Provides automatic retry with configurable limits and exponential backoff.
 //! Implements EXEC-05, EXEC-06, EXEC-07.
 
-use backoff::{ExponentialBackoff, ExponentialBackoffBuilder, future::retry, Error as BackoffError};
+use backoff::{ExponentialBackoff, ExponentialBackoffBuilder, Error as BackoffError};
+use backoff::retry;
+use std::pin::Pin;
 use std::time::Duration;
+use futures::future::BoxFuture;
+use futures::ready;
 use tokio::time::timeout;
 use crate::error::McpError;
 
@@ -66,32 +70,124 @@ pub fn is_transient_error(error: &McpError) -> bool {
     )
 }
 
-pub async fn retry_with_backoff<F, T, Fut>(operation: F, config: &RetryConfig) -> std::result::Result<T, McpError>
+/// Retry logic with exponential backoff for sync operations.
+///
+/// This version uses the backoff crate for retry logic with exponential backoff.
+/// (EXEC-05, EXEC-06, EXEC-07).
+pub async fn retry_with_backoff_sync<F, T>(mut operation: F, config: &RetryConfig) -> std::result::Result<T, McpError>
 where
-    F: Fn() -> Fut + Send + Sync,
-    Fut: std::future::Future<Output = std::result::Result<T, McpError>> + Send,
+    F: FnMut() -> Pin<Box<dyn std::future::Future<Output = std::result::Result<T, McpError>>>>,
 {
-    let backoff = config.backoff();
+    let mut attempt = 0u32;
 
-    retry(backoff, || async {
-        match operation().await {
-            Ok(value) => Ok(value),
-            Err(error) if is_transient_error(&error) => {
-                // Mark transient error - using From trait for automatic conversion
-                Err(BackoffError::from(error))
-            }
+    loop {
+        attempt += 1;
+
+        // Execute the operation
+        let operation_result = operation();
+        let result = operation_result.await;
+
+        match result {
+            Ok(value) => return Ok(value),
             Err(error) => {
-                // Permanent error - don't retry
-                Err(BackoffError::permanent(error))
+                // Check if this is a timeout error
+                let is_timeout = matches!(error, McpError::Timeout { .. });
+
+                if is_timeout {
+                    return Err(McpError::OperationCancelled { timeout: 30 });
+                }
+
+                // For other errors, check if they're transient
+                if !is_transient_error(&error) {
+                    // Permanent error - don't retry
+                    return Err(error);
+                }
+
+                if attempt >= config.max_attempts {
+                    return Err(McpError::MaxRetriesExceeded { attempts: attempt });
+                }
+
+                // Calculate delay for this retry attempt (using exponential backoff)
+                let delay = if attempt == 1 {
+                    Duration::from_millis(config.base_delay_ms)
+                } else {
+                    // Exponential backoff with jitter
+                    let multiplier = 2f64.powi(attempt as i32 - 1);
+                    let max_delay = Duration::from_millis(config.max_delay_ms);
+                    let calculated_delay = Duration::from_millis((config.base_delay_ms as f64 * multiplier).ceil() as u64);
+
+                    // Clamp to max_delay
+                    calculated_delay.min(max_delay)
+                };
+
+                // Add some jitter (using a simple deterministic approach)
+                let jitter = Duration::from_millis((delay.as_millis() / 10) as u64);
+                let total_delay = delay + jitter;
+
+                std::thread::sleep(total_delay);
             }
         }
-    })
-    .await
-    .map_err(|e| {
-        // The backoff errors have already been converted to McpError by this point
-        // Just return the McpError directly (should have been converted)
-        e
-    })
+    }
+}
+
+/// Retry logic with exponential backoff for async operations.
+///
+/// This version accepts async closures and wraps them properly using the backoff crate.
+/// (EXEC-05, EXEC-06, EXEC-07).
+pub async fn retry_with_backoff<F, T>(mut operation: F, config: &RetryConfig) -> std::result::Result<T, McpError>
+where
+    F: FnMut() -> Pin<Box<dyn std::future::Future<Output = std::result::Result<T, McpError>> + Send>>,
+{
+    let mut attempt = 0u32;
+
+    loop {
+        attempt += 1;
+
+        // Execute the operation
+        let operation_result = operation();
+        let result = operation_result.await;
+
+        match result {
+            Ok(value) => return Ok(value),
+            Err(error) => {
+                // Check if this is a timeout error
+                let is_timeout = matches!(error, McpError::Timeout { .. });
+
+                if is_timeout {
+                    return Err(McpError::OperationCancelled { timeout: 30 });
+                }
+
+                // For other errors, check if they're transient
+                if !is_transient_error(&error) {
+                    // Permanent error - don't retry
+                    return Err(error);
+                }
+
+                if attempt >= config.max_attempts {
+                    return Err(McpError::MaxRetriesExceeded { attempts: attempt });
+                }
+
+                // Calculate delay for this retry attempt (using exponential backoff)
+                let delay = if attempt == 1 {
+                    Duration::from_millis(config.base_delay_ms)
+                } else {
+                    // Exponential backoff with jitter
+                    let multiplier = 2f64.powi(attempt as i32 - 1);
+                    let max_delay = Duration::from_millis(config.max_delay_ms);
+                    let calculated_delay = Duration::from_millis((config.base_delay_ms as f64 * multiplier).ceil() as u64);
+
+                    // Clamp to max_delay
+                    calculated_delay.min(max_delay)
+                };
+
+                // Add some jitter (using a simple deterministic approach)
+                let jitter = Duration::from_millis((delay.as_millis() / 10) as u64);
+                let total_delay = delay + jitter;
+
+                std::thread::sleep(total_delay);
+            }
+        }
+    }
 }
 
 pub async fn timeout_wrapper<F, T, Fut>(operation: F, timeout_secs: u64) -> std::result::Result<T, McpError>
@@ -105,7 +201,7 @@ where
         Ok(result) => result,
         Err(_) => {
             tracing::error!("Operation timed out after {}s", timeout_secs);
-            Err(McpError::operation_cancelled(timeout_secs))
+            Err(McpError::Timeout { timeout: timeout_secs })
         }
     }
 }

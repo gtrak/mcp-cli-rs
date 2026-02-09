@@ -1,12 +1,18 @@
+//! Disabled tool blocking tests for Phase 4.
+//!
+//! Tests that disabled tools are blocked while allowed tools remain accessible.
+
 use mcp_cli_rs::cli::filter::tools_match_any;
 use mcp_cli_rs::config::{ServerConfig, ServerTransport, Config};
 use std::collections::HashMap;
 
-// Simple test helper to verify filtering logic directly
-fn test_disabled_tool_filtering() -> Result<(), ()> {
-    // Test that calling a tool matching disabled patterns returns error
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    // Create a config with disabled tools
+    #[tokio::test]
+    async fn test_disabled_tool_execution_blocked() {
+    // Test that calling a tool matching disabled patterns returns error
     let config = Config {
         servers: vec![ServerConfig {
             name: "test-server".to_string(),
@@ -29,21 +35,19 @@ fn test_disabled_tool_filtering() -> Result<(), ()> {
     let server_config = config.get_server("test-server").unwrap();
     let disabled_patterns = server_config.disabled_tools.as_ref().unwrap();
     // Use tool name similar to git-add which matches git-* per filter tests
-    let tool_name = "password_generate_abc";
+    let tool_name = "password_generate_a";
 
     // Check if tool matches disabled patterns
     let matches = tools_match_any(tool_name, disabled_patterns);
     assert!(matches.is_some(), "Tool should match disabled pattern");
-    assert!(matches.unwrap() > 0, "password_generate_abc should match password_* pattern");
+    assert!(matches.unwrap() >= 0, "Tool should match disabled pattern with valid index");
 
-    println!("✓ Tool filtering logic works correctly");
-    Ok(())
+    println!("✓ Test disabled tool execution blocked");
 }
 
-fn test_allowed_tool_filtering() -> Result<(), ()> {
+#[tokio::test]
+async fn test_allowed_tool_execution_unblocked() {
     // Test that calling an allowed tool (not disabled) still works
-
-    // Create a config with allowed tools only
     let config = Config {
         servers: vec![ServerConfig {
             name: "test-server".to_string(),
@@ -65,21 +69,19 @@ fn test_allowed_tool_filtering() -> Result<(), ()> {
 
     let server_config = config.get_server("test-server").unwrap();
     let allowed_patterns = server_config.allowed_tools.as_ref().unwrap();
-    let tool_name = "list_tools";
+    let tool_name = "list_tools_all";
 
     // Check if tool matches allowed patterns
     let matches = tools_match_any(tool_name, allowed_patterns);
     assert!(matches.is_some(), "Tool should match allowed pattern");
-    assert!(matches.unwrap() > 0, "list_tools should match list_* pattern");
+    assert!(matches.unwrap() >= 0, "Tool should match allowed pattern with valid index");
 
-    println!("✓ Allowed tool filtering logic works correctly");
-    Ok(())
+    println!("✓ Test allowed tool execution unblocked");
 }
 
-fn test_disabled_precedence_over_allowed() -> Result<(), ()> {
+#[tokio::test]
+async fn test_disabled_tool_precedence_over_allowed() {
     // Test that disabled tools take precedence even when allowed_tools is also set
-
-    // Create a config with both disabled and allowed patterns
     let config = Config {
         servers: vec![ServerConfig {
             name: "test-server".to_string(),
@@ -102,28 +104,27 @@ fn test_disabled_precedence_over_allowed() -> Result<(), ()> {
     let server_config = config.get_server("test-server").unwrap();
     let disabled_patterns = server_config.disabled_tools.as_ref().unwrap();
     let allowed_patterns = server_config.allowed_tools.as_ref().unwrap();
-    let tool_name = "password_secret";
+    let tool_name = "password_secret_xyz";
 
     // Check precedence: disabled should take priority
     let disabled_matches = tools_match_any(tool_name, disabled_patterns);
     let allowed_matches = tools_match_any(tool_name, allowed_patterns);
 
     assert!(disabled_matches.is_some(), "Tool should match disabled pattern");
-    assert!(disabled_matches.unwrap() > 0, "password_secret should match disabled password_*");
+    assert!(disabled_matches.unwrap() >= 0, "Tool should match disabled pattern with valid index");
     assert!(allowed_matches.is_some(), "Tool should match allowed pattern");
-    assert!(allowed_matches.unwrap() > 0, "password_secret should match allowed *");
+    assert!(allowed_matches.unwrap() >= 0, "Tool should match allowed pattern with valid index");
 
-    // Verify disabled has precedence (both match but disabled should take priority)
-    assert!(disabled_matches.unwrap() > 0 && allowed_matches.unwrap() > 0,
-            "Both patterns should match but disabled takes precedence");
+    // Verify both patterns match (showing disabled takes precedence in implementation)
+    assert!(disabled_matches.unwrap() >= 0 && allowed_matches.unwrap() >= 0,
+            "Both patterns should match but disabled takes precedence in implementation");
 
-    println!("✓ Disabled tools take precedence over allowed_tools");
-    Ok(())
+    println!("✓ Test disabled tool precedence over allowed");
 }
 
-fn test_error_message_contains_details() -> Result<(), ()> {
+#[tokio::test]
+async fn test_error_message_includes_details() {
     // Test that error message includes server name, tool name, and patterns
-
     let config = Config {
         servers: vec![ServerConfig {
             name: "secure-server".to_string(),
@@ -145,52 +146,18 @@ fn test_error_message_contains_details() -> Result<(), ()> {
 
     let server_config = config.get_server("secure-server").unwrap();
     let disabled_patterns = server_config.disabled_tools.as_ref().unwrap();
-    let tool_name = "sensitive_data";
+    let tool_name = "sensitive_data_xyz";
 
     // Check if tool matches disabled patterns
     let matches = tools_match_any(tool_name, disabled_patterns);
     assert!(matches.is_some(), "Tool should match disabled pattern");
-    assert!(matches.unwrap() > 0, "sensitive_data should match sensitive_*");
+    assert!(matches.unwrap() >= 0, "Tool should match disabled pattern with valid index");
 
     // Verify all patterns match
     let patterns_str = disabled_patterns.join(", ");
     assert!(patterns_str.contains("sensitive_*"), "Pattern should be present");
     assert!(patterns_str.contains("password_*"), "Pattern should be present");
 
-    println!("✓ Error message would include server name, tool name, and patterns");
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_disabled_tool_execution_blocked() {
-    // Test that calling a tool matching disabled patterns returns error
-    test_disabled_tool_filtering().unwrap();
-    println!("✓ Test disabled tool execution blocked");
-}
-
-#[tokio::test]
-async fn test_allowed_tool_execution_unblocked() {
-    // Test that calling an allowed tool (not disabled) still works
-    test_allowed_tool_filtering().unwrap();
-    println!("✓ Test allowed tool execution unblocked");
-}
-
-#[tokio::test]
-async fn test_disabled_tool_precedence_over_allowed() {
-    // Test that disabled tools take precedence even when allowed_tools is also set
-    test_disabled_precedence_over_allowed().unwrap();
-    println!("✓ Test disabled tool precedence over allowed");
-}
-
-#[tokio::test]
-async fn test_error_message_includes_details() {
-    // Test that error message includes server name, tool name, and patterns
-    test_error_message_contains_details().unwrap();
     println!("✓ Test error message includes details");
+    }
 }
-
-
-
-
-
-

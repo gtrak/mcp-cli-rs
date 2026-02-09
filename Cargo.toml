@@ -1,63 +1,29 @@
 [package]
 name = "mcp-cli-rs"
 version = "0.1.0"
-edition = "2021"
-description = "MCP CLI client in Rust with cross-platform support"
+edition = "2024"
 
 [dependencies]
-# Core framework
-clap = { version = "4.5", features = ["derive"] }
-tokio = { version = "1.49", features = ["full"] }
-async-trait = "0.1"
-
-# MCP protocol
+glob = "0.3"
+tokio = { version = "1.35", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-# Transport/Network
-reqwest = { version = "0.12", features = ["json"] }
-http = "1.0"
-
-# Error handling
 anyhow = "1.0"
-thiserror = "2.0"
-
-# Logging
 tracing = "0.1"
-tracing-subscriber = "0.3"
-
-# Utilities
-shell-words = "1.1"
-glob = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+colored = "2.0"
+clap = { version = "4.5", features = ["derive"] }
+windows-sys = { version = "0.61", features = ["Win32_System_Threading"] }
+futures = "0.3"
+futures-util = "0.3"
+backoff = { version = "0.4", features = ["futures"] }
+backoff-futures = "0.3.2"
+async-trait = "0.1"
+http = "0.2"
+reqwest = { version = "0.11", features = ["json"] }
+thiserror = "1.0"
+sha2 = "0.10"
 dirs = "5.0"
 toml = "0.8"
-futures-util = "0.3"
-
-# Performance & Reliability (discussed in EXEC-07)
-colored = "3.1"
-backoff = { version = "0.4", features = ["tokio"] }
-
-# IPC/Networking
-interprocess = { version = "2.3", features = ["tokio"] }
-
-[target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.59", features = ["Win32_Security", "Win32_System_Threading", "Win32_System_ProcessStatus", "Win32_Foundation"] }
-winapi = { version = "0.3", features = [
-    "processthreadsapi",
-    "handleapi",
-    "winnt",
-    "securitybaseapi",
-] }
-
-# Cryptography (for config fingerprinting)
-sha2 = "0.10"
 hex = "0.4"
-
-# Daemon binary
-[[bin]]
-name = "mcp-daemon"
-path = "src/bin/daemon.rs"
-
-[dev-dependencies]
-tokio-test = "0.4"
-tempfile = "3.13"
+tempfile = "3.24.0"

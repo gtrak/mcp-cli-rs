@@ -10,6 +10,7 @@ use crate::ipc::ProtocolClient;
 use crate::parallel::{ParallelExecutor, list_tools_parallel};
 use crate::output::{print_error, print_warning, print_info};
 use crate::retry::{retry_with_backoff, timeout_wrapper, RetryConfig};
+use futures_util::FutureExt;
 use tokio::sync::Mutex;
 
 /// Execute the list servers command.
@@ -311,35 +312,28 @@ pub async fn cmd_call_tool(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, a
 
     // Execute tool with retry logic (EXEC-05, EXEC-07)
     let retry_config = RetryConfig::from_config(&config);
-    let timeout_secs = config.timeout_secs;
 
-    // Create shared access for retry closure
+    // Create shared access for operation closure
     let daemon_shared = Arc::new(tokio::sync::Mutex::new(daemon));
 
-    // Wrap execution with both retry logic and overall timeout
-    let result = timeout_wrapper(
-        || async {
-            retry_with_backoff(
-                || {
-                    let daemon_shared = daemon_shared.clone();
-                    let server_name_clone = server_name.clone();
-                    let tool_name_clone = tool_name.clone();
-                    let arguments_clone = arguments.clone();
+    // Execute tool with retry logic - this is an async operation
+    let operation = || {
+        let daemon_shared = daemon_shared.clone();
+        let server_name_clone = server_name.clone();
+        let tool_name_clone = tool_name.clone();
+        let arguments_clone = arguments.clone();
 
-                    async move {
-                        let mut daemon_guard = daemon_shared.lock().await;
-                        daemon_guard
-                            .execute_tool(&server_name_clone, &tool_name_clone, arguments_clone)
-                            .await
-                    }
-                },
-                &retry_config,
-            )
-            .await
-        },
-        timeout_secs,
-    )
-    .await;
+        // Convert async block to boxed trait object Future using futures-util
+        Box::new(async move {
+            let mut daemon_guard = daemon_shared.lock().await;
+            daemon_guard
+                .execute_tool(&server_name_clone, &tool_name_clone, arguments_clone)
+                .await
+        }).boxed()
+    };
+
+    // Execute with retry
+    let result = retry_with_backoff(operation, &retry_config).await;
 
     match result {
         Ok(result) => {

@@ -18,7 +18,9 @@ pub fn get_daemon_socket_path() -> std::path::PathBuf {
 async fn main() -> anyhow::Result<()> {
     // Initialize tracing with colored output
     if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "info");
+        unsafe {
+            std::env::set_var("RUST_LOG", "info");
+        }
     }
     tracing_subscriber::fmt()
         .with_max_level(LevelFilter::INFO)
