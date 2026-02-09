@@ -47,11 +47,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Tool Filtering
 
-- [ ] **FILT-01**: Filter tool availability based on server configuration using allowedTools glob patterns
-- [ ] **FILT-02**: Filter tool availability based on server configuration using disabledTools glob patterns
-- [ ] **FILT-03**: Ensure disabledTools patterns take precedence over allowedTools patterns when both are defined
-- [ ] **FILT-04**: Display error message when user attempts to call disabled tool
-- [ ] **FILT-05**: Support glob pattern wildcards (*, ?) in filter rules
+- [x] **FILT-01**: Filter tool availability based on server configuration using allowedTools glob patterns
+- [x] **FILT-02**: Filter tool availability based on server configuration using disabledTools glob patterns
+- [x] **FILT-03**: Ensure disabledTools patterns take precedence over allowedTools patterns when both are defined
+- [x] **FILT-04**: Display error message when user attempts to call disabled tool
+- [x] **FILT-05**: Support glob pattern wildcards (*, ?) in filter rules
 
 ### Error Handling
 
@@ -60,7 +60,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **ERR-03**: Implement exit code conventions: 0 for success, 1 for client errors, 2 for server errors, 3 for network errors
 - [x] **ERR-04**: Display colored terminal output when stdout is a TTY and NO_COLOR is not set
 - [ ] **ERR-05**: Capture and forward stderr output from stdio-based MCP servers to the user
-- [ ] **ERR-06**: Handle ambiguous commands (e.g., "server tool" without subcommand) and prompt user to specify info vs call
+- [x] **ERR-06**: Handle ambiguous commands (e.g., "server tool" without subcommand) and prompt user to specify info vs call
 - [x] **ERR-07**: Warn when some servers fail to connect during parallel operations
 
 ### CLI Support
@@ -69,14 +69,14 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **CLI-02**: Display version information when -v/--version flag is provided
 - [ ] **CLI-03**: Support custom config file path via -c/--config command line option
 - [x] **CLI-04**: Gracefully handle signals (SIGINT, SIGTERM) with proper cleanup of connections and resources
-- [ ] **CLI-05**: Support both space-separated (server tool) and slash-separated (server/tool) argument formats for info, grep, and call commands
+- [x] **CLI-05**: Support both space-separated (server tool) and slash-separated (server/tool) argument formats for info, grep, and call commands
 
 ### Cross-Platform Support
 
-- [ ] **XP-01**: Test stdio process spawning on Windows and ensure no zombie processes remain
-- [ ] **XP-02**: Implement Windows named pipe security flags (security_qos_flags) to prevent privilege escalation
+- [x] **XP-01**: Test stdio process spawning on Windows and ensure no zombie processes remain
+- [x] **XP-02**: Implement Windows named pipe security flags (security_qos_flags) to prevent privilege escalation
 - [ ] **XP-03**: Ensure MCP protocol compliance for stdio transport (newline-delimited messages, no embedded newlines)
-- [ ] **XP-04**: Validate connection daemon functionality on Linux, macOS, and Windows
+- [x] **XP-04**: Validate connection daemon functionality on Linux, macOS, and Windows
 
 ## v2 Requirements
 
@@ -135,27 +135,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXEC-05 | Phase 3 | Complete |
 | EXEC-06 | Phase 3 | Complete |
 | EXEC-07 | Phase 3 | Complete |
-| FILT-01 | Phase 4 | Pending |
-| FILT-02 | Phase 4 | Pending |
-| FILT-03 | Phase 4 | Pending |
-| FILT-04 | Phase 4 | Pending |
-| FILT-05 | Phase 4 | Pending |
+| FILT-01 | Phase 4 | Complete |
+| FILT-02 | Phase 4 | Complete |
+| FILT-03 | Phase 4 | Complete |
+| FILT-04 | Phase 4 | Complete |
+| FILT-05 | Phase 4 | Complete |
 | ERR-01 | Phase 1 | Pending |
 | ERR-02 | Phase 1 | Pending |
 | ERR-03 | Phase 1 | Pending |
 | ERR-04 | Phase 3 | Complete |
 | ERR-05 | Phase 1 | Pending |
-| ERR-06 | Phase 1 | Pending |
+| ERR-06 | Phase 4 | Complete |
 | ERR-07 | Phase 3 | Complete |
 | CLI-01 | Phase 1 | Pending |
 | CLI-02 | Phase 1 | Pending |
 | CLI-03 | Phase 1 | Pending |
 | CLI-04 | Phase 3 | Complete |
-| CLI-05 | Phase 4 | Pending |
-| XP-01 | Phase 4 | Pending |
-| XP-02 | Phase 4 | Pending |
+| CLI-05 | Phase 4 | Complete |
+| XP-01 | Phase 4 | Complete |
+| XP-02 | Phase 4 | Complete |
 | XP-03 | Phase 1 | Pending |
-| XP-04 | Phase 4 | Pending |
+| XP-04 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 42 total
