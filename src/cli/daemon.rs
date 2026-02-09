@@ -99,22 +99,22 @@ async fn spawn_daemon_and_wait(daemon_config: Arc<Config>, fingerprint: &str) ->
     // Get current executable path and daemon binary path
     let current_exe = std::env::current_exe()?;
     let daemonexe_path = if cfg!(windows) {
-        // On Windows, find mcp-daemon.exe in the same directory
+        // On Windows, find daemon.exe in the same directory
         current_exe
             .parent()
             .unwrap_or(&current_exe)
-            .join("mcp-daemon.exe")
+            .join("daemon.exe")
     } else {
-        // On Unix, find mcp-daemon in the same directory or PATH
+        // On Unix, find daemon in the same directory or PATH
         let daemon_in_same_dir = current_exe
             .parent()
             .unwrap_or(&current_exe)
-            .join("mcp-daemon");
+            .join("daemon");
 
         if daemon_in_same_dir.exists() {
             daemon_in_same_dir
         } else {
-            PathBuf::from("mcp-daemon")
+            PathBuf::from("daemon")
         }
     };
 
@@ -223,17 +223,17 @@ mod tests {
             current_exe
                 .parent()
                 .unwrap_or(&current_exe)
-                .join("mcp-daemon.exe")
+                .join("daemon.exe")
         } else {
             let daemon_in_same_dir = current_exe
                 .parent()
                 .unwrap_or(&current_exe)
-                .join("mcp-daemon");
+                .join("daemon");
 
             if daemon_in_same_dir.exists() {
                 daemon_in_same_dir
             } else {
-                PathBuf::from("mcp-daemon")
+                PathBuf::from("daemon")
             }
         };
 
