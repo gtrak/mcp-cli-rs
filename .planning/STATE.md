@@ -13,10 +13,23 @@
 
 **Current Position**
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements for v1.1
-Last activity: 2026-02-09 — v1.0 milestone complete, starting v1.1
+Phase: 05-unified-daemon
+Plan: 01 of 3 (single binary foundation)
+Status: Phase complete (plan 01 complete, next: 05-02)
+Last activity: 2026-02-09 — Single binary foundation established
+
+Progress: 1/3 plans complete (33%)
+
+## Decisions (from 05-01)
+
+- [2026-02-09] Eliminated separate daemon binary (mcp-daemon.exe), single binary mcp-cli-rs
+- [2026-02-09] Daemon code preserved in lib.rs exports for CLI integration
+- [2026-02-09] Confirmed single binary architecture (Cargo.toml no explicit [[bin]] sections)
+- [2026-02-09] Library-first design: core functionality in lib.rs, CLI in main.rs
+
+## Issues Resolved
+
+- [2026-02-09] None for this plan (all verification checks passed)
 
 **Accumulated Context (from v1.0)**
 
