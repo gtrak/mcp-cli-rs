@@ -1,6 +1,6 @@
 //! CLI commands for MCP CLI tool.
 
-use crate::config::{ServerConfig, ServerTransport, Config};
+use crate::config::{ServerConfig, ServerTransport};
 use crate::error::{McpError, Result};
 use crate::transport::Transport;
 use crate::client::ToolInfo;
@@ -289,6 +289,25 @@ pub async fn cmd_call_tool(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, a
             serde_json::from_str(&input).map_err(|e| McpError::InvalidJson { source: e })?
         }
     };
+
+    // Check if tool is disabled (FILT-04)
+    let server_config = config.get_server(&server_name);
+    if let Some(server_config) = server_config {
+        // Check if tool matches disabled_tools patterns
+        if let Some(disabled_patterns) = &server_config.disabled_tools {
+            let is_disabled = crate::cli::filter::tools_match_any(&tool_name, disabled_patterns);
+            if is_disabled.is_some() {
+                let patterns_str = disabled_patterns.join(", ");
+                print_error(&format!(
+                    "Tool '{}' on server '{}' is disabled (blocked by patterns: {})",
+                    tool_name, server_name, patterns_str
+                ));
+                return Err(McpError::UsageError {
+                    message: format!("Tool execution blocked by disabled_tools configuration. Remove patterns from disabled_tools list to allow this tool."),
+                });
+            }
+        }
+    }
 
     // Execute tool with retry logic (EXEC-05, EXEC-07)
     let retry_config = RetryConfig::from_config(&config);

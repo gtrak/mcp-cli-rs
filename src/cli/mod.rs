@@ -5,6 +5,7 @@
 
 pub mod commands;
 pub mod daemon;
+pub mod filter;
 
 pub use commands::{
     cmd_list_servers,
