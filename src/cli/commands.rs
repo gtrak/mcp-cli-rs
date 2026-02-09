@@ -8,9 +8,8 @@ use std::io::{self, Read, IsTerminal};
 use std::sync::Arc;
 use crate::ipc::ProtocolClient;
 use crate::parallel::{ParallelExecutor, list_tools_parallel};
-use crate::output::{print_error, print_warning, print_info, print_success};
-use crate::retry::{retry_with_backoff, timeout_wrapper, RetryConfig, is_transient_error};
-use backoff::Error as BackoffError;
+use crate::output::{print_error, print_warning, print_info};
+use crate::retry::{retry_with_backoff, timeout_wrapper, RetryConfig};
 use tokio::sync::Mutex;
 
 /// Execute the list servers command.
@@ -50,7 +49,7 @@ pub async fn cmd_list_servers(mut daemon: Box<dyn ProtocolClient>, with_descript
     // Create daemon client for parallel execution (daemon is moved here and not used again)
     let daemon_arc = Arc::new(Mutex::new(daemon));
 
-    // List tools from all servers in parallel
+    // List tools from all servers in parallel with filtering
     let (successes, failures): (Vec<(String, Vec<ToolInfo>)>, Vec<String>) = {
         list_tools_parallel(
             server_names,
@@ -79,6 +78,7 @@ pub async fn cmd_list_servers(mut daemon: Box<dyn ProtocolClient>, with_descript
                 }
             },
             &executor,
+            config.as_ref(),
         )
         .await?
     };
@@ -110,6 +110,21 @@ pub async fn cmd_list_servers(mut daemon: Box<dyn ProtocolClient>, with_descript
             failures.len(),
             successes.len() + failures.len(),
             failures.join(", ")
+        ));
+        println!();
+    }
+
+    // Check if partial filtering was applied (disableTools without allowedTools)
+    let has_disabled_tools = config.servers.iter().any(|s| {
+        s.disabled_tools.as_ref().map_or(false, |d| !d.is_empty())
+    });
+    let has_allowed_tools = config.servers.iter().any(|s| {
+        s.allowed_tools.as_ref().map_or(false, |a| !a.is_empty())
+    });
+
+    if has_disabled_tools && !has_allowed_tools {
+        print_warning(&format!(
+            "Server filtering enabled: disabled tools will be blocked when allowed_tools is empty"
         ));
         println!();
     }
@@ -375,7 +390,7 @@ pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str
     // Create daemon client for parallel execution (daemon is moved here and not used again)
     let daemon_arc = Arc::new(Mutex::new(daemon));
 
-    // List tools from all servers in parallel
+    // List tools from all servers in parallel with filtering
     let (successes, failures): (Vec<(String, Vec<ToolInfo>)>, Vec<String>) = {
         list_tools_parallel(
             server_names,
@@ -404,6 +419,7 @@ pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str
                 }
             },
             &executor,
+            config.as_ref(),
         )
         .await?
     };
@@ -444,6 +460,21 @@ pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str
             successes.len(),
             failures.len(),
             failures.join(", ")
+        ));
+        println!();
+    }
+
+    // Check if partial filtering was applied (disableTools without allowedTools)
+    let has_disabled_tools = config.servers.iter().any(|s| {
+        s.disabled_tools.as_ref().map_or(false, |d| !d.is_empty())
+    });
+    let has_allowed_tools = config.servers.iter().any(|s| {
+        s.allowed_tools.as_ref().map_or(false, |a| !a.is_empty())
+    });
+
+    if has_disabled_tools && !has_allowed_tools {
+        print_warning(&format!(
+            "Server filtering enabled: disabled tools will be blocked when allowed_tools is empty"
         ));
         println!();
     }
