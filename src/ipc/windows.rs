@@ -52,7 +52,11 @@ impl IpcServer for NamedPipeIpcServer {
     async fn accept(&self) -> Result<(Box<dyn crate::ipc::IpcStream>, String), McpError> {
         // Create server instance for this connection
         let server = tokio::net::windows::named_pipe::ServerOptions::new()
-            .reject_remote_clients(true) // Local connections only
+            .reject_remote_clients(true) // XP-02: Windows named pipe security - local connections only
+            // XP-02 requirement: https://learn.microsoft.com/en-us/windows/win32/ipc/pipe-security-and-access-rights
+            // This prevents remote clients from connecting, protecting against privilege escalation
+            // attacks and ensuring only local clients can access the named pipe.
+            // The `\\.\pipe\` prefix restricts to the local machine's pipe namespace.
             .create(&self.pipe_name)
             .map_err(|e| McpError::IpcError {
                 message: format!("Failed to create named pipe {}: {}", self.pipe_name, e),
