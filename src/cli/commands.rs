@@ -253,6 +253,27 @@ pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str) -
 /// Returns McpError::InvalidProtocol for malformed response
 /// Returns McpError::Timeout if timeout exceeded (EXEC-06)
 /// Returns McpError::MaxRetriesExceeded if max retries exceeded (EXEC-07)
+/// Execute the call tool command.
+///
+/// Calls a tool on a configured MCP server with JSON arguments.
+/// Implements EXEC-01: tool execution with inline or stdin input.
+/// Implements EXEC-02: argument passing via command-line argument or stdin pipe.
+/// Implements FILT-04: disabledTools blocking with clear error messages.
+/// Implements FILT-03: disabledTools precedence over allowedTools when both defined.
+/// Implements EXEC-05: retry logic with exponential backoff for transient errors.
+/// Implements EXEC-07: operation timeout enforcement.
+/// Implements EXEC-06: timeout enforcement for overall operations.
+///
+/// # Arguments
+/// * `daemon` - Daemon IPC client
+/// * `tool_id` - Server tool identifier in format "server.tool" or "server/tool"
+/// * `args_json` - JSON arguments as command-line argument or None for stdin pipe
+///
+/// # Errors
+/// Returns McpError::ServerNotFound if server not configured
+/// Returns McpError::UsageError if tool is disabled (FILT-04)
+/// Returns McpError::InvalidJson if arguments parsing fails
+/// Returns error on tool execution failure
 pub async fn cmd_call_tool(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, args_json: Option<&str>) -> Result<()> {
     let (server_name, tool_name) = parse_tool_id(tool_id)?;
 

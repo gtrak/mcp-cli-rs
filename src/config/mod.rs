@@ -71,12 +71,17 @@ pub struct ServerConfig {
     pub description: Option<String>,
 
     /// Optional list of tool names allowed to be used by this server.
-    /// This is used in Phase 4 for tool filtering.
+    /// Implements FILT-01, FILT-02: Glob pattern matching for allowedTools configuration.
+    /// DisabledTools patterns take precedence when both allowed_tools and disabled_tools are defined.
+    /// Supports wildcard patterns (*, ?) for flexible matching.
     #[serde(default)]
     pub allowed_tools: Option<Vec<String>>,
 
-    /// Optional list of tool names disabled for this server.
-    /// This is used in Phase 4 for tool filtering.
+    /// Optional list of tool patterns to disable for this server.
+    /// Implements FILT-03, FILT-04: Glob pattern matching for disabledTools blocking.
+    /// When defined, attempts to call blocked tools return clear error messages.
+    /// Precedence: disabledTools > allowedTools when both present.
+    /// Supports wildcard patterns (*, ?) for flexible matching.
     #[serde(default)]
     pub disabled_tools: Option<Vec<String>>,
 }
@@ -85,7 +90,14 @@ impl ServerConfig {
     /// Create a transport for this server configuration.
     ///
     /// This implements TransportFactory trait to bridge config and transport layers.
-    /// Implements Task 4 of Plan 01-04.
+    /// Implements Task 4 of Plan 01-04: CLI command and tool execution infrastructure.
+    ///
+    /// # Arguments
+    /// * `_server_name` - Server name (unused in transport creation, provided for context)
+    ///
+    /// # Returns
+    /// * `Ok(Box<dyn Transport + Send + Sync>)` - Transport instance for server connection
+    /// * `Err(McpError)` - Transport creation error
     pub fn create_transport(
         &self,
         _server_name: &str,
