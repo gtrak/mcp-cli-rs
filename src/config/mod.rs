@@ -155,6 +155,14 @@ pub struct Config {
     /// This implements EXEC-06 requirement for operation timeout.
     #[serde(default = "default_timeout_secs")]
     pub timeout_secs: u64,
+
+    /// Timeout for idle daemon sessions in seconds.
+    ///
+    /// Default value of 60s provides reasonable balance between resource usage and usability.
+    /// When exceeded, daemon shuts down automatically unless explicitly terminated by user.
+    /// This implements PLAN-03: TTL configuration for daemon idle timeout.
+    #[serde(default = "default_daemon_ttl")]
+    pub daemon_ttl: u64,
 }
 
 impl Config {
@@ -200,6 +208,10 @@ fn default_retry_delay_ms() -> u64 {
 
 fn default_timeout_secs() -> u64 {
     1800
+}
+
+fn default_daemon_ttl() -> u64 {
+    60
 }
 
 impl ServerTransport {
