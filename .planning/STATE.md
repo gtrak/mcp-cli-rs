@@ -5,20 +5,28 @@
 **Mode:** yolo
 **Depth:** standard
 
-**Last session:** 2026-02-09T12:55:00Z
-**Stopped at:** Starting v1.1 implementation
+**Last session:** 2026-02-09T14:30:00Z
+**Stopped at:** Completed operational modes (plan 05-02)
 **Resume file:** None
 **Milestone v1.0:** Complete (42/42 requirements, 4 phases)
-**Milestone v1.1:** In Progress (defining requirements)
+**Milestone v1.1:** In Progress (operational modes implemented)
 
 **Current Position**
 
 Phase: 05-unified-daemon
-Plan: 01 of 3 (single binary foundation)
-Status: Phase complete (plan 01 complete, next: 05-02)
-Last activity: 2026-02-09 — Single binary foundation established
+Plan: 02 of 3 (operational modes)
+Status: Phase complete (plan 01 and 02 complete, next: 05-03)
+Last activity: 2026-02-09 — Operational modes established
 
-Progress: 1/3 plans complete (33%)
+Progress: 2/3 plans complete (66%)
+
+## Decisions (from 05-02)
+
+- [2026-02-09] Implemented three operational modes: standalone, auto-daemon, require-daemon
+- [2026-02-09] Added daemon subcommand `mcp daemon [--ttl N]` for persistent daemon startup
+- [2026-02-09] TTL configuration available via --ttl flag or MCP_DAEMON_TTL env var
+- [2026-02-09] Added DaemonNotRunning error variant with exit code 1 for daemon dependency failures
+- [2026-02-09] Default behavior (no flags) maintains backward compatible auto-spawn
 
 ## Decisions (from 05-01)
 
