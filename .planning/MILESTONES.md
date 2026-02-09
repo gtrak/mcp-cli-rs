@@ -48,3 +48,56 @@ Milestone tracking for MCP CLI Rust Rewrite project.
 
 ---
 *Last updated: 2026-02-09*
+
+---
+
+## Milestone v1.1: Unified Daemon Architecture
+
+**Started:** 2026-02-09
+**Status:** 🚧 In Progress
+
+### Goal
+
+Refactor daemon architecture to unify CLI and daemon into a single binary with three operational modes, removing the need for a separate daemon executable.
+
+### What We're Building
+
+**Architecture Changes:**
+- Remove separate daemon.exe binary - integrate daemon logic into main CLI
+- Three operational modes for the unified binary:
+  1. **Standalone Daemon Mode**: Run as persistent daemon only
+  2. **Auto-spawn Mode**: One-shot CLI that spawns daemon with TTL, then daemon auto-shuts down
+  3. **Require Daemon Mode**: One-shot CLI that fails if daemon is not running
+
+**Key Features:**
+- Configurable TTL (time-to-live) for auto-shutdown daemon
+- Clean daemon lifecycle management
+- Single binary distribution (no separate daemon.exe)
+- Backward compatible with existing config and behavior
+
+### Phase Structure
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 5 | Unified Daemon Architecture | 🚧 In Progress |
+
+### Requirements
+
+- [ ] Remove daemon binary (src/bin/daemon.rs)
+- [ ] Add daemon command to main CLI
+- [ ] Implement 3 operational modes
+- [ ] Configurable TTL for auto-shutdown
+- [ ] Update Cargo.toml (single binary)
+- [ ] Test all 3 modes on Windows
+- [ ] Test all 3 modes on Unix
+
+### Acceptance Criteria
+
+1. `mcp daemon` starts standalone daemon
+2. `mcp --auto-daemon list` spawns daemon, executes command, daemon shuts down after TTL
+3. `mcp --require-daemon list` fails with clear error if daemon not running
+4. All existing functionality works unchanged
+5. No separate daemon.exe binary exists
+
+---
+*Last updated: 2026-02-09*

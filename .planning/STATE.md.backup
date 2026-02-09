@@ -1,0 +1,212 @@
+# State: MCP CLI Rust Rewrite
+
+**Created:** 2025-02-06
+**Last updated:** 2026-02-08 - Completed retry/timeout integration and signal handling (plan 03-05), Phase 3 at 100% (6/6 plans complete)
+**Mode:** yolo
+**Depth:** standard
+
+---
+
+## Current Position
+
+**Active Phase:** 04-tool-filtering (ready to start)
+
+**Status:** Phase 3 complete (all 6 plans finished)
+
+**Progress:**
+```
+Phase 1: Core Protocol & Configuration         ██████████████ 100% (4/4 plans complete)
+Phase 2: Connection Daemon & Cross-Platform IPC ██████████████ 100% (11/11 plans complete, 5 gap closure)
+Phase 3: Performance & Reliability             ██████████████ 100% (6/6 plans complete)
+Phase 4: Tool Filtering & Cross-Platform Validation ░░░░░░░░░░░ 0%
+```
+Phase 1: Core Protocol & Configuration         ██████████████ 100% (4/4 plans complete)
+Phase 2: Connection Daemon & Cross-Platform IPC ██████████████ 100% (11/11 plans complete, 5 gap closure)
+Phase 3: Performance & Reliability             █████████████░ 83% (5/6 plans complete, 1 wave)
+Phase 4: Tool Filtering & Cross-Platform Validation ░░░░░░░░░░░ 0%
+```
+
+---
+
+## Performance Metrics
+
+**Requirements Coverage:**
+- Total v1 requirements: 42
+- Covered in roadmap: 42 (100%)
+- Unmapped: 0
+
+**Phase Distribution:**
+- Phase 1: 25 requirements
+- Phase 2: 4 requirements
+- Phase 3: 6 requirements
+- Phase 4: 7 requirements
+
+---
+
+## Accumulated Context
+
+### Key Decisions
+
+1. **Performance Configuration Infrastructure (plan 03-01):** Added concurrency_limit, retry_max, retry_delay_ms, and timeout_secs fields to Config struct with requirement-based defaults (5 concurrent, 3 retries with 1000ms delay, 1800s timeout). Created output.rs module with colored utilities supporting NO_COLOR environment variable. Dependencies: colored v3.1.1 and backoff v0.4.0 with tokio feature. Provides foundation for parallel execution (DISC-05) and retry behavior (EXEC-07).
+
+2. **Parallel Execution Infrastructure (plan 03-02):** Created parallel.rs module with ParallelExecutor struct and list_tools_parallel() function. Uses futures_util::stream::buffer_unordered with Arc<Semaphore> to control concurrency (default 5 per DISC-05). Returns tuple (Vec<String>, Vec<String>) for success/failure collection, enabling flexible error handling (prepares ERR-07). Implements generic F: Fn(String) -> Fut + Send + Sync + Clone for flexible list_fn closures. Exports module and functions via lib.rs.
+
+2. **Stack Selection:** Rust with tokio async runtime, clap CLI parser, reqwest HTTP client, tokio process spawning. Critical: tokio::process::Command with kill_on_drop(true) to prevent Windows zombie processes (the Bun implementation's main failure).
+
+2. **Phase Structure:** 4 phases following natural delivery boundaries, not arbitrary templates. Phase 1 builds foundation (transport + protocol), Phase 2 adds daemon (performance), Phase 3 enhances reliability, Phase 4 polishes UX and validates cross-platform behavior.
+
+3. **Windows-First Approach:** Critical Windows issues (process spawning, named pipe security) tested in early phases (1-2) when codebase is simpler, avoiding late discovery of platform-specific bugs.
+
+4. **No mcp-sdk dependency:** Implemented MCP protocol directly using tokio + serde_json. Version 0.0.3 has only 11.36% documented coverage and 827 weekly downloads, insufficient for production use. Transport abstraction trait enables stdio/HTTP switching without dependencies.
+
+5. **Architecture Approach:** Layered architecture with trait-based abstractions. Transport abstraction (stdio vs HTTP), IPC abstraction (Unix sockets vs named pipes), no global mutable state (explicit AppContext passing).
+
+6. **Transport abstraction pattern:** ServerTransport trait with send(), ping(), and transport_type() methods. TransportFactory trait converts ServerTransport to actual transport instances.
+
+7. **Error handling with thiserror:** Domain-specific error types (ConnectionError, InvalidProtocol, Timeout, InvalidRequest, NoResult, ParseError) with context-aware error messages.
+
+8. **IPC abstraction implementation:** Created IpcServer, IpcClient, IpcStream traits with factory functions (create_ipc_server, get_socket_path). Unix socket implementation provided with create_dir_all for socket directory and StaleSocket detection.
+
+9. **Windows named pipe IPC:** Windows implementation using tokio::net::windows::named_pipe with SECURITY_IDENTIFICATION (set by interprocess crate). NamedPipeIpcServer/Client support multiple connections with first_pipe_instance(true) to prevent multiple daemons.
+
+10. **NDJSON Protocol for CLI-Daemon Communication:** Newline-delimited JSON format for CLI-daemon requests/responses, one JSON object per line with newline terminator. Simple and robust, matching MCP protocol conventions.
+
+11. **Idle Timeout Default 60 Seconds:** Daemon self-terminates after 60 seconds of inactivity, tracked via Arc<Mutex<Instant>> for thread-safe activity updates.
+
+12. **Config Fingerprinting:** SHA256-based fingerprint calculation for config validation, enabling CLI to detect configuration changes and restart daemon when needed.
+
+13. **Stub Implementation Strategy:** Implemented stub handlers for ExecuteTool, ListTools, ListServers returning Error::NotImplemented. Full implementation deferred to plan 02-05 (connection pool CLI integration).
+
+14. **Connection Pool with Health Checks:** Implemented connection pool caching transport connections with MCP ping health checks. Connections are validated before reuse, and automatically recreated after 3 consecutive health check failures. Thread-safe pool enables concurrent access from multiple client handlers.
+
+15. **Test Compilation Gap Closure (Plan 02-11):** Fixed all compilation errors in daemon lifecycle tests and IPC integration tests. Created comprehensive IPC integration tests with 3 test cases covering roundtrip, concurrent connections, and large message transfer. All IPC tests compile successfully with proper timeout handling, JoinError imports, and BufReader wrapping for AsyncBufRead compliance.
+
+16. **ProtocolClient Lifetime Issue (RESOLVED):** ProtocolClient trait lifetime issue prevented CLI compilation. Gap closure plan 02-07 created to resolve this by converting from &Config to Arc<Config>, eliminating lifetime parameter and enabling shared ownership. Requires trait and wrapper refactoring (completed in gap closure).
+
+17. **Parallel Execution Infrastructure (plan 03-02):** Created parallel.rs module with ParallelExecutor struct and list_tools_parallel() function. Uses futures_util::stream::buffer_unordered with Arc<Semaphore> to control concurrency (default 5 per DISC-05). Returns tuple (Vec<String>, Vec<String>) for success/failure collection, enabling flexible error handling (prepares ERR-07). Implements generic F: Fn(String) -> Fut + Send + Sync + Clone for flexible list_fn closures. Exports module and functions via lib.rs. Allows parallel server/tool discovery for cmd_list_servers and cmd_search_tools.
+
+18. **CLI Colored Output Integration (plan 03-04):** All CLI error/warning/info messages now use print_error/print_warning/print_info functions from output.rs. cmd_server_info uses print_error for ServerNotFound, cmd_tool_info uses print_error for ToolNotFound, cmd_call_tool uses print_error for stdin JSON errors. NO_COLOR environment variable respected for terminal compatibility. Provides consistent visual feedback across entire CLI interface.
+
+19. **Graceful Shutdown Infrastructure (plan 03-06):** Created shutdown.rs module with GracefulShutdown struct and run_with_graceful_shutdown() wrapper function. Implements cross-platform signal handling (SIGINT/SIGTERM on Unix, Ctrl+C on Windows) using tokio::signal::unix::Signal and tokio::process::Command. Uses broadcast channel for shutdown notifications to support multiple subscribers. Provides configurable 3-second default shutdown timeout for graceful operation completion.
+
+20. **Retry and Timeout Integration (plan 03-05):** cmd_call_tool wraps daemon.execute_tool with retry_with_backoff for automatic retry on transient errors (EXEC-05), and wraps entire operation with timeout_wrapper for overall timeout enforcement (EXEC-06). RetryConfig::from_config() loads settings from Config (max_attempts=3, base_delay=1000ms, max_delay=15000ms). Uses Arc<Mutex<Box<dyn ProtocolClient>>> for shared daemon access in retry closure (technical constraint for Box<dyn ProtocolClient> not implementing Clone). GracefulShutdown integrated in main.rs using run_with_graceful_shutdown wrapper for CLI-04 signal handling.
+
+### Technical Decisions Made
+
+| Decision | Rationale |
+|----------|-----------|
+| Use tokio::process::Command with kill_on_drop(true) | Fixes Windows zombie process issue from Bun implementation |
+| Layered architecture (CLI → Client → Transport) | Clear separation of concerns, testable, transport-agnostic |
+| Trait-based IPC abstraction | Enables Unix sockets (*nix) and named pipes (Windows) without scattering #[cfg] conditionals |
+| thiserror + anyhow error handling | Domain-specific errors for library, context-aware errors for application |
+| shell-words for command parsing | Prevents command injection vulnerabilities in config parsing |
+| No global mutable state | Explicit context passing (AppContext) avoids test interference and race conditions |
+| Colored output with NO_COLOR support (plan 03-01) | Better readability, respects terminal preferences via NO_COLOR env var |
+| colored crate v3.1.1 (plan 03-01) | Simple API, 10M+ downloads/month, reliable terminal output |
+| backoff crate v0.4.0 with tokio (plan 03-01) | Includes jitter and cancel-safety for robust retry logic |
+| Retry logic integration (plan 03-03) | RetryConfig integrates with Config.retry_max and retry_delay_ms; retry_with_backoff distinguishes transient vs permanent errors |
+| Default performance values in Config (plan 03-01) | concurrency_limit=5 (DISC-05), retry_max=3 (EXEC-07), retry_delay_ms=1000 (EXEC-07), timeout_secs=1800 (EXEC-06) |
+| IPC abstraction using interprocess crate | Provides unified IPC support across platforms with tokio async features |
+| IPC error categorization (IpcError variants) | Enables precise error handling and better error messages for IPC failures |
+| tokio::named_pipe instead of interprocess | Better tokio integration, same SECURITY_IDENTIFICATION protection, cleaner async patterns |
+| Connection pool with health checks | Thread-safe caching of transport connections, MCP ping validation, automatic recreation on failures |
+| Arc<Config> for ProtocolClient lifetime fix | Eliminates lifetime parameter, enables shared ownership across CLI operations |
+| Comprehensive test compilation fixes (plan 02-11) | Created IPC integration tests, fixed all async/await and timeout compilation errors, enabled complete codebase compilation |
+| ParallelExecutor with Semaphore (plan 03-02) | Thread-safe parallel server/tool discovery with configurable concurrency limits |
+| Arc<Mutex<Box<dyn ProtocolClient>>> for shared access | Enables multiple async threads to safely access daemon client concurrently |
+| Closure cloning requirement in list_tools_parallel | Required by tokio::stream::Stream for ownership transfer across threads |
+| Colored output pattern (plan 03-04) | Consistent visual feedback using print_error/print_warning/print_info with NO_COLOR support |
+| Glob pattern matching (plan 03-04) | Flexible tool name searching with fallback to substring matching |
+| Graceful shutdown with broadcast channels (plan 03-06) | Cross-platform signal handling (SIGINT/SIGTERM/Ctrl+C) with tokio::sync::broadcast for multi-subscriber notifications |
+| Retry and timeout integration (plan 03-05) | cmd_call_tool wraps execute_tool with retry_with_backoff (EXEC-05) and timeout_wrapper (EXEC-06), using Arc<Mutex> for shared daemon access to avoid Box<dyn ProtocolClient> Clone constraint |
+
+### Known Pitfalls to Avoid
+
+From research/PITFALLS.md:
+
+**Critical (address in Phase 1):**
+- ✅ Set `.kill_on_drop(true)` on all tokio::process::Command spawns (prevent Windows zombie processes)
+- ✅ Use `shell-words::split()` for command parsing (prevent command injection)
+- ✅ Use `writeln!` for stdio transport messages (prevent embedded newlines breaking MCP protocol)
+- ✅ Use `tokio::fs` and `tokio::process` in async code (prevent blocking executor)
+- ✅ Wrap errors with context using thiserror (prevent generic error messages)
+- ✅ Implement exit code conventions (0=success, 1=client error, 2=server error, 3=network error)
+
+**Critical (address in Phase 2):**
+- ✅ Use `security_qos_flags` when opening Windows named pipes (prevent privilege escalation)
+- ✅ Implement connection health checks before reuse (prevent stale connection reuse)
+- ✅ Abstract platform differences behind traits (prevent scattered #[cfg] conditionals)
+- ✅ Fix all test compilation errors (plan 02-11 gap closure completed)
+
+### Requirements by Phase
+
+**Phase 1 (25):**
+- Configuration (5): CONFIG-01 through CONFIG-05
+- Server Connections (4): CONN-01, CONN-02, CONN-03, CONN-04
+- Discovery & Search (5): DISC-01, DISC-02, DISC-03, DISC-04, DISC-06
+- Tool Execution (5): EXEC-01, EXEC-02, EXEC-03, EXEC-04, EXEC-06
+- Error Handling (5): ERR-01, ERR-02, ERR-03, ERR-05, ERR-06
+- CLI Support (3): CLI-01, CLI-02, CLI-03
+- Cross-Platform (1): XP-03
+
+**Phase 2 (4):**
+- Server Connections (4): CONN-05, CONN-06, CONN-07, CONN-08
+
+**Phase 3 (6):**
+- Discovery & Search (1): DISC-05
+- Tool Execution (2): EXEC-05, EXEC-07
+- Error Handling (2): ERR-04, ERR-07
+- CLI Support (1): CLI-04
+
+**Phase 4 (7):**
+- Tool Filtering (5): FILT-01, FILT-02, FILT-03, FILT-04, FILT-05
+- CLI Support (1): CLI-05
+- Cross-Platform (3): XP-01, XP-02, XP-04
+
+### Outstanding Questions
+
+1. **mcp-sdk Evaluation:** During Phase 1 planning, verify if mcp-sdk 0.0.3 handles MCP protocol correctly (initialization handshake, message delimiters, error responses). If not, re-implement using tokio + serde_json.
+
+2. **Daemon Connection Pool Scaling:** Test with 100+ server connections during Phase 2 implementation. Add TTL or eviction if memory usage is excessive (not blocking for MVP).
+
+3. ~~Connection Health Checks~~ ✅ **RESOLVED in plan 02-04:** Implemented connection pool with MCP ping health checks; connections validated before reuse, recreated after 3 failures.
+
+4. ~~Test Compilation Gap Closure~~ ✅ **RESOLVED in plan 02-11:** Fixed all compilation errors in daemon lifecycle tests and IPC integration tests. Created comprehensive IPC integration tests with 3 test cases covering roundtrip, concurrent connections, and large message transfer. All IPC tests compile successfully with proper timeout handling, JoinError imports, and BufReader wrapping for AsyncBufRead compliance. Phase 2 gap closure complete.
+
+---
+
+## Session Continuity
+
+**Next Steps:**
+- Execute Phase 4 plan 04-01: Implement tool filtering and validation
+- Plan 03-05 completed: retry/timeout integration and signal handling (CLI-04)
+- Plan 03-06 completed: graceful shutdown infrastructure with cross-platform signal handling
+- Plan 03-04 completed: parallel execution with colored CLI output and glob pattern matching
+- Plan 03-03 completed: retry logic with exponential backoff and timeout enforcement
+- Plan 03-01 completed: performance config fields added (concurrency_limit, retry_max, retry_delay_ms, timeout_secs) and colored output utilities created
+- Plan 03-02 completed: parallel execution infrastructure with Semaphore-based concurrency limits
+- Phase 2 gap closure completed: all test compilation errors fixed, IPC integration tests created and working
+- Phase 3 complete: all 6 plans finished (performance config, parallel execution, retry logic, colored output, parallel CLI, graceful shutdown)
+- After Phase 3: ready to proceed to Phase 4 (tool filtering, cross-platform validation)
+
+**Project Context for New Sessions:**
+- Solo developer + Claude workflow (no teams, no stakeholders)
+- Roadmap created with 4 phases covering all 42 v1 requirements
+- Windows-first approach to catch platform-specific bugs early
+- Critical Windows issues: zombie processes (kill_on_drop), named pipe security (security_qos_flags)
+- No external MCP SDK dependency - protocol implemented directly
+- Architecture: layered, trait-based abstractions, no global mutable state
+- Core protocol layer complete: transport abstraction, McpClient with tool discovery/execution, comprehensive error handling
+- IPC abstraction layer complete: Unix socket implementation + Windows named pipe backend
+- Daemon layer complete: binary with IPC communication, idle timeout, lifecycle management
+- Phase 2 complete: daemon lifecycle, cross-platform IPC, connection pools, health checks, all tests compile successfully
+- Phase 3 in progress: performance configuration fields and colored output utilities (plan 03-01 complete), parallel execution (plan 03-02 complete), retry logic (plan 03-03 complete), parallel CLI commands (plan 03-04 complete), graceful shutdown (plan 03-06 complete)
+
+---
+
+**Last updated:** 2026-02-08 - Plan 03-05 completed (retry/timeout integration and signal handling), Phase 3 complete (6/6 plans, 100%), ready for Phase 4
+**Mode:** yolo
+**Depth:** standard
+**Plans completed:** 01-01 through 01-04 (Phase 1), 02-01 through 02-11 (Phase 2), 03-01 through 03-06 (Phase 3)
+**Phase 3 progress:** 100% (6/6 plans complete, 2 waves)
+**Planning docs committed:** true

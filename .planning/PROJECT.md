@@ -10,14 +10,17 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 
 ## Current Milestone
 
-**Milestone:** v1.1 (Not defined yet)
-**Status:** Planning
+**Milestone:** v1.1 Unified Daemon Architecture
+**Status:** In Progress
 **Started:** 2026-02-09
 
-**Goal:** To be defined based on user input
+**Goal:** Refactor to a single binary with 3 operational modes - standalone daemon, auto-spawn with TTL, and require-existing-daemon.
 
 **Target features:**
-- To be determined
+- Remove separate daemon binary
+- Unified CLI with `mcp daemon` command
+- Auto-spawn mode with configurable TTL
+- Require-daemon mode for explicit dependency
 
 ---
 
@@ -42,10 +45,17 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 - ✓ Format tool call results for CLI-friendly display
 - ✓ Validate JSON arguments with clear error messages
 - ✓ Auto-detect stdin input for tool arguments
+- ✓ Windows named pipe IPC support
+- ✓ Direct mode (no daemon) for one-shot operations
 
-### Active
+### Active (v1.1)
 
-(TBD — v1.1 scope to be defined)
+- [ ] Unified single binary (no separate daemon.exe)
+- [ ] Standalone daemon mode (`mcp daemon`)
+- [ ] Auto-spawn mode with TTL (`mcp --auto-daemon`)
+- [ ] Require-daemon mode (`mcp --require-daemon`)
+- [ ] Configurable TTL for auto-shutdown
+- [ ] Clean daemon lifecycle management
 
 ### Out of Scope
 
@@ -73,10 +83,10 @@ The tool will be wrapped in a skill for LLM use, so error messages and output sh
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Rust language | Fix Windows process spawning, remove Bun dependency, single binary | — Pending |
-| Keep daemon architecture | Maintain performance benefit of connection caching (simplify if needed) | — Pending |
-| Use Rust MCP SDK | Avoid reimplementing MCP protocol from scratch | — Pending |
-| Skill-compatible output | Tool will be wrapped for LLM use, need machine-parsable errors | — Pending |
+| Rust language | Fix Windows process spawning, remove Bun dependency, single binary | ✓ Working |
+| Unified binary (v1.1) | Simplify deployment, remove daemon.exe management | — In Progress |
+| Three operational modes | Flexibility: persistent daemon, auto-spawn, or explicit dependency | — In Progress |
+| Skill-compatible output | Tool will be wrapped for LLM use, need machine-parsable errors | ✓ Working |
 
 ---
-*Last updated: 2025-02-06 after initialization*
+*Last updated: 2026-02-09 — Milestone v1.1 started*

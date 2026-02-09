@@ -194,14 +194,12 @@ Plans:
 - Platform-specific behavior differences (comprehensive cross-platform testing)
 - Incomplete glob pattern matching (standard glob crate usage)
 
-**Plans:** 5 plans in 1 wave
+**Plans:** 3 plans in 1 wave
 
 Plans:
-- [x] 04-01-PLAN.md — Tool filtering features (FILT-01 through FILT-05)
-- [x] 04-02-PLAN.md — Windows process spawning validation (XP-01)
-- [x] 04-03-PLAN.md — Cross-platform daemon validation (XP-04)
-- [x] 04-04-PLAN.md — Gap closure: Fix Windows process test compilation (XP-01)
-- [x] 04-05-PLAN.md — Gap closure: Verify and document XP-02 security compliance (XP-02)
+- [ ] 04-01-PLAN.md — Tool filtering features (FILT-01 through FILT-05)
+- [ ] 04-02-PLAN.md — Windows process spawning validation (XP-01)
+- [ ] 04-03-PLAN.md — Cross-platform daemon validation (XP-04)
 
 ---
 
@@ -209,11 +207,60 @@ Plans:
 
 | Phase | Name | Status | Completion |
 |-------|------|--------|------------|
-| 1 | Core Protocol & Configuration | Complete | 100% (4/4 plans complete) |
+| 1 | Core Protocol & Configuration | Complete | 100% |
 | 2 | Connection Daemon & Cross-Platform IPC | Complete | 100% (11/11 plans complete, including 5 gap closure) |
 | 3 | Performance & Reliability | Complete | 100% (6/6 plans complete in 4 waves) |
-| 4 | Tool Filtering & Cross-Platform Validation | Complete | 100% (5/5 plans complete in 1 wave, 2 gap closure) |
+| 4 | Tool Filtering & Cross-Platform Validation | In progress | 67% (2/3 plans complete, 1 wave) |
 
 ---
 
-**Last updated:** 2026-02-09 (Phase 4 complete - gap closure verified)
+**Last updated:** 2026-02-08 (Phase 3 complete - all 6 plans executed and verified)
+
+---
+
+## Phase 5: Unified Daemon Architecture
+
+**Goal:** Refactor from two-binary architecture to unified single binary with three operational modes.
+
+**Dependencies:**
+- Phase 1-4: All previous phases complete
+
+**Requirements (12/12):**
+- Unified Daemon: DAEMON-01 through DAEMON-12
+
+**Success Criteria:**
+1. `mcp daemon` starts standalone persistent daemon
+2. `mcp --auto-daemon list` spawns daemon if needed, executes command, daemon auto-shuts down after TTL
+3. `mcp --require-daemon list` fails with clear error if daemon not running
+4. Default behavior (no flags) maintains backward compatibility (auto-spawn)
+5. TTL configurable via flag, env var, or config file
+6. Only one binary exists (no separate daemon.exe)
+
+**What This Delivers:**
+- Simplified deployment (single binary)
+- Flexible operational modes for different use cases
+- Better resource management with configurable TTL
+- Clear error messages for daemon dependency failures
+
+**Plans:** 3 plans in 2 waves
+
+Plans:
+- [ ] 05-01-PLAN.md — Remove daemon binary, integrate into CLI
+- [ ] 05-02-PLAN.md — Implement 3 operational modes
+- [ ] 05-03-PLAN.md — Add TTL configuration and testing
+
+---
+
+## Progress
+
+| Phase | Name | Status | Completion |
+|-------|------|--------|------------|
+| 1 | Core Protocol & Configuration | Complete | 100% (4/4 plans) |
+| 2 | Connection Daemon & Cross-Platform IPC | Complete | 100% (11/11 plans) |
+| 3 | Performance & Reliability | Complete | 100% (6/6 plans) |
+| 4 | Tool Filtering & Cross-Platform Validation | Complete | 100% (5/5 plans) |
+| 5 | Unified Daemon Architecture | In Progress | 0% (0/3 plans) |
+
+---
+
+**Last updated:** 2026-02-09 (Phase 5 started)
