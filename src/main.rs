@@ -15,9 +15,17 @@ struct Cli {
     #[arg(short, long, global = true)]
     config: Option<std::path::PathBuf>,
 
-    /// Run without daemon (direct mode) - connects to servers directly without caching
+    /// Run without daemon (direct mode)
     #[arg(long, global = true)]
     no_daemon: bool,
+
+    /// Auto-spawn daemon if not running (default behavior)
+    #[arg(long, global = true, conflicts_with = "no_daemon")]
+    auto_daemon: bool,
+
+    /// Require daemon to be already running (fail if not running)
+    #[arg(long, global = true, conflicts_with_all = ["no_daemon", "auto_daemon"])]
+    require_daemon: bool,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -25,6 +33,13 @@ struct Cli {
 
 #[derive(Clone, Subcommand)]
 enum Commands {
+    /// Start the connection daemon
+    Daemon {
+        /// Daemon idle timeout in seconds
+        #[arg(short, long, default_value = "60")]
+        ttl: u64,
+    },
+
     /// List all servers and their available tools (CLI-01, DISC-01)
     List {
         /// Include tool descriptions
