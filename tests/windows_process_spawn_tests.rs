@@ -6,12 +6,11 @@
 
 #[cfg(test)]
 mod process_cleanup_tests {
-    use super::mcp_cli_rs::client::stdio::StdioTransport;
+    use mcp_cli_rs::client::stdio::StdioTransport;
     use std::collections::HashMap;
-    use std::sync::Arc;
-    use tokio::sync::Semaphore;
     use tokio::time::{timeout, Duration};
     use serde_json::json;
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
     /// Integration test: CLI command execution with shutdown
     #[tokio::test]
@@ -139,7 +138,7 @@ mod process_cleanup_tests {
 
         // Drop each at random intervals
         for (i, child) in processes.into_iter().enumerate() {
-            let delay = Duration::from_millis((i % 3 + 1) * 100);
+            let delay = Duration::from_millis(((i % 3 + 1) * 100) as u64);
             tokio::spawn(async move {
                 tokio::time::sleep(delay).await;
                 // Just dropping - kill_on_drop will handle cleanup
@@ -325,7 +324,7 @@ mod process_cleanup_tests {
 
         // Execute batch
         for i in 0..batch_size {
-            let mut child = tokio::process::Command::new("cmd.exe")
+            let child = tokio::process::Command::new("cmd.exe")
                 .args(&["/c", "echo", &format!("batch_{}", i)])
                 .kill_on_drop(true)
                 .stdout(std::process::Stdio::piped())
@@ -420,7 +419,7 @@ mod process_cleanup_tests {
 
         // Attempt to send data (simulating write failure)
         let stdout = child.stdout.take().expect("No stdout handle");
-        let mut writer = tokio::io::AsyncWriter::new(stdout);
+        let mut writer = stdout;
 
         // Try to write multiple times (simulate buffer issues)
         for _ in 0..5 {
