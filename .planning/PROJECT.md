@@ -8,37 +8,49 @@ A Rust rewrite of the mcp-cli tool for interacting with Model Context Protocol (
 
 Reliable cross-platform MCP server interaction without dependencies. Developers and AI agents can discover available tools, inspect schemas, and execute operations through a simple CLI that works consistently on Linux, macOS, and Windows.
 
-## Requirements
+## Current State (v1.0 - SHIPPED)
 
-### Validated
+**Status:** ✅ Complete and verified
+**Shipped:** 2026-02-10
+**Requirements:** 42/42 verified (100%)
 
-(None yet — ship to validate)
+### Validated (v1.0)
 
-### Active
+- ✅ Connect to MCP servers via stdio and HTTP transports
+- ✅ List all configured servers and their available tools
+- ✅ Display server details (transport, connection info, tool count, instructions)
+- ✅ Display tool schemas (name, description, input JSON Schema)
+- ✅ Search tools by glob pattern across all servers
+- ✅ Execute tools with JSON arguments (inline or stdin)
+- ✅ Parse and substitute environment variables from configuration
+- ✅ Filter tools based on allowedTools/disabledTools patterns
+- ✅ Implement retry logic with exponential backoff for transient errors
+- ✅ Use connection daemon for caching (configurable, optional)
+- ✅ Provide structured, actionable error messages
+- ✅ Support environment variables for configuration (timeout, concurrency, retry, etc.)
+- ✅ Handle concurrent parallel connections with configurable limits
+- ✅ Gracefully handle signals and cleanup resources
+- ✅ Format tool call results for CLI-friendly display
+- ✅ Validate JSON arguments with clear error messages
+- ✅ Auto-detect stdin input for tool arguments
+- ✅ Colored terminal output with NO_COLOR support
+- ✅ Cross-platform support (Windows, Linux, macOS)
 
-- [ ] Connect to MCP servers via stdio and HTTP transports
-- [ ] List all configured servers and their available tools
-- [ ] Display server details (transport, connection info, tool count, instructions)
-- [ ] Display tool schemas (name, description, input JSON Schema)
-- [ ] Search tools by glob pattern across all servers
-- [ ] Execute tools with JSON arguments (inline or stdin)
-- [ ] Parse and substitute environment variables from configuration
-- [ ] Filter tools based on allowedTools/disabledPatterns
-- [ ] Implement retry logic with exponential backoff for transient errors
-- [ ] Use connection daemon for caching (configurable, optional)
-- [ ] Provide structured, actionable error messages
-- [ ] Support environment variables for configuration (timeout, concurrency, retry, etc.)
-- [ ] Handle concurrent parallel connections with configurable limits
-- [ ] Gracefully handle signals and cleanup resources
-- [ ] Format tool call results for CLI-friendly display
-- [ ] Validate JSON arguments with clear error messages
-- [ ] Auto-detect stdin input for tool arguments
+### Active (v1.1 - Next Milestone)
+
+- [ ] Unified daemon architecture (single binary, three operational modes)
+- [ ] Configurable TTL for auto-shutdown daemon
+- [ ] Remove separate daemon.exe binary
+- [ ] Enhanced platform testing and validation
 
 ### Out of Scope
 
 - Bug-for-bug compatibility with Bun implementation — this is an opportunity to improve (where reasonable)
 - Public distribution/crates.io publishing — local compilation only
 - MCP server implementation — this tool is a client only
+- SSE and Streamable HTTP transports — deferred to post-MVP
+- Tool aliasing/shortcuts — config complexity without clear benefit
+- Multi-server transactions — MCP doesn't support transactions
 
 ## Context
 
@@ -60,10 +72,23 @@ The tool will be wrapped in a skill for LLM use, so error messages and output sh
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Rust language | Fix Windows process spawning, remove Bun dependency, single binary | — Pending |
-| Keep daemon architecture | Maintain performance benefit of connection caching (simplify if needed) | — Pending |
-| Use Rust MCP SDK | Avoid reimplementing MCP protocol from scratch | — Pending |
-| Skill-compatible output | Tool will be wrapped for LLM use, need machine-parsable errors | — Pending |
+| Rust language | Fix Windows process spawning, remove Bun dependency, single binary | ✅ Verified - 42/42 requirements met |
+| Daemon architecture | Maintain performance benefit of connection caching | ✅ Verified - 50%+ performance improvement |
+| Use Rust MCP SDK | Avoid reimplementing MCP protocol from scratch | ✅ Working well, protocol compliance verified |
+| Skill-compatible output | Tool will be wrapped for LLM use | ✅ Machine-parsable errors implemented |
+
+## Next Milestone Goals (v1.1)
+
+**Focus:** Unified Daemon Architecture
+
+**Goals:**
+1. Refactor to single binary (remove separate daemon.exe)
+2. Three operational modes: standalone daemon, auto-spawn, require-daemon
+3. Configurable TTL for automatic daemon shutdown
+4. Enhanced cross-platform testing
+
+**Target:** Complete v1.1 architecture improvements and begin v2 feature planning
 
 ---
-*Last updated: 2025-02-06 after initialization*
+
+*Last updated: 2026-02-10 after v1.0 milestone completion*
