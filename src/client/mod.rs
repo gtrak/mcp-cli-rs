@@ -51,6 +51,35 @@ impl McpClient {
         }
     }
 
+    /// Initialize the MCP server connection.
+    ///
+    /// Sends initialize request with client capabilities and receives server capabilities.
+    /// The server automatically sends notifications/initialized - we don't need to wait for it.
+    pub async fn initialize(&mut self) -> Result<()> {
+        let init_request = Self::json_rpc_request("initialize", serde_json::json!({
+            "protocolVersion": "2024-11-05",
+            "capabilities": {
+                "roots": {},
+                "sampling": {},
+                "tools": {}
+            },
+            "clientInfo": {
+                "name": "mcp-cli-rs",
+                "version": env!("CARGO_PKG_VERSION")
+            }
+        }));
+
+        let response = self.transport.send(init_request).await?;
+
+        let _result = response["result"]
+            .as_object()
+            .ok_or_else(|| McpError::InvalidProtocol {
+                message: "Expected result in initialize response".to_string(),
+            })?;
+
+        Ok(())
+    }
+
     /// List available tools from the server.
     ///
     /// This implements DISC-01: discovery of available tools.
@@ -60,10 +89,9 @@ impl McpClient {
     /// Returns McpError::InvalidProtocol if response is malformed
     /// Returns McpError::Timeout if server doesn't respond
     pub async fn list_tools(&mut self) -> Result<Vec<ToolInfo>> {
-        // Build JSON-RPC request for "tools/list"
+        let _ = self.initialize().await?;
+        
         let request = Self::json_rpc_request("tools/list", serde_json::json!({}));
-
-        // Send request via transport
         let response = self.transport.send(request).await?;
 
         // Parse response

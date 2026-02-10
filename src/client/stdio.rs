@@ -124,6 +124,38 @@ impl StdioTransport {
 
 #[async_trait]
 impl Transport for StdioTransport {
+    async fn receive_notification(&mut self) -> Result<serde_json::Value> {
+        use tokio::time::timeout;
+        use std::time::Duration;
+        
+        let mut line = String::new();
+        let notification = timeout(Duration::from_secs(10), async move {
+            let _ = self.stdout.read_line(&mut line).await.map_err(|e| {
+                McpError::connection_error("stdio", e)
+            })?;
+            if line.trim().is_empty() {
+                return Err(McpError::InvalidProtocol {
+                    message: "Empty notification line".to_string(),
+                });
+            }
+            let notification: serde_json::Value = serde_json::from_str(&line)
+                .map_err(|e| {
+                    McpError::InvalidProtocol {
+                        message: format!("Invalid JSON notification: {}", e),
+                    }
+                })?;
+            Ok(notification)
+        }).await;
+        
+        match notification {
+            Ok(Ok(n)) => Ok(n),
+            Ok(Err(e)) => Err(e),
+            Err(_) => Err(McpError::Timeout {
+                timeout: 10,
+            })
+        }
+    }
+
     async fn send(&mut self, request: serde_json::Value) -> Result<serde_json::Value> {
         // Send request using write! + newline (newline-delimited JSON)
         let request_str = request.to_string();

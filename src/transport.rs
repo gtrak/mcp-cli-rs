@@ -21,6 +21,13 @@ pub trait Transport: Send + Sync {
     /// and returns the parsed response.
     async fn send(&mut self, request: Value) -> Result<Value>;
 
+    /// Receive a JSON-RPC notification from the server.
+    ///
+    /// This method reads unsolicited notifications sent by the server,
+    /// such as "notifications/initialized" after an initialize request.
+    /// Used in Phase 1 for MCP protocol initialization (INIT-01).
+    async fn receive_notification(&mut self) -> Result<Value>;
+
     /// Check if the connection is healthy.
     ///
     /// This method sends a minimal "ping" request and expects a response.

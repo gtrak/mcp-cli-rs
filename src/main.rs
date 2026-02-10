@@ -16,11 +16,11 @@ struct Cli {
     #[arg(short, long, global = true)]
     config: Option<std::path::PathBuf>,
 
-    /// Run without daemon (direct mode)
+    /// Run without daemon (direct mode) - **currently recommended for daemon-mode issues**
     #[arg(long, global = true)]
     no_daemon: bool,
 
-    /// Auto-spawn daemon if not running (default behavior)
+    /// Auto-spawn daemon if not running (default behavior - **has known issues on Windows**)
     #[arg(long, global = true, conflicts_with = "no_daemon")]
     auto_daemon: bool,
 
@@ -254,6 +254,7 @@ pub async fn run_auto_daemon_mode(
     cli: &Cli,
     config: Arc<mcp_cli_rs::config::Config>,
 ) -> mcp_cli_rs::error::Result<()> {
+    eprintln!("DEBUG: run_auto_daemon_mode called");
     // Check if daemon is running
     let socket_path = get_socket_path();
 
@@ -271,23 +272,48 @@ pub async fn run_auto_daemon_mode(
             let ttl = config.daemon_ttl;
 
             // Spawn daemon as background task
+            eprintln!("DEBUG: Spawning daemon with TTL={}s...", ttl);
             let config_clone = Arc::clone(&config);
             tokio::spawn(async move {
-                if let Err(e) = spawn_background_daemon(config_clone, ttl).await {
-                    tracing::error!("Failed to spawn daemon: {}", e);
+                eprintln!("DEBUG: Inside tokio::spawn, about to spawn daemon...");
+                match spawn_background_daemon(config_clone, ttl).await {
+                    Ok(_) => eprintln!("DEBUG: spawn_background_daemon returned Ok"),
+                    Err(e) => eprintln!("DEBUG: spawn_background_daemon failed: {}", e),
                 }
             });
 
-            // Wait for daemon to start
-            tokio::time::sleep(Duration::from_millis(500)).await;
+            // Wait for daemon to start with exponential backoff
+            let mut retries = 0;
+            let max_retries = 20;  // More retries
+            let mut delay = Duration::from_millis(500);  // Start with longer delay
 
-            // Connect and execute
-            let client = try_connect_to_daemon(config, &socket_path).await
-                .map_err(|e| mcp_cli_rs::error::McpError::io_error(
-                    std::io::Error::new(std::io::ErrorKind::Other, e)
-                ))?;
+            loop {
+                tokio::time::sleep(delay).await;
 
-            execute_command(cli, client).await
+                match try_connect_to_daemon(config.clone(), &socket_path).await {
+                    Ok(client) => {
+                        tracing::info!("Connected to daemon after {} attempt(s)", retries + 1);
+                        return execute_command(cli, client).await;
+                    }
+                    Err(e) => {
+                        retries += 1;
+                        if retries >= max_retries {
+                            return Err(mcp_cli_rs::error::McpError::IOError {
+                                source: std::io::Error::new(
+                                    std::io::ErrorKind::Other,
+                                    format!("Failed to start daemon after {} attempts: {}", max_retries, e)
+                                ),
+                            });
+                        }
+                        // Linear backoff: add 200ms each time, cap at 2 seconds
+                        delay += Duration::from_millis(200);
+                        if delay > Duration::from_secs(2) {
+                            delay = Duration::from_secs(2);
+                        }
+                        tracing::debug!("Daemon not ready, retrying in {:?} (attempt {}/{})", delay, retries, max_retries);
+                    }
+                }
+            }
         }
     }
 }
@@ -312,39 +338,65 @@ pub async fn run_require_daemon_mode(
     }
 }
 
-async fn try_connect_to_daemon(config: Arc<mcp_cli_rs::config::Config>, socket_path: &std::path::Path) -> mcp_cli_rs::error::Result<Box<dyn mcp_cli_rs::ipc::ProtocolClient>> {
-    create_ipc_client(config)
+async fn try_connect_to_daemon(config: Arc<mcp_cli_rs::config::Config>, _socket_path: &std::path::Path) -> mcp_cli_rs::error::Result<Box<dyn mcp_cli_rs::ipc::ProtocolClient>> {
+    let client = create_ipc_client(config.clone())?;
+    
+    // Actually verify the connection works by sending a ping
+    let mut test_client = client;
+    match test_client.list_servers().await {
+        Ok(_) => Ok(test_client),
+        Err(e) => Err(e),
+    }
 }
 
 async fn spawn_background_daemon(_config: Arc<mcp_cli_rs::config::Config>, ttl: u64) -> mcp_cli_rs::error::Result<()> {
-    use mcp_cli_rs::config::loader::find_and_load;
-    use mcp_cli_rs::daemon::run_daemon;
-
-    // Load configuration
-    let config = find_and_load(None)
-        .await
-        .map_err(|e| mcp_cli_rs::error::McpError::usage_error(
-            format!("Failed to load configuration: {}", e)
-        ))?;
-
-    // Get socket path
-    let socket_path = get_socket_path();
-
-    // Remove existing socket file if present
-    if let Err(e) = std::fs::remove_file(&socket_path) {
-        if e.kind() != std::io::ErrorKind::NotFound {
-            tracing::warn!("Could not remove existing socket file: {}", e);
-        }
-    }
-
-    // Create daemon lifecycle with specified TTL
-    let lifecycle = mcp_cli_rs::daemon::lifecycle::DaemonLifecycle::new(ttl);
-
-    // Run daemon in background
-    run_daemon(config, socket_path, lifecycle).await
+    // Spawn the daemon as a separate process using the binary itself
+    // This is necessary because the daemon runs an IPC server that needs
+    // to be independent of the client process
+    
+    // Get the current executable path
+    let current_exe = std::env::current_exe()
         .map_err(|e| mcp_cli_rs::error::McpError::IOError {
-            source: std::io::Error::new(std::io::ErrorKind::Other, e),
-        })
+            source: std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to get executable path: {}", e)),
+        })?;
+    
+    // Build arguments for daemon subcommand
+    let mut args = vec!["daemon".to_string()];
+    
+    // Add TTL flag if specified
+    // Note: TTL is passed via env var MCP_DAEMON_TTL since CLI arg requires special handling
+    
+    // Spawn the daemon process
+    tracing::info!("Spawning daemon process: {:?} daemon (TTL: {}s)", current_exe, ttl);
+    
+    eprintln!("DEBUG: Spawning daemon: {:?} with args: {:?}", current_exe, args);
+    
+    // Get current working directory so daemon can find config
+    let current_dir = std::env::current_dir()
+        .map_err(|e| mcp_cli_rs::error::McpError::IOError {
+            source: std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to get current directory: {}", e)),
+        })?;
+    
+    let child = tokio::process::Command::new(&current_exe)
+        .args(&args)
+        .env("MCP_DAEMON_TTL", ttl.to_string())
+        .current_dir(&current_dir)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .kill_on_drop(false)  // Keep daemon running after this process exits
+        .spawn()
+        .map_err(|e| mcp_cli_rs::error::McpError::IOError {
+            source: std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to spawn daemon: {}", e)),
+        })?;
+    
+    eprintln!("DEBUG: Daemon spawned with PID: {:?}", child.id());
+    
+    // Give the daemon a moment to start before we return
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    
+    // Return immediately - the daemon process is now running independently
+    Ok(())
 }
 
 /// Direct protocol client that connects to servers without daemon
@@ -382,10 +434,36 @@ impl mcp_cli_rs::ipc::ProtocolClient for DirectProtocolClient {
             .ok_or_else(|| mcp_cli_rs::error::McpError::ServerNotFound {
                 server: server_name.to_string(),
             })?;
-        
+
         let mut transport = server_config.create_transport(server_name)?;
-        
-        // Build MCP tools/list JSON-RPC request
+
+        // MCP Protocol: Send initialize request first
+        let init_request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {
+                    "roots": {},
+                    "sampling": {},
+                    "tools": {}
+                },
+                "clientInfo": {
+                    "name": "mcp-cli-rs",
+                    "version": env!("CARGO_PKG_VERSION")
+                }
+            }
+        });
+
+        // Send initialize and get response
+        transport.send(init_request).await
+            .map_err(|e| mcp_cli_rs::error::McpError::IOError {
+                source: std::io::Error::new(std::io::ErrorKind::Other, e),
+            })?;
+
+        // Server automatically sends notifications/initialized - we don't need to send it
+        // Now send tools/list request
         let mcp_request = serde_json::json!({
             "jsonrpc": "2.0",
             "id": 1,
@@ -426,10 +504,36 @@ impl mcp_cli_rs::ipc::ProtocolClient for DirectProtocolClient {
             .ok_or_else(|| mcp_cli_rs::error::McpError::ServerNotFound {
                 server: server_name.to_string(),
             })?;
-        
+
         let mut transport = server_config.create_transport(server_name)?;
-        
-        // Build MCP tools/call JSON-RPC request
+
+        // MCP Protocol: Send initialize request first
+        let init_request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {
+                    "roots": {},
+                    "sampling": {},
+                    "tools": {}
+                },
+                "clientInfo": {
+                    "name": "mcp-cli-rs",
+                    "version": env!("CARGO_PKG_VERSION")
+                }
+            }
+        });
+
+        // Send initialize and get response
+        transport.send(init_request).await
+            .map_err(|e| mcp_cli_rs::error::McpError::IOError {
+                source: std::io::Error::new(std::io::ErrorKind::Other, e),
+            })?;
+
+        // Server automatically sends notifications/initialized - we don't need to send it
+        // Now send tools/call request
         let mcp_request = serde_json::json!({
             "jsonrpc": "2.0",
             "id": 1,

@@ -346,6 +346,11 @@ impl crate::transport::Transport for DummyTransport {
         Ok(serde_json::json!({"result": "success"}))
     }
 
+    async fn receive_notification(&mut self) -> crate::error::Result<serde_json::Value> {
+        // Stub implementation - return success
+        Ok(serde_json::json!({"method": "notifications/initialized", "result": {}}))
+    }
+
     async fn ping(&self) -> crate::error::Result<()> {
         // Stub implementation - always succeeds
         Ok(())

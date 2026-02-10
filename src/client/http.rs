@@ -40,6 +40,12 @@ impl HttpTransport {
 
 #[async_trait]
 impl Transport for HttpTransport {
+    async fn receive_notification(&mut self) -> Result<serde_json::Value> {
+        Err(McpError::InvalidProtocol {
+            message: "HTTP transport does not support notifications".to_string(),
+        })
+    }
+
     async fn send(&mut self, request: serde_json::Value) -> Result<serde_json::Value> {
         // Create request URL (append base_url to request path if needed)
         let url = self.base_url.clone();
