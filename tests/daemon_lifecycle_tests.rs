@@ -5,10 +5,11 @@
 //! XP-04: Validates daemon lifecycle works consistently on Linux, macOS, Windows
 
 use mcp_cli_rs::config::loader::load_config_sync;
-use mcp_cli_rs::ipc::IpcClient;
+use mcp_cli_rs::ipc::create_ipc_client;
 use mcp_cli_rs::config::Config;
 use mcp_cli_rs::daemon::fingerprint::calculate_fingerprint;
 use mcp_cli_rs::daemon::orphan::{cleanup_orphaned_daemon, read_daemon_pid, write_daemon_pid};
+use mcp_cli_rs::daemon::protocol::{DaemonRequest, DaemonResponse};
 use tempfile::TempDir;
 use tokio::process::Command;
 use tokio::time::{sleep, Duration, timeout};
@@ -22,17 +23,21 @@ fn create_config_from_content(content: &str) -> Config {
     load_config_sync(&config_path).expect("Failed to parse config")
 }
 
-/// Kill any existing daemon processes
-async fn kill_existing_daemons() {
-    let _ = Command::new("pkill")
-        .args(&["-f", "mcp-cli-rs"])
-        .output()
-        .await;
-    let _ = Command::new("taskkill")
-        .args(&["/F", "/IM", "mcp-cli-rs.exe"])
-        .output()
-        .await;
-    sleep(Duration::from_millis(500)).await;
+/// Send shutdown signal to daemon and wait for it to exit
+async fn shutdown_daemon_gracefully(config: &Config) -> Result<(), std::io::Error> {
+    let config_arc = std::sync::Arc::new(config.clone());
+    if let Ok(mut client) = create_ipc_client(config_arc) {
+        if let Ok(response) = timeout(Duration::from_secs(5),
+            client.send_request(&DaemonRequest::Shutdown)
+        ).await {
+            if matches!(response, Ok(DaemonResponse::ShutdownAck)) {
+                // Give daemon time to clean up
+                sleep(Duration::from_millis(500)).await;
+                return Ok(());
+            }
+        }
+    }
+    Err(std::io::Error::new(std::io::ErrorKind::Other, "Failed to shutdown daemon"))
 }
 
 /// Start daemon and wait for it to be ready
@@ -41,14 +46,14 @@ async fn start_daemon(config: &Config, ttl_secs: u64) -> Result<tokio::process::
     let config_path = temp_dir.path().join("mcp_servers.toml");
     std::fs::write(&config_path, toml::to_string(&config).expect("Failed to serialize config"))?;
 
-    let mut child = Command::new(if cfg!(windows) { "cargo" } else { "cargo" })
+    let mut child = Command::new("cargo")
         .args(&["run", "--", "daemon", "--ttl", &ttl_secs.to_string()])
         .current_dir(std::env::current_dir()?)
         .env("MCP_CONFIG_PATH", &config_path)
         .kill_on_drop(true)
         .spawn()?;
 
-    // Wait for daemon to be ready
+    // Wait for daemon to be ready with exponential backoff
     let max_wait = Duration::from_secs(10);
     let mut wait_time = Duration::from_millis(100);
     let mut connected = false;
@@ -56,11 +61,11 @@ async fn start_daemon(config: &Config, ttl_secs: u64) -> Result<tokio::process::
     while wait_time < max_wait {
         sleep(wait_time).await;
         let config_arc = std::sync::Arc::new(config.clone());
-        if let Ok(mut client) = mcp_cli_rs::ipc::create_ipc_client(config_arc) {
+        if let Ok(mut client) = create_ipc_client(config_arc) {
             if let Ok(response) = timeout(Duration::from_secs(1), 
-                client.send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
+                client.send_request(&DaemonRequest::Ping)
             ).await {
-                if matches!(response, Ok(mcp_cli_rs::daemon::protocol::DaemonResponse::Pong)) {
+                if matches!(response, Ok(DaemonResponse::Pong)) {
                     connected = true;
                     break;
                 }
@@ -80,9 +85,7 @@ async fn start_daemon(config: &Config, ttl_secs: u64) -> Result<tokio::process::
 /// Test daemon startup and connection on all platforms
 #[tokio::test]
 async fn test_daemon_startup_connection() {
-    // Kill any existing daemons
-    kill_existing_daemons().await;
-
+    // Clean up any orphaned daemon using IPC cleanup
     let config = create_config_from_content(
         r#"
 [[servers]]
@@ -95,23 +98,26 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
     // Get socket path
     let socket_path = mcp_cli_rs::ipc::get_socket_path();
 
-    // Clean up orphaned daemon
-    let _ = cleanup_orphaned_daemon(&config, &socket_path);
+    // Clean up orphaned daemon using the cleanup function
+    let _ = cleanup_orphaned_daemon(&config, &socket_path).await;
+
+    // Try to shutdown any existing daemon gracefully first
+    let _ = shutdown_daemon_gracefully(&config).await;
 
     // Start daemon with short TTL
     let mut daemon = start_daemon(&config, 30).await.expect("Failed to start daemon");
 
     // Create IPC client to verify connection
-    let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config.clone()))
+    let mut client = create_ipc_client(std::sync::Arc::new(config.clone()))
         .expect("Failed to create IPC client");
 
     // Send Ping request
-    let response = client.send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
+    let response = client.send_request(&DaemonRequest::Ping)
         .await
         .expect("Failed to send request");
 
     // Verify Pong response
-    assert!(matches!(response, mcp_cli_rs::daemon::protocol::DaemonResponse::Pong),
+    assert!(matches!(response, DaemonResponse::Pong),
              "Expected Pong response on daemon startup");
 
     // Verify config is accessible
@@ -119,10 +125,8 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
     assert!(!config_fingerprint.is_empty(),
              "Config fingerprint should be generated");
 
-    // Shutdown daemon
-    let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
-        .expect("Failed to create IPC client");
-    let _ = client.send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Shutdown).await;
+    // Shutdown daemon gracefully
+    shutdown_daemon_gracefully(&config).await.expect("Failed to shutdown daemon");
 
     // Wait for daemon to exit
     let _ = daemon.wait().await;
@@ -131,9 +135,7 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
 /// Test daemon idle timeout
 #[tokio::test]
 async fn test_daemon_idle_timeout() {
-    // Kill any existing daemons
-    kill_existing_daemons().await;
-
+    // Clean up any orphaned daemon
     let config = create_config_from_content(
         r#"
 [[servers]]
@@ -147,22 +149,25 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
     let socket_path = mcp_cli_rs::ipc::get_socket_path();
 
     // Clean up orphaned daemon
-    let _ = cleanup_orphaned_daemon(&config, &socket_path);
+    let _ = cleanup_orphaned_daemon(&config, &socket_path).await;
+
+    // Try graceful shutdown first
+    let _ = shutdown_daemon_gracefully(&config).await;
 
     // Start daemon with very short TTL (3 seconds)
     let mut daemon = start_daemon(&config, 3).await.expect("Failed to start daemon");
 
     // Create IPC client
     let config_arc = std::sync::Arc::new(config.clone());
-    let mut client = mcp_cli_rs::ipc::create_ipc_client(config_arc.clone())
+    let mut client = create_ipc_client(config_arc.clone())
         .expect("Failed to create IPC client");
 
     // Send Ping request (active connection)
-    let response = client.send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
+    let response = client.send_request(&DaemonRequest::Ping)
         .await
         .expect("Failed to send request");
 
-    assert!(matches!(response, mcp_cli_rs::daemon::protocol::DaemonResponse::Pong),
+    assert!(matches!(response, DaemonResponse::Pong),
              "Should respond to Ping when actively connected");
 
     // Wait for TTL to expire (3 seconds + buffer)
@@ -181,9 +186,7 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
 /// Test orphaned daemon cleanup on startup
 #[tokio::test]
 async fn test_orphaned_daemon_cleanup() {
-    // Kill any existing daemons
-    kill_existing_daemons().await;
-
+    // Clean up any orphaned daemon
     let config = create_config_from_content(
         r#"
 [[servers]]
@@ -195,6 +198,9 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
 
     // Get socket path
     let socket_path = mcp_cli_rs::ipc::get_socket_path();
+
+    // Try graceful shutdown first
+    let _ = shutdown_daemon_gracefully(&config).await;
 
     // Manually create stale socket file
     if cfg!(unix) {
@@ -333,9 +339,7 @@ async fn test_orphaned_pid_cleanup_platforms() {
 /// Test shutdown with active connection
 #[tokio::test]
 async fn test_shutdown_with_active_connection() {
-    // Kill any existing daemons
-    kill_existing_daemons().await;
-
+    // Clean up any orphaned daemon
     let config = create_config_from_content(
         r#"
 [[servers]]
@@ -345,26 +349,33 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
 "#,
     );
 
+    // Get socket path and clean up
+    let socket_path = mcp_cli_rs::ipc::get_socket_path();
+    let _ = cleanup_orphaned_daemon(&config, &socket_path).await;
+
+    // Try graceful shutdown first
+    let _ = shutdown_daemon_gracefully(&config).await;
+
     // Start daemon
     let mut daemon = start_daemon(&config, 60).await.expect("Failed to start daemon");
 
     // Create IPC client
-    let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config.clone()))
+    let mut client = create_ipc_client(std::sync::Arc::new(config.clone()))
         .expect("Failed to create IPC client");
 
     // Verify connection works
-    let response = client.send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
+    let response = client.send_request(&DaemonRequest::Ping)
         .await
         .expect("Failed to send request");
-    assert!(matches!(response, mcp_cli_rs::daemon::protocol::DaemonResponse::Pong));
+    assert!(matches!(response, DaemonResponse::Pong));
 
     // Send shutdown request
-    let response = client.send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Shutdown)
+    let response = client.send_request(&DaemonRequest::Shutdown)
         .await
         .expect("Failed to send shutdown request");
 
     // Should get ShutdownAck
-    assert!(matches!(response, mcp_cli_rs::daemon::protocol::DaemonResponse::ShutdownAck),
+    assert!(matches!(response, DaemonResponse::ShutdownAck),
              "Should receive ShutdownAck response");
 
     // Wait for daemon to exit
@@ -376,12 +387,12 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
 #[tokio::test]
 async fn test_daemon_protocol_consistency() {
     // Test that protocol types are consistent
-    let request = mcp_cli_rs::daemon::protocol::DaemonRequest::Ping;
-    let response = mcp_cli_rs::daemon::protocol::DaemonResponse::Pong;
+    let request = DaemonRequest::Ping;
+    let response = DaemonResponse::Pong;
 
     // Verify ping/pong works
-    assert!(matches!(request, mcp_cli_rs::daemon::protocol::DaemonRequest::Ping));
-    assert!(matches!(response, mcp_cli_rs::daemon::protocol::DaemonResponse::Pong));
+    assert!(matches!(request, DaemonRequest::Ping));
+    assert!(matches!(response, DaemonResponse::Pong));
 
     println!("✓ Daemon protocol consistency test passed");
 }
