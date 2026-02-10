@@ -1,8 +1,8 @@
 use anyhow::Result;
-use backoff::future::Retry;
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::time::Duration;
 
 use crate::config::Config;

@@ -35,14 +35,9 @@ impl DaemonLifecycle {
         *last_activity = Instant::now();
     }
 
-    /// Check if the daemon should shutdown
-    /// Returns true if idle timeout exceeded OR shutdown was explicitly requested
+    /// Check if the daemon should shutdown due to idle timeout
+    /// Call this periodically (e.g., every 1 second) in a separate task
     pub fn should_shutdown(&self) -> bool {
-        // Check if explicit shutdown was requested
-        if !self.running.load(std::sync::atomic::Ordering::SeqCst) {
-            return true;
-        }
-        // Check idle timeout
         let last_activity = self.last_activity.lock().unwrap();
         let elapsed = last_activity.elapsed();
         elapsed > self.idle_timeout

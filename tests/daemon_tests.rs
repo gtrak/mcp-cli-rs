@@ -1,6 +1,6 @@
 //! Daemon lifecycle and functionality tests.
 
-use mcp_cli_rs::config::loader::{find_and_load, load_config_sync};
+use mcp_cli_rs::config::loader::{find_and_load, load_config};
 use mcp_cli_rs::config::Config;
 use mcp_cli_rs::daemon::fingerprint::calculate_fingerprint;
 use mcp_cli_rs::daemon::orphan::{read_daemon_pid, write_daemon_pid};
@@ -8,11 +8,15 @@ use tempfile::TempDir;
 
 /// Create a config from content.
 fn create_config_from_content(content: &str) -> Config {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let config_path = temp_dir.path().join("config.toml");
     std::fs::write(&config_path, content).expect("Failed to write config");
 
-    load_config_sync(&config_path).expect("Failed to parse config")
+    runtime
+        .block_on(load_config(&config_path))
+        .expect("Failed to parse config")
 }
 
 /// Test config fingerprinting.
@@ -21,20 +25,17 @@ fn test_config_fingerprinting() {
     // Create test configs with different content
     let config1 = create_config_from_content(
         r#"
-[[servers]]
-name = "test"
+[servers.test]
 transport = { type = "stdio", command = "echo" }
 "#,
     );
 
     let config2 = create_config_from_content(
         r#"
-[[servers]]
-name = "test"
+[servers.test]
 transport = { type = "stdio", command = "echo" }
 
-[[servers]]
-name = "test2"
+[servers.test2]
 transport = { type = "stdio", command = "cat" }
 "#,
     );
@@ -96,13 +97,11 @@ fn test_missing_pid_file() {
 fn test_fingerprint_uniqueness() {
     let config = create_config_from_content(
         r#"
-[[servers]]
-name = "test-server"
+[servers.test-server]
 description = "Test server"
 transport = { type = "stdio", command = "echo", args = ["test"] }
 
-[[servers]]
-name = "test-server-2"
+[servers.test-server-2]
 description = "Another test server"
 transport = { type = "stdio", command = "cat" }
 "#,
@@ -133,8 +132,7 @@ transport = { type = "stdio", command = "cat" }
 /// Test fingerprint for empty config.
 #[test]
 fn test_fingerprint_empty_config() {
-    // Empty servers list
-    let content = r#"servers = []"#;
+    let content = r#""#; // Empty config
 
     let config = create_config_from_content(content);
 

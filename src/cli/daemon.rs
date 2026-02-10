@@ -13,6 +13,7 @@ use crate::config::Config;
 use crate::daemon::fingerprint::calculate_fingerprint;
 use crate::daemon::orphan::{cleanup_orphaned_daemon, write_daemon_pid};
 use crate::ipc::ProtocolClient;
+use crate::error::McpError;
 
 // NOTE: These functions are implemented in src/main.rs instead
 // They are commented out here to avoid compilation errors
@@ -273,6 +274,7 @@ async fn wait_for_daemon_startup(config: Arc<Config>, socket_path: &Path, timeou
                 return Ok(client);
             }
             Err(_) => {
+                // Daemon not yet ready, wait and retry
                 tracing::debug!("Daemon not ready yet, retrying in {:?}...", retry_delay);
                 sleep(retry_delay).await;
                 retry_delay = std::cmp::min(retry_delay * 2, Duration::from_secs(1));

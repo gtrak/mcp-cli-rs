@@ -3,7 +3,7 @@
 //! Uses tokio::net::windows::named_pipe for cross-platform named pipe IPC
 
 use async_trait::async_trait;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use tokio::net::windows::named_pipe::{NamedPipeClient, ClientOptions};
 
@@ -77,18 +77,12 @@ impl IpcServer for NamedPipeIpcServer {
 #[derive(Clone)]
 pub struct NamedPipeIpcClient {
     config: Arc<Config>,
-    custom_path: Option<PathBuf>,
 }
 
 impl NamedPipeIpcClient {
     /// Create a new NamedPipeIpcClient with a config reference (convenience method)
     pub fn with_config(config: Arc<Config>) -> Self {
-        Self { config, custom_path: None }
-    }
-
-    /// Create a new NamedPipeIpcClient that connects to a specific pipe path (for testing)
-    pub fn with_path(config: Arc<Config>, path: PathBuf) -> Self {
-        Self { config, custom_path: Some(path) }
+        Self { config }
     }
 }
 
@@ -101,11 +95,8 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
 
     /// Send a daemon protocol request and receive response
     async fn send_request(&mut self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
-        // Get daemon named pipe path (use custom path if set)
-        let pipe_path = match &self.custom_path {
-            Some(path) => path.clone(),
-            None => crate::ipc::get_socket_path(),
-        };
+        // Get daemon named pipe path
+        let pipe_path = crate::ipc::get_socket_path();
         tracing::debug!("IPC: Connecting to pipe at {:?}", pipe_path);
 
         // Connect to daemon

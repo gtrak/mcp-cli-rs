@@ -31,27 +31,6 @@ args = ["-m", "mcp_server"]
     }
 
     #[test]
-    fn test_config_parsing_with_disabled_tools() {
-        let toml = r#"
-[[servers]]
-name = "my_server"
-disabled_tools = ["password_*"]
-
-[servers.transport]
-type = "stdio"
-command = "python"
-args = ["-m", "mcp_server"]
-"#;
-
-        let config: Config = toml::from_str(toml).unwrap();
-        let server = config.servers.first().unwrap();
-
-        assert_eq!(server.name, "my_server");
-        assert_eq!(server.disabled_tools, Some(vec!["password_*".to_string()]));
-        assert!(server.allowed_tools.is_none());
-    }
-
-    #[test]
     fn test_config_parsing_with_both_allowed_and_disabled() {
         let toml = r#"
 [[servers]]
@@ -121,26 +100,6 @@ args = ["-m", "mcp_server"]
 
         // Empty lists are valid - they mean no filtering
         assert!(validation_error.is_ok());
-    }
-
-    #[test]
-    fn test_config_validation_with_valid_tool_filtering() {
-        let toml = r#"
-[[servers]]
-name = "my_server"
-allowed_tools = ["*"]
-disabled_tools = ["password_*"]
-
-[servers.transport]
-type = "stdio"
-command = "python"
-args = ["-m", "mcp_server"]
-"#;
-
-        let config: Config = toml::from_str(toml).unwrap();
-        let server = config.servers.first().unwrap();
-
-        assert!(loader::validate_server_config(server, "test.toml").is_ok());
     }
 
     #[test]

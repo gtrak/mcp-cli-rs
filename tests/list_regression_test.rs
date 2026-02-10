@@ -32,21 +32,10 @@ fn shutdown_daemon_gracefully() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Force kill any remaining daemon processes (fallback)
-fn kill_daemon_forcefully() {
-    let _ = Command::new("taskkill")
-        .args(&["/F", "/IM", "mcp-cli-rs.exe"])
-        .output();
-    std::thread::sleep(Duration::from_millis(200));
-}
-
-/// Cleanup daemon - try graceful shutdown first, then force kill
+/// Cleanup daemon - try graceful shutdown first
 fn cleanup_daemon() {
     // Try graceful shutdown via IPC
     let _ = shutdown_daemon_gracefully();
-
-    // Fallback to force kill
-    kill_daemon_forcefully();
 
     // Wait for cleanup
     std::thread::sleep(Duration::from_millis(300));
