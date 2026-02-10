@@ -14,6 +14,7 @@ use tempfile::TempDir;
 use tokio::process::Command;
 use tokio::time::Duration;
 use backoff::future::retry;
+use serial_test::serial;
 
 /// Create a config from content.
 fn create_config_from_content(content: &str) -> Config {
@@ -78,6 +79,7 @@ async fn start_daemon(config: &Config, ttl_secs: u64) -> Result<tokio::process::
 
 /// Test daemon startup and connection on all platforms
 #[tokio::test]
+#[serial]
 async fn test_daemon_startup_connection() {
     // Clean up any orphaned daemon using IPC cleanup
     let config = create_config_from_content(
@@ -128,6 +130,7 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
 
 /// Test daemon idle timeout
 #[tokio::test]
+#[serial]
 async fn test_daemon_idle_timeout() {
     // Clean up any orphaned daemon
     let config = create_config_from_content(
@@ -179,6 +182,7 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
 
 /// Test orphaned daemon cleanup on startup
 #[tokio::test]
+#[serial]
 async fn test_orphaned_daemon_cleanup() {
     // Clean up any orphaned daemon
     let config = create_config_from_content(
@@ -221,6 +225,7 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
 
 /// Test config fingerprinting for change detection
 #[tokio::test]
+#[serial]
 async fn test_config_fingerprint_detection() {
     let config1 = create_config_from_content(
         r#"
@@ -252,6 +257,7 @@ transport = { type = "stdio", command = "echo", args = ["modified"] }
 
 /// Test config version switching
 #[tokio::test]
+#[serial]
 async fn test_config_version_switching() {
     let config_content1 = r#"
 [[servers]]
@@ -282,6 +288,7 @@ transport = { type = "stdio", command = "cat" }
 
 /// Test config file cleanup
 #[tokio::test]
+#[serial]
 async fn test_config_file_cleanup() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let config = create_config_from_content(
@@ -309,6 +316,7 @@ transport = { type = "stdio", command = "echo" }
 
 /// Test orphaned PID cleanup on different platforms
 #[tokio::test]
+#[serial]
 async fn test_orphaned_pid_cleanup_platforms() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let pid_file = temp_dir.path().join("mcp-cli-daemon.pid");
@@ -332,6 +340,7 @@ async fn test_orphaned_pid_cleanup_platforms() {
 
 /// Test shutdown with active connection
 #[tokio::test]
+#[serial]
 async fn test_shutdown_with_active_connection() {
     // Clean up any orphaned daemon
     let config = create_config_from_content(
@@ -379,6 +388,7 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
 
 /// Test daemon protocol consistency
 #[tokio::test]
+#[serial]
 async fn test_daemon_protocol_consistency() {
     // Test that protocol types are consistent
     let request = DaemonRequest::Ping;

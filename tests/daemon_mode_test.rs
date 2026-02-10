@@ -6,9 +6,11 @@ use std::process::Command;
 use std::time::Duration;
 use std::thread;
 use mcp_cli_rs::daemon::protocol::DaemonResponse;
+use serial_test::serial;
 
 /// Test that daemon mode can list servers and tools
 #[tokio::test]
+#[serial]
 #[ignore = "Tests actual daemon and requires running daemon"]
 async fn test_daemon_mode_list_servers_and_tools() {
     // This test requires:
@@ -49,6 +51,7 @@ async fn test_daemon_mode_list_servers_and_tools() {
 
 /// Test that spawn_daemon_and_wait works correctly
 #[test]
+#[serial]
 fn test_spawn_daemon_using_main_entry() {
     // This test spawns a daemon and verifies it starts
     let _ = Command::new("taskkill")
@@ -90,6 +93,7 @@ fn test_spawn_daemon_using_main_entry() {
 
 /// Quick smoke test: verify daemon can be started and stopped
 #[test]
+#[serial]
 #[ignore]
 fn test_daemon_lifecycle() {
     // Kill any existing daemon
@@ -130,6 +134,7 @@ fn test_daemon_lifecycle() {
 
 /// Test auto-daemon mode: spawns daemon if needed, executes command, daemon auto-shutdowns
 #[tokio::test]
+#[serial]
 #[ignore]
 async fn test_auto_daemon_mode() {
     // Kill any existing daemon
@@ -194,6 +199,7 @@ async fn test_auto_daemon_mode() {
 
 /// Test auto-daemon mode with actual server
 #[tokio::test]
+#[serial]
 #[ignore]
 async fn test_auto_daemon_with_server() {
     use mcp_cli_rs::config::loader::load_config_sync;

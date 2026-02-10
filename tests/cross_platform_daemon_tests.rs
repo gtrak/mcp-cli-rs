@@ -11,6 +11,8 @@ use std::time::Duration;
 use backoff::future::retry;
 use mcp_cli_rs::daemon::protocol::{DaemonRequest, DaemonResponse};
 use mcp_cli_rs::ipc::IpcClient;
+use tokio::time::{timeout, sleep};
+use serial_test::serial;
 
 /// Get a temporary socket/pipe path for testing
 fn get_test_socket_path() -> PathBuf {
@@ -89,6 +91,7 @@ async fn test_windows_named_pipe_creation() {
 /// Test Unix socket client-server roundtrip (Linux/macOS)
 #[cfg(unix)]
 #[tokio::test]
+#[serial]
 async fn test_unix_socket_client_server_roundtrip() {
     let socket_path = get_unix_test_socket_path();
 
@@ -160,6 +163,7 @@ async fn test_unix_socket_client_server_roundtrip() {
 /// Test Unix socket multiple concurrent connections
 #[cfg(unix)]
 #[tokio::test]
+#[serial]
 async fn test_unix_socket_multiple_concurrent_connections() {
     let socket_path = get_unix_test_socket_path();
 
@@ -222,6 +226,7 @@ async fn test_unix_socket_multiple_concurrent_connections() {
 /// Test Unix socket large message transfer (Linux/macOS)
 #[cfg(unix)]
 #[tokio::test]
+#[serial]
 async fn test_unix_socket_large_message_transfer() {
     let socket_path = get_unix_test_socket_path();
 
@@ -288,6 +293,7 @@ async fn test_unix_socket_large_message_transfer() {
 /// Test Unix socket server cleanup on path removal (Linux/macOS)
 #[cfg(unix)]
 #[tokio::test]
+#[serial]
 async fn test_unix_socket_cleanup_on_removal() {
     let socket_path = get_unix_test_socket_path();
 
@@ -316,6 +322,7 @@ async fn test_unix_socket_cleanup_on_removal() {
 /// Test Unix socket StaleSocketError handling (Linux/macOS)
 #[cfg(unix)]
 #[tokio::test]
+#[serial]
 async fn test_unix_socket_stale_error_handling() {
     let socket_path = get_unix_test_socket_path();
 
@@ -365,6 +372,7 @@ async fn test_windows_named_pipe_server_creation() {
 /// Test Windows named pipe client-server roundtrip
 #[cfg(windows)]
 #[tokio::test]
+#[serial]
 async fn test_windows_named_pipe_client_server_roundtrip() {
     // Use a unique pipe name to avoid conflicts with other tests
     let pipe_name = format!(r"\\.\pipe\mcp-cli-test-roundtrip-{}", std::process::id());
@@ -410,23 +418,25 @@ async fn test_windows_named_pipe_client_server_roundtrip() {
             .expect("Failed to send response");
     });
 
-    // Client already created at the start of the test with the correct pipe path
-
     let request = DaemonRequest::Ping;
-    let backoff = backoff::ExponentialBackoffBuilder::new()
-        .with_initial_interval(Duration::from_millis(10))
-        .with_max_interval(Duration::from_secs(2))
-        .with_max_elapsed_time(Some(Duration::from_secs(5)))
-        .build();
-
-    let response = Retry::spawn(backoff, || async {
-        client.send_request(&request).await.map_err(backoff::Error::transient)
-    }).await;
-
-    let response = match response {
-        Ok(r) => r,
-        Err(_) => DaemonResponse::Error { code: 1, message: "timeout".to_string() },
-    };
+    let response = timeout(Duration::from_secs(5), async {
+        let mut delay = Duration::from_millis(10);
+        loop {
+            let config = mcp_cli_rs::config::Config::default();
+            let mut client = mcp_cli_rs::ipc::create_ipc_client_for_path(std::sync::Arc::new(config), &pipe_path)
+                .expect("Failed to create IPC client");
+            match client.send_request(&request).await {
+                Ok(r) => break r,
+                Err(_) => {
+                    if delay > Duration::from_secs(2) {
+                        return DaemonResponse::Error { code: 1, message: "timeout".to_string() };
+                    }
+                    sleep(delay).await;
+                    delay *= 2;
+                }
+            }
+        }
+    }).await.expect("Timeout waiting for server");
 
     // Verify response
     assert!(matches!(response, DaemonResponse::Pong),
@@ -439,6 +449,7 @@ async fn test_windows_named_pipe_client_server_roundtrip() {
 /// Test Windows named pipe multiple sequential connections
 #[cfg(windows)]
 #[tokio::test]
+#[serial]
 async fn test_windows_named_pipe_multiple_sequential_connections() {
     // Use a unique pipe name to avoid conflicts with other tests
     let pipe_name = format!(r"\\.\pipe\mcp-cli-test-sequential-{}", std::process::id());
@@ -494,6 +505,9 @@ async fn test_windows_named_pipe_multiple_sequential_connections() {
         .build();
 
     let response = retry(backoff, || async {
+        let config = mcp_cli_rs::config::Config::default();
+        let mut client = mcp_cli_rs::ipc::create_ipc_client_for_path(std::sync::Arc::new(config), &pipe_path)
+            .expect("Failed to create IPC client");
         client.send_request(&request).await.map_err(backoff::Error::transient)
     }).await;
 
@@ -513,6 +527,7 @@ async fn test_windows_named_pipe_multiple_sequential_connections() {
 /// Test Windows named pipe large message transfer
 #[cfg(windows)]
 #[tokio::test]
+#[serial]
 async fn test_windows_named_pipe_large_message_transfer() {
     // Use a unique pipe name to avoid conflicts with other tests
     let pipe_name = format!(r"\\.\pipe\mcp-cli-test-large-{}", std::process::id());
@@ -561,14 +576,23 @@ async fn test_windows_named_pipe_large_message_transfer() {
 
     // Send request with exponential backoff
     let request = DaemonRequest::Ping;
-    let backoff = backoff::ExponentialBackoffBuilder::new()
-        .with_initial_interval(Duration::from_millis(10))
-        .with_max_interval(Duration::from_secs(2))
-        .with_max_elapsed_time(Some(Duration::from_secs(5)))
-        .build();
-
-    let response = retry(backoff, || async {
-        client.send_request(&request).await.map_err(backoff::Error::transient)
+    let response = timeout(Duration::from_secs(5), async {
+        let mut delay = Duration::from_millis(10);
+        loop {
+            let config = mcp_cli_rs::config::Config::default();
+            let mut client = mcp_cli_rs::ipc::create_ipc_client_for_path(std::sync::Arc::new(config), &pipe_path)
+                .expect("Failed to create IPC client");
+            match client.send_request(&request).await {
+                Ok(r) => break r,
+                Err(_) => {
+                    if delay > Duration::from_secs(2) {
+                        return DaemonResponse::Error { code: 1, message: "timeout".to_string() };
+                    }
+                    sleep(delay).await;
+                    delay *= 2;
+                }
+            }
+        }
     }).await;
 
     let response = match response {
@@ -590,6 +614,7 @@ async fn test_windows_named_pipe_large_message_transfer() {
 /// Test Windows named pipe SECURITY_IDENTIFICATION flags applied
 #[cfg(windows)]
 #[tokio::test]
+#[serial]
 async fn test_windows_named_pipe_security_flags() {
     // Use a unique pipe name to avoid conflicts with other tests
     let pipe_name = format!(r"\\.\pipe\mcp-cli-test-security-{}", std::process::id());
@@ -629,6 +654,9 @@ async fn test_windows_named_pipe_security_flags() {
         .build();
 
     let _response = retry(backoff, || async {
+        let config = mcp_cli_rs::config::Config::default();
+        let mut client = mcp_cli_rs::ipc::create_ipc_client_for_path(std::sync::Arc::new(config), &pipe_path)
+            .expect("Failed to create IPC client");
         client.send_request(&request).await.map_err(backoff::Error::transient)
     }).await;
 
