@@ -151,41 +151,50 @@ pub async fn run_daemon(config: Config, socket_path: PathBuf, lifecycle: DaemonL
     Ok(())
 }
 
-/// Handle client requests
-pub async fn handle_client(
-    stream: impl crate::ipc::IpcStream + Unpin,
-    state: DaemonState,
-) {
-    use tokio::io::BufReader;
-    
-    // Update activity timestamp
-    state.update_activity();
+    /// Handle client requests
+    pub async fn handle_client(
+        stream: impl crate::ipc::IpcStream + Unpin,
+        state: DaemonState,
+    ) {
+        use tokio::io::BufReader;
+        eprintln!("DEBUG DAEMON: New client connected");
 
-    // Wrap stream for buffered reading
-    let (reader, mut writer) = tokio::io::split(stream);
-    let mut buf_reader = BufReader::new(reader);
+        // Update activity timestamp
+        state.update_activity();
 
-    // Read request from stream
-    let request = match crate::daemon::protocol::receive_request(&mut buf_reader).await {
-        Ok(req) => req,
-        Err(e) => {
-            tracing::warn!("Error reading request: {}", e);
+        // Wrap stream for buffered reading
+        let (reader, mut writer) = tokio::io::split(stream);
+        let mut buf_reader = BufReader::new(reader);
+
+        // Read request from stream
+        eprintln!("DEBUG DAEMON: Reading request...");
+        let request = match crate::daemon::protocol::receive_request(&mut buf_reader).await {
+            Ok(req) => {
+                eprintln!("DEBUG DAEMON: Got request: {:?}", req);
+                req
+            },
+            Err(e) => {
+                eprintln!("DEBUG DAEMON: Error reading request: {}", e);
+                return;
+            }
+        };
+
+        // Handle request
+        eprintln!("DEBUG DAEMON: Handling request...");
+        let response = handle_request(request, &state).await;
+        eprintln!("DEBUG DAEMON: Generated response: {:?}", response);
+
+        // Send response
+        eprintln!("DEBUG DAEMON: Sending response...");
+        if let Err(e) = crate::daemon::protocol::send_response(&mut writer, &response).await {
+            eprintln!("DEBUG DAEMON: Error sending response: {}", e);
             return;
         }
-    };
+        eprintln!("DEBUG DAEMON: Response sent");
 
-    // Handle request
-    let response = handle_request(request, &state).await;
-
-    // Send response
-    if let Err(e) = crate::daemon::protocol::send_response(&mut writer, &response).await {
-        tracing::warn!("Error sending response: {}", e);
-        return;
+        // Update activity timestamp
+        state.update_activity();
     }
-
-    // Update activity timestamp
-    state.update_activity();
-}
 
 /// Handle daemon request and return response
 pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, state: &DaemonState)

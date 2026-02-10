@@ -97,9 +97,11 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
     async fn send_request(&mut self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
         // Get daemon named pipe path
         let pipe_path = crate::ipc::get_socket_path();
+        eprintln!("DEBUG IPC: Connecting to pipe at {:?}", pipe_path);
 
         // Connect to daemon
         let mut stream = self.connect(&pipe_path).await?;
+        eprintln!("DEBUG IPC: Connected to pipe");
 
         // Split stream for reading and writing
         use tokio::io::{BufReader};
@@ -107,16 +109,21 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
         let mut buf_reader = BufReader::new(reader);
 
         // Send request using NDJSON protocol
+        eprintln!("DEBUG IPC: Sending request: {:?}", request);
         crate::daemon::protocol::send_request(&mut writer, request).await
             .map_err(|e| McpError::IpcError {
                 message: format!("Failed to send IPC request: {}", e),
             })?;
+        eprintln!("DEBUG IPC: Request sent");
 
         // Receive response using NDJSON protocol
-        crate::daemon::protocol::receive_response(&mut buf_reader).await
+        eprintln!("DEBUG IPC: Waiting for response...");
+        let result = crate::daemon::protocol::receive_response(&mut buf_reader).await
             .map_err(|e| McpError::IpcError {
                 message: format!("Failed to receive IPC response: {}", e),
-            })
+            });
+        eprintln!("DEBUG IPC: Got response: {:?}", result);
+        result
     }
 
     /// Connect to an IPC server at the given path

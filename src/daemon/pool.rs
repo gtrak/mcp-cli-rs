@@ -52,18 +52,23 @@ impl ConnectionPool {
 
     /// Take a connection from the pool for use
     pub async fn take(&self, server_name: &str) -> Result<Option<PooledConnection>> {
+        eprintln!("DEBUG: take() called for server: {}", server_name);
         let mut connections = self.connections.lock().unwrap();
+        eprintln!("DEBUG: Got lock, checking for existing connection");
 
         if let Some(mut conn) = connections.remove(server_name) {
+            eprintln!("DEBUG: Found existing connection for: {}", server_name);
             if conn.is_healthy() {
                 conn.touch();
-                tracing::debug!("Taking cached connection for: {}", server_name);
+                eprintln!("DEBUG: Connection is healthy, returning it");
                 return Ok(Some(conn));
             }
-            tracing::warn!("Discarding unhealthy connection for: {}", server_name);
+            eprintln!("DEBUG: Connection is unhealthy, discarding");
         }
 
-        tracing::info!("Creating new connection for: {}", server_name);
+        eprintln!("DEBUG: No existing connection, creating new one for: {}", server_name);
+        drop(connections); // Release lock before creating transport
+
         let transport = self.create_transport(server_name)?;
         Ok(Some(PooledConnection {
             transport,
@@ -84,10 +89,12 @@ impl ConnectionPool {
 
     /// Execute a tool using cached or new connection
     pub async fn execute(&self, server_name: &str, tool_name: &str, arguments: serde_json::Value) -> Result<serde_json::Value> {
+        eprintln!("DEBUG: execute() called for server: {}, tool: {}", server_name, tool_name);
         let mut conn = match self.take(server_name).await? {
             Some(c) => c,
             None => return Err(McpError::ServerNotFound { server: server_name.to_string() }),
         };
+        eprintln!("DEBUG: Got connection, sending request");
 
         let mcp_request = serde_json::json!({
             "jsonrpc": "2.0",
@@ -116,10 +123,12 @@ impl ConnectionPool {
 
     /// List tools using cached or new connection
     pub async fn list_tools(&self, server_name: &str) -> Result<Vec<ToolInfo>> {
+        eprintln!("DEBUG: list_tools() called for server: {}", server_name);
         let mut conn = match self.take(server_name).await? {
             Some(c) => c,
             None => return Err(McpError::ServerNotFound { server: server_name.to_string() }),
         };
+        eprintln!("DEBUG: Got connection, sending tools/list request");
 
         let mcp_request = serde_json::json!({
             "jsonrpc": "2.0",
@@ -129,6 +138,7 @@ impl ConnectionPool {
 
         let result = match conn.transport.send(mcp_request).await {
             Ok(response) => {
+                eprintln!("DEBUG: Got response: {:?}", response);
                 if let Some(result) = response.get("result") {
                     let tools: Vec<ToolInfo> = if let Some(tools_array) = result.get("tools").and_then(|t| t.as_array()) {
                         tools_array.iter().filter_map(|tool| {
@@ -157,11 +167,18 @@ impl ConnectionPool {
     }
 
     fn create_transport(&self, server_name: &str) -> Result<BoxedTransport> {
+        eprintln!("DEBUG: Creating transport for server: {}", server_name);
         let server_config = self.config.servers.iter()
             .find(|s| s.name.as_str() == server_name)
             .ok_or_else(|| McpError::ServerNotFound { server: server_name.to_string() })?;
 
-        server_config.create_transport(server_name).map_err(|e|
+        eprintln!("DEBUG: Found server config: name={}", server_config.name);
+        let result = server_config.create_transport(server_name);
+        match &result {
+            Ok(_) => eprintln!("DEBUG: Transport created successfully"),
+            Err(e) => eprintln!("DEBUG: Transport creation failed: {}", e),
+        }
+        result.map_err(|e|
             McpError::ConnectionError {
                 server: server_name.to_string(),
                 source: std::io::Error::new(std::io::ErrorKind::Other, e.to_string()),
