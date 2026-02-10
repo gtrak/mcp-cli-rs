@@ -403,11 +403,13 @@ fn spawn_windows_daemon(
     ttl: u64,
     current_dir: &std::path::Path,
 ) -> mcp_cli_rs::error::Result<()> {
-    use windows::core::w;
     use windows::Win32::Foundation::CloseHandle;
-    use windows::Win32::System::Threading::{CreateProcessW, CREATE_UNICODE_ENVIRONMENT, CREATE_NEW_CONSOLE, STARTUPINFOW, PROCESS_INFORMATION};
+    use windows::Win32::System::Threading::{CreateProcessW, CREATE_UNICODE_ENVIRONMENT, CREATE_NO_WINDOW, DETACHED_PROCESS, STARTUPINFOW, PROCESS_INFORMATION};
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
+    
+    // Check if debug mode is enabled
+    let debug_mode = std::env::var("MCP_DAEMON_DEBUG").is_ok();
     
     // Build command line: executable daemon --ttl {ttl}
     let cmd_line = format!(r#""{}" daemon --ttl {}"#, current_exe.display(), ttl);
@@ -431,6 +433,13 @@ fn spawn_windows_daemon(
     
     let mut process_info = PROCESS_INFORMATION::default();
     
+    // Creation flags: hide window unless debugging
+    let creation_flags = if debug_mode {
+        CREATE_UNICODE_ENVIRONMENT
+    } else {
+        CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_UNICODE_ENVIRONMENT
+    };
+    
     unsafe {
         CreateProcessW(
             None,  // Application name (use command line)
@@ -438,7 +447,7 @@ fn spawn_windows_daemon(
             None,  // Process security attributes
             None,  // Thread security attributes
             false, // Inherit handles
-            CREATE_NEW_CONSOLE | CREATE_UNICODE_ENVIRONMENT, // Creation flags
+            creation_flags,
             None,  // Environment (inherit)
             windows::core::PCWSTR(dir_wide.as_ptr()),
             &startup_info,
@@ -455,7 +464,11 @@ fn spawn_windows_daemon(
         let _ = CloseHandle(process_info.hProcess);
         let _ = CloseHandle(process_info.hThread);
         
-        tracing::info!("Daemon spawned with PID: {}", process_info.dwProcessId);
+        if debug_mode {
+            tracing::info!("Daemon spawned with visible console (debug mode), PID: {}", process_info.dwProcessId);
+        } else {
+            tracing::info!("Daemon spawned with hidden console, PID: {}", process_info.dwProcessId);
+        }
     }
     
     Ok(())
