@@ -19,9 +19,9 @@ fn test_list_no_daemon() {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
-            let has_servers = stdout.contains("Servers:")
+            let has_servers = stdout.contains("Configured servers:")
                 || stdout.contains("MCP Servers")
-                || stdout.contains("Configured servers");
+                || stdout.contains("Servers:");
             let has_tools = stdout.contains("Tools:");
 
             println!("Exit code: {:?}", output.status.code());
@@ -72,9 +72,9 @@ fn test_manual_daemon_spawn() {
 
     println!("List completed. stdout length: {}", stdout.len());
     assert!(
-        stdout.contains("Servers:")
+        stdout.contains("Configured servers:")
             || stdout.contains("MCP Servers")
-            || stdout.contains("Configured servers")
+            || stdout.contains("Servers:")
             || stdout.contains("No servers"),
         "Should show servers when daemon is running"
     );
