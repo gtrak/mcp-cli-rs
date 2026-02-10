@@ -404,7 +404,8 @@ fn spawn_windows_daemon(
     current_dir: &std::path::Path,
 ) -> mcp_cli_rs::error::Result<()> {
     use windows::Win32::Foundation::CloseHandle;
-    use windows::Win32::System::Threading::{CreateProcessW, CREATE_UNICODE_ENVIRONMENT, CREATE_NO_WINDOW, DETACHED_PROCESS, STARTUPINFOW, PROCESS_INFORMATION};
+    use windows::Win32::System::Threading::{CreateProcessW, CREATE_UNICODE_ENVIRONMENT, CREATE_NO_WINDOW, STARTUPINFOW, PROCESS_INFORMATION, STARTF_USESHOWWINDOW};
+    use windows::Win32::UI::WindowsAndMessaging::SW_HIDE;
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
     
@@ -425,11 +426,17 @@ fn spawn_windows_daemon(
         .chain(Some(0))
         .collect();
     
-    // Startup info
-    let startup_info = STARTUPINFOW {
+    // Startup info - hide window properly
+    let mut startup_info = STARTUPINFOW {
         cb: std::mem::size_of::<STARTUPINFOW>() as u32,
         ..Default::default()
     };
+    
+    // If not in debug mode, hide the window completely
+    if !debug_mode {
+        startup_info.dwFlags = STARTF_USESHOWWINDOW;
+        startup_info.wShowWindow = SW_HIDE.0 as u16;
+    }
     
     let mut process_info = PROCESS_INFORMATION::default();
     
@@ -437,7 +444,7 @@ fn spawn_windows_daemon(
     let creation_flags = if debug_mode {
         CREATE_UNICODE_ENVIRONMENT
     } else {
-        CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_UNICODE_ENVIRONMENT
+        CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT
     };
     
     unsafe {
