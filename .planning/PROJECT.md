@@ -8,13 +8,9 @@ A Rust rewrite of the mcp-cli tool for interacting with Model Context Protocol (
 
 Reliable cross-platform MCP server interaction without dependencies. Developers and AI agents can discover available tools, inspect schemas, and execute operations through a simple CLI that works consistently on Linux, macOS, and Windows.
 
-## Current State (v1.0 - SHIPPED)
+## Requirements
 
-**Status:** ✅ Complete and verified
-**Shipped:** 2026-02-10
-**Requirements:** 42/42 verified (100%)
-
-### Validated (v1.0)
+### Validated (v1.0 - v1.1)
 
 - ✅ Connect to MCP servers via stdio and HTTP transports
 - ✅ List all configured servers and their available tools
@@ -35,13 +31,29 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 - ✅ Auto-detect stdin input for tool arguments
 - ✅ Colored terminal output with NO_COLOR support
 - ✅ Cross-platform support (Windows, Linux, macOS)
+- ✅ Unified daemon architecture (single binary, three operational modes)
+- ✅ Configurable TTL for auto-shutdown daemon
 
-### Active (v1.1 - Next Milestone)
+## Current Milestone: v1.2 Ergonomic CLI Output
 
-- [ ] Unified daemon architecture (single binary, three operational modes)
-- [ ] Configurable TTL for auto-shutdown daemon
-- [ ] Remove separate daemon.exe binary
-- [ ] Enhanced platform testing and validation
+**Goal:** Improve CLI output format to be more ergonomic, self-describing, and aligned with standard CLI conventions, making it easier for both humans and LLMs to navigate.
+
+**Target features:**
+- Redesigned tool listing with parameter overview (like --help format)
+- Progressive detail levels (summary → parameters → full schema)
+- Consistent command structure across all subcommands
+- Better default output for tool discovery (descriptions + usage hints)
+- Machine-readable JSON output option for scripting
+- Grouped tool display by server with clear visual hierarchy
+
+### Active (v1.2)
+
+- [ ] Redesigned tool listing format with parameter overview
+- [ ] Progressive detail: summary view → parameter details → full schema
+- [ ] Improved default `list` output with descriptions and usage hints
+- [ ] Consistent help-style formatting across all commands
+- [ ] JSON output mode for programmatic use
+- [ ] Better visual hierarchy in multi-server listings
 
 ### Out of Scope
 
@@ -77,18 +89,19 @@ The tool will be wrapped in a skill for LLM use, so error messages and output sh
 | Use Rust MCP SDK | Avoid reimplementing MCP protocol from scratch | ✅ Working well, protocol compliance verified |
 | Skill-compatible output | Tool will be wrapped for LLM use | ✅ Machine-parsable errors implemented |
 
-## Next Milestone Goals (v1.1)
+## Next Milestone Goals (v1.2)
 
-**Focus:** Unified Daemon Architecture
+**Focus:** Ergonomic CLI Output
 
 **Goals:**
-1. Refactor to single binary (remove separate daemon.exe)
-2. Three operational modes: standalone daemon, auto-spawn, require-daemon
-3. Configurable TTL for automatic daemon shutdown
-4. Enhanced cross-platform testing
+1. Improve tool listing to show parameter overview (like --help)
+2. Progressive disclosure: summary → parameters → full schema
+3. Consistent formatting across all commands
+4. JSON output mode for scripting
+5. Better visual hierarchy
 
-**Target:** Complete v1.1 architecture improvements and begin v2 feature planning
+**Target:** Complete v1.2 output improvements
 
 ---
 
-*Last updated: 2026-02-10 after v1.0 milestone completion*
+*Last updated: 2026-02-10 after v1.1 milestone completion*
