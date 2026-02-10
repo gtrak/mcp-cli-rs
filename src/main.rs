@@ -41,6 +41,9 @@ enum Commands {
         ttl: Option<u64>,
     },
 
+    /// Shutdown the running daemon
+    Shutdown,
+
     /// List all servers and their available tools (CLI-01, DISC-01)
     List {
         /// Include tool descriptions
@@ -97,6 +100,11 @@ async fn run(cli: Cli) -> Result<()> {
     // Handle daemon subcommand first (standalone mode)
     if let Some(Commands::Daemon { ttl }) = &cli.command {
         return run_standalone_daemon(*ttl).await;
+    }
+
+    // Handle shutdown command
+    if let Some(Commands::Shutdown) = &cli.command {
+        return shutdown_daemon().await;
     }
 
     // Load configuration using the loader
@@ -179,6 +187,10 @@ async fn execute_command(cli: &Cli, mut client: Box<dyn mcp_cli_rs::ipc::Protoco
             // Daemon subcommand is handled separately in run()
             Ok(())
         }
+        Some(Commands::Shutdown) => {
+            // Shutdown subcommand is handled separately in run()
+            Ok(())
+        }
         Some(Commands::List { with_descriptions }) => {
             cmd_list_servers(client, with_descriptions).await
         }
@@ -198,6 +210,35 @@ async fn execute_command(cli: &Cli, mut client: Box<dyn mcp_cli_rs::ipc::Protoco
             cmd_list_servers(client, false).await
         }
     }
+}
+
+/// Shutdown the running daemon via IPC
+async fn shutdown_daemon() -> Result<()> {
+    use mcp_cli_rs::config::loader::find_and_load;
+    
+    // Load configuration (needed for IPC context)
+    let config = find_and_load(None)
+        .await
+        .map_err(|e| mcp_cli_rs::error::McpError::usage_error(
+            format!("Failed to load configuration: {}", e)
+        ))?;
+
+    let config_arc = Arc::new(config);
+    
+    // Create IPC client to connect to daemon
+    let mut client = create_ipc_client(config_arc)
+        .map_err(|e| mcp_cli_rs::error::McpError::io_error(
+            std::io::Error::new(std::io::ErrorKind::ConnectionRefused, e)
+        ))?;
+
+    // Send shutdown request
+    client.shutdown().await
+        .map_err(|e| mcp_cli_rs::error::McpError::io_error(
+            std::io::Error::new(std::io::ErrorKind::Other, e)
+        ))?;
+
+    println!("Daemon shutdown request sent successfully");
+    Ok(())
 }
 
 /// Run in standalone daemon mode - starts persistent daemon with specified TTL
@@ -591,5 +632,12 @@ impl mcp_cli_rs::ipc::ProtocolClient for DirectProtocolClient {
                 message: "Invalid MCP response format".to_string(),
             })
         }
+    }
+
+    async fn shutdown(&mut self) -> mcp_cli_rs::error::Result<()> {
+        // Direct mode doesn't support daemon shutdown
+        Err(mcp_cli_rs::error::McpError::InvalidProtocol {
+            message: "Direct mode doesn't support daemon shutdown".to_string(),
+        })
     }
 }

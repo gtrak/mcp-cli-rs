@@ -165,6 +165,7 @@ pub trait ProtocolClient: Send + Sync {
         tool_name: &str,
         arguments: serde_json::Value,
     ) -> Result<serde_json::Value, McpError>;
+    async fn shutdown(&mut self) -> Result<(), McpError>;
 }
 
 #[async_trait]
@@ -235,6 +236,19 @@ impl<T: IpcClient + Send + Sync + Clone> ProtocolClient for IpcClientWrapper<T> 
                     "Expected ToolResult for '{}.{}', got {:?}",
                     server_name, tool_name, response
                 ),
+            }),
+        }
+    }
+
+    async fn shutdown(&mut self) -> Result<(), McpError> {
+        let response = self
+            .client
+            .send_request(&crate::daemon::protocol::DaemonRequest::Shutdown)
+            .await?;
+        match response {
+            crate::daemon::protocol::DaemonResponse::ShutdownAck => Ok(()),
+            _ => Err(crate::error::McpError::InvalidProtocol {
+                message: format!("Expected ShutdownAck, got {:?}", response),
             }),
         }
     }
