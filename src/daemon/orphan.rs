@@ -52,32 +52,30 @@ pub fn is_daemon_running(pid: u32) -> bool {
 
 #[cfg(windows)]
 pub fn is_daemon_running(pid: u32) -> bool {
-    use windows_sys::Win32::System::Threading::{GetExitCodeProcess, OpenProcess};
-    use windows_sys::Win32::System::Threading::PROCESS_QUERY_INFORMATION;
+    use windows::Win32::System::Threading::{GetExitCodeProcess, OpenProcess, PROCESS_QUERY_INFORMATION};
+    use windows::Win32::Foundation::CloseHandle;
 
     const STILL_ACTIVE: u32 = 259;
 
     unsafe {
         // Open the process with query information rights
-        let process_handle = OpenProcess(PROCESS_QUERY_INFORMATION, 0, pid);
+        let process_handle = OpenProcess(PROCESS_QUERY_INFORMATION, false, pid);
 
-        if process_handle.is_null() {
-            // Process doesn't exist or we don't have access
-            return false;
+        match process_handle {
+            Ok(handle) => {
+                let mut exit_code: u32 = 0;
+                let result = GetExitCodeProcess(handle, &mut exit_code);
+                
+                // Close the handle
+                let _ = CloseHandle(handle);
+
+                match result {
+                    Ok(_) => exit_code == STILL_ACTIVE,
+                    Err(_) => false,
+                }
+            }
+            Err(_) => false,
         }
-
-        let mut exit_code: u32 = 0;
-        let success = GetExitCodeProcess(process_handle, &mut exit_code);
-
-        // Close the handle
-        let _ = windows_sys::Win32::Foundation::CloseHandle(process_handle);
-
-        if success == 0 {
-            return false;
-        }
-
-        // If exit code is STILL_ACTIVE (259), process is running
-        exit_code == STILL_ACTIVE
     }
 }
 
@@ -128,7 +126,7 @@ pub async fn cleanup_orphaned_daemon(daemon_config: &Config, socket_path: &Path)
     // Try to connect via IPC to check if daemon is running
     let ipc_result = try_connect_via_ipc(daemon_config, socket_path);
 
-    if let Ok(client) = ipc_result {
+    if let Ok(_client) = ipc_result {
         // Daemon is running, nothing to clean up
         tracing::info!("Daemon is running, no cleanup needed");
         return Ok(());
@@ -231,26 +229,20 @@ pub fn kill_daemon_process(pid: u32) -> Result<()> {
 
     #[cfg(windows)]
     {
-        use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess};
-        use windows_sys::Win32::System::Threading::PROCESS_TERMINATE;
+        use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+        use windows::Win32::Foundation::CloseHandle;
 
         unsafe {
-            let process_handle = OpenProcess(PROCESS_TERMINATE, 0, pid);
-            if process_handle.is_null() {
-                return Err(anyhow::anyhow!(
-                    "Failed to open process handle for PID: {}",
-                    pid
-                ));
+            let process_handle = OpenProcess(PROCESS_TERMINATE, false, pid)
+                .map_err(|e| anyhow::anyhow!("Failed to open process handle for PID {}: {}", pid, e))?;
+
+            let result = TerminateProcess(process_handle, 1);
+            let _ = CloseHandle(process_handle);
+
+            match result {
+                Ok(_) => tracing::info!("Terminated daemon process PID: {}", pid),
+                Err(e) => return Err(anyhow::anyhow!("Failed to terminate process PID {}: {}", pid, e)),
             }
-
-            let success = TerminateProcess(process_handle, 1);
-            let _ = windows_sys::Win32::Foundation::CloseHandle(process_handle);
-
-            if success == 0 {
-                return Err(anyhow::anyhow!("Failed to terminate process PID: {}", pid));
-            }
-
-            tracing::info!("Terminated daemon process PID: {}", pid);
         }
     }
 

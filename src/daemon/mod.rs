@@ -222,6 +222,34 @@ pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, sta
                 }
             };
 
+            // MCP Protocol: Send initialize request first
+            let init_request = serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 0,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {
+                        "roots": {},
+                        "sampling": {},
+                        "tools": {}
+                    },
+                    "clientInfo": {
+                        "name": "mcp-cli-rs-daemon",
+                        "version": env!("CARGO_PKG_VERSION")
+                    }
+                }
+            });
+
+            // Send initialize and get response
+            if let Err(e) = transport.send(init_request).await {
+                tracing::error!("Failed to initialize MCP connection for {}: {}", server_name, e);
+                return crate::daemon::protocol::DaemonResponse::Error {
+                    code: 3,
+                    message: format!("Failed to initialize MCP connection: {}", e),
+                };
+            }
+
             // Build MCP tools/call JSON-RPC request
             let mcp_request = serde_json::json!({
                 "jsonrpc": "2.0",
@@ -283,6 +311,34 @@ pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, sta
                     };
                 }
             };
+
+            // MCP Protocol: Send initialize request first
+            let init_request = serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 0,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {
+                        "roots": {},
+                        "sampling": {},
+                        "tools": {}
+                    },
+                    "clientInfo": {
+                        "name": "mcp-cli-rs-daemon",
+                        "version": env!("CARGO_PKG_VERSION")
+                    }
+                }
+            });
+
+            // Send initialize and get response
+            if let Err(e) = transport.send(init_request).await {
+                tracing::error!("Failed to initialize MCP connection for {}: {}", server_name, e);
+                return crate::daemon::protocol::DaemonResponse::Error {
+                    code: 3,
+                    message: format!("Failed to initialize MCP connection: {}", e),
+                };
+            }
 
             // Build MCP tools/list JSON-RPC request
             let mcp_request = serde_json::json!({

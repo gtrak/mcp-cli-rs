@@ -11,6 +11,9 @@ use crate::ipc::IpcServer;
 use crate::error::McpError;
 use crate::config::Config;
 
+/// Windows named pipe name
+const PIPE_NAME: &str = r"\\.\pipe\mcp-cli-daemon-socket";
+
 /// Windows named pipe implementation of IPC server
 ///
 /// Accepts connections via named pipes on Windows systems
@@ -22,19 +25,9 @@ impl NamedPipeIpcServer {
     /// Create a new NamedPipeIpcServer with the specified pipe name
     ///
     /// Creates a named pipe that can accept multiple client connections
-    pub fn new(path: &Path) -> Result<Self, McpError> {
-        // Extract pipe name from the path (remove any directory components)
-        let pipe_name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .ok_or_else(|| McpError::IpcError {
-                message: format!("Invalid pipe path: {}", path.display()),
-            })?;
-
-        let pipe_name_display = format!(r"\\.\pipe\{}", pipe_name);
-
+    pub fn new(_path: &Path) -> Result<Self, McpError> {
         Ok(Self {
-            pipe_name: pipe_name_display,
+            pipe_name: PIPE_NAME.to_string(),
         })
     }
 
@@ -52,6 +45,7 @@ impl IpcServer for NamedPipeIpcServer {
     async fn accept(&self) -> Result<(Box<dyn crate::ipc::IpcStream>, String), McpError> {
         // Create server instance for this connection
         let server = tokio::net::windows::named_pipe::ServerOptions::new()
+            .first_pipe_instance(false)  // Allow multiple instances
             .reject_remote_clients(true) // Local connections only
             .create(&self.pipe_name)
             .map_err(|e| McpError::IpcError {
@@ -84,6 +78,26 @@ impl NamedPipeIpcClient {
     pub fn with_config(config: Arc<Config>) -> Self {
         Self { config }
     }
+
+    /// Connect to the named pipe with retry logic for ERROR_PIPE_BUSY (231)
+    async fn connect_with_retry(&self) -> Result<NamedPipeClient, McpError> {
+        loop {
+            match ClientOptions::new().open(PIPE_NAME) {
+                Ok(client) => return Ok(client),
+                Err(e) => {
+                    // ERROR_PIPE_BUSY = 231
+                    if e.raw_os_error() == Some(231) {
+                        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                        continue;
+                    }
+                    return Err(McpError::ConnectionError {
+                        server: PIPE_NAME.to_string(),
+                        source: e,
+                    });
+                }
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -95,11 +109,8 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
 
     /// Send a daemon protocol request and receive response
     async fn send_request(&mut self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
-        // Get daemon named pipe path
-        let pipe_path = crate::ipc::get_socket_path();
-
-        // Connect to daemon
-        let mut stream = self.connect(&pipe_path).await?;
+        // Connect to daemon with retry logic
+        let stream = self.connect_with_retry().await?;
 
         // Split stream for reading and writing
         use tokio::io::{BufReader};
@@ -122,27 +133,11 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
     /// Connect to an IPC server at the given path
     ///
     /// Returns a boxed stream for communication
-    async fn connect(&self, path: &Path) -> Result<Box<dyn crate::ipc::IpcStream>, McpError> {
-        let pipe_name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .ok_or_else(|| McpError::IpcError {
-                message: format!("Invalid pipe path: {}", path.display()),
-            })?;
-
-        let pipe_name_display = format!(r"\\.\pipe\{}", pipe_name);
-
-        let client = ClientOptions::new()
-            .open(&pipe_name_display)
-            .map_err(|e| McpError::ConnectionError {
-                server: pipe_name_display.clone(),
-                source: e,
-            })?;
-
+    async fn connect(&self, _path: &Path) -> Result<Box<dyn crate::ipc::IpcStream>, McpError> {
+        let client = self.connect_with_retry().await?;
         Ok(Box::new(client) as Box<dyn crate::ipc::IpcStream>)
     }
 }
-
 
 /// Manual implementation of IpcStream for NamedPipeClient
 impl crate::ipc::IpcStream for NamedPipeClient {}

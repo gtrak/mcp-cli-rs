@@ -254,7 +254,6 @@ pub async fn run_auto_daemon_mode(
     cli: &Cli,
     config: Arc<mcp_cli_rs::config::Config>,
 ) -> mcp_cli_rs::error::Result<()> {
-    eprintln!("DEBUG: run_auto_daemon_mode called");
     // Check if daemon is running
     let socket_path = get_socket_path();
 
@@ -272,13 +271,10 @@ pub async fn run_auto_daemon_mode(
             let ttl = config.daemon_ttl;
 
             // Spawn daemon as background task
-            eprintln!("DEBUG: Spawning daemon with TTL={}s...", ttl);
             let config_clone = Arc::clone(&config);
             tokio::spawn(async move {
-                eprintln!("DEBUG: Inside tokio::spawn, about to spawn daemon...");
-                match spawn_background_daemon(config_clone, ttl).await {
-                    Ok(_) => eprintln!("DEBUG: spawn_background_daemon returned Ok"),
-                    Err(e) => eprintln!("DEBUG: spawn_background_daemon failed: {}", e),
+                if let Err(e) = spawn_background_daemon(config_clone, ttl).await {
+                    tracing::error!("Failed to spawn daemon: {}", e);
                 }
             });
 
@@ -360,16 +356,8 @@ async fn spawn_background_daemon(_config: Arc<mcp_cli_rs::config::Config>, ttl: 
             source: std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to get executable path: {}", e)),
         })?;
     
-    // Build arguments for daemon subcommand
-    let mut args = vec!["daemon".to_string()];
-    
-    // Add TTL flag if specified
-    // Note: TTL is passed via env var MCP_DAEMON_TTL since CLI arg requires special handling
-    
     // Spawn the daemon process
     tracing::info!("Spawning daemon process: {:?} daemon (TTL: {}s)", current_exe, ttl);
-    
-    eprintln!("DEBUG: Spawning daemon: {:?} with args: {:?}", current_exe, args);
     
     // Get current working directory so daemon can find config
     let current_dir = std::env::current_dir()
@@ -377,25 +365,99 @@ async fn spawn_background_daemon(_config: Arc<mcp_cli_rs::config::Config>, ttl: 
             source: std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to get current directory: {}", e)),
         })?;
     
-    let child = tokio::process::Command::new(&current_exe)
-        .args(&args)
-        .env("MCP_DAEMON_TTL", ttl.to_string())
-        .current_dir(&current_dir)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .kill_on_drop(false)  // Keep daemon running after this process exits
-        .spawn()
+    // Spawn daemon as truly independent process
+    #[cfg(windows)]
+    {
+        spawn_windows_daemon(&current_exe, ttl, &current_dir)?;
+    }
+    
+    #[cfg(not(windows))]
+    {
+        let args = vec!["daemon".to_string()];
+        let _child = tokio::process::Command::new(&current_exe)
+            .args(&args)
+            .env("MCP_DAEMON_TTL", ttl.to_string())
+            .current_dir(&current_dir)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .kill_on_drop(false)
+            .spawn()
+            .map_err(|e| mcp_cli_rs::error::McpError::IOError {
+                source: std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to spawn daemon: {}", e)),
+            })?;
+        
+        tracing::info!("Daemon spawned with PID: {:?}", _child.id());
+    }
+    
+    // Give the daemon time to start up before returning
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    
+    Ok(())
+}
+
+/// Spawn daemon process on Windows using windows-rs APIs
+#[cfg(windows)]
+fn spawn_windows_daemon(
+    current_exe: &std::path::Path,
+    ttl: u64,
+    current_dir: &std::path::Path,
+) -> mcp_cli_rs::error::Result<()> {
+    use windows::core::w;
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{CreateProcessW, CREATE_UNICODE_ENVIRONMENT, CREATE_NEW_CONSOLE, STARTUPINFOW, PROCESS_INFORMATION};
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    
+    // Build command line: executable daemon --ttl {ttl}
+    let cmd_line = format!(r#""{}" daemon --ttl {}"#, current_exe.display(), ttl);
+    let cmd_wide: Vec<u16> = OsStr::new(&cmd_line)
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
+    
+    // Current directory as wide string
+    let dir_wide: Vec<u16> = current_dir
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
+    
+    // Startup info
+    let startup_info = STARTUPINFOW {
+        cb: std::mem::size_of::<STARTUPINFOW>() as u32,
+        ..Default::default()
+    };
+    
+    let mut process_info = PROCESS_INFORMATION::default();
+    
+    unsafe {
+        CreateProcessW(
+            None,  // Application name (use command line)
+            windows::core::PWSTR(cmd_wide.as_ptr() as *mut u16),
+            None,  // Process security attributes
+            None,  // Thread security attributes
+            false, // Inherit handles
+            CREATE_NEW_CONSOLE | CREATE_UNICODE_ENVIRONMENT, // Creation flags
+            None,  // Environment (inherit)
+            windows::core::PCWSTR(dir_wide.as_ptr()),
+            &startup_info,
+            &mut process_info,
+        )
         .map_err(|e| mcp_cli_rs::error::McpError::IOError {
-            source: std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to spawn daemon: {}", e)),
+            source: std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Failed to spawn daemon process: {}", e)
+            ),
         })?;
+        
+        // Close handles immediately - we don't need them and the process will continue running
+        let _ = CloseHandle(process_info.hProcess);
+        let _ = CloseHandle(process_info.hThread);
+        
+        tracing::info!("Daemon spawned with PID: {}", process_info.dwProcessId);
+    }
     
-    eprintln!("DEBUG: Daemon spawned with PID: {:?}", child.id());
-    
-    // Give the daemon a moment to start before we return
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    
-    // Return immediately - the daemon process is now running independently
     Ok(())
 }
 
