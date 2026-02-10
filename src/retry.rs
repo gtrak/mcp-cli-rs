@@ -3,12 +3,10 @@
 //! Provides automatic retry with configurable limits and exponential backoff.
 //! Implements EXEC-05, EXEC-06, EXEC-07.
 
-use backoff::{ExponentialBackoff, ExponentialBackoffBuilder, Error as BackoffError};
-use backoff::retry;
+use backoff::ExponentialBackoff;
 use std::pin::Pin;
 use std::time::Duration;
 use futures::future::BoxFuture;
-use futures::ready;
 use tokio::time::timeout;
 use crate::error::McpError;
 
@@ -37,7 +35,7 @@ impl RetryConfig {
 
     /// Get the backoff configuration.
     fn backoff(&self) -> ExponentialBackoff {
-        ExponentialBackoffBuilder::new()
+        backoff::ExponentialBackoffBuilder::new()
             .with_initial_interval(Duration::from_millis(self.base_delay_ms))
             .with_max_interval(Duration::from_millis(self.max_delay_ms))
             .with_multiplier(2.0)
@@ -124,7 +122,7 @@ where
                 let jitter = Duration::from_millis((delay.as_millis() / 10) as u64);
                 let total_delay = delay + jitter;
 
-                std::thread::sleep(total_delay);
+                tokio::time::sleep(total_delay).await;
             }
         }
     }
@@ -184,7 +182,7 @@ where
                 let jitter = Duration::from_millis((delay.as_millis() / 10) as u64);
                 let total_delay = delay + jitter;
 
-                std::thread::sleep(total_delay);
+                tokio::time::sleep(total_delay).await;
             }
         }
     }

@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use backoff::future::retry;
 use mcp_cli_rs::cli::commands::{cmd_list_servers, cmd_server_info, cmd_tool_info, cmd_call_tool, cmd_search_tools};
 use mcp_cli_rs::cli::daemon::ensure_daemon;
 use mcp_cli_rs::config::loader::{find_and_load, load_config};
@@ -379,23 +380,18 @@ pub async fn run_auto_daemon_mode(
     config: Arc<mcp_cli_rs::config::Config>,
 ) -> mcp_cli_rs::error::Result<()> {
     tracing::debug!("run_auto_daemon_mode called");
-    // Check if daemon is running
     let socket_path = get_socket_path();
 
     match try_connect_to_daemon(config.clone(), &socket_path).await {
         Ok(client) => {
-            // Daemon is running, use it
             tracing::info!("Using existing daemon");
             execute_command(cli, client).await
         }
         Err(_) => {
-            // Daemon not running, spawn it
             tracing::info!("Daemon not running, spawning...");
 
-            // Get TTL from config (includes env var override via config loader)
             let ttl = config.daemon_ttl;
 
-            // Spawn daemon as background task
             tracing::debug!("Spawning daemon with TTL={}s...", ttl);
             let config_clone = Arc::clone(&config);
             tokio::spawn(async move {
@@ -406,38 +402,27 @@ pub async fn run_auto_daemon_mode(
                 }
             });
 
-            // Wait for daemon to start with exponential backoff
-            let mut retries = 0;
-            let max_retries = 20;  // More retries
-            let mut delay = Duration::from_millis(500);  // Start with longer delay
+            let backoff = backoff::ExponentialBackoffBuilder::new()
+                .with_initial_interval(Duration::from_millis(500))
+                .with_max_interval(Duration::from_secs(2))
+                .with_max_elapsed_time(Some(Duration::from_secs(10)))
+                .build();
 
-            loop {
-                tokio::time::sleep(delay).await;
+            let client = retry(backoff, || async {
+                try_connect_to_daemon(config.clone(), &socket_path)
+                    .await
+                    .map_err(backoff::Error::transient)
+            })
+            .await
+            .map_err(|e| mcp_cli_rs::error::McpError::IOError {
+                source: std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    format!("Failed to start daemon: {}", e)
+                ),
+            })?;
 
-                match try_connect_to_daemon(config.clone(), &socket_path).await {
-                    Ok(client) => {
-                        tracing::info!("Connected to daemon after {} attempt(s)", retries + 1);
-                        return execute_command(cli, client).await;
-                    }
-                    Err(e) => {
-                        retries += 1;
-                        if retries >= max_retries {
-                            return Err(mcp_cli_rs::error::McpError::IOError {
-                                source: std::io::Error::new(
-                                    std::io::ErrorKind::Other,
-                                    format!("Failed to start daemon after {} attempts: {}", max_retries, e)
-                                ),
-                            });
-                        }
-                        // Linear backoff: add 200ms each time, cap at 2 seconds
-                        delay += Duration::from_millis(200);
-                        if delay > Duration::from_secs(2) {
-                            delay = Duration::from_secs(2);
-                        }
-                        tracing::debug!("Daemon not ready, retrying in {:?} (attempt {}/{})", delay, retries, max_retries);
-                    }
-                }
-            }
+            tracing::info!("Connected to daemon");
+            execute_command(cli, client).await
         }
     }
 }

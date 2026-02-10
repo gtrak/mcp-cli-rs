@@ -8,8 +8,9 @@ mod ipc_tests {
     use std::path::PathBuf;
     use std::time::Duration;
     use mcp_cli_rs::daemon::protocol::{DaemonRequest, DaemonResponse};
-    use tokio::time::{timeout, sleep};
+    use tokio::time::timeout;
     use tokio::task::JoinError;
+    use backoff::future::retry;
 
     /// Get a temporary socket/pipe path for testing
     fn get_test_socket_path() -> PathBuf {
@@ -71,21 +72,20 @@ mod ipc_tests {
 
         // Send request with exponential backoff
         let request = DaemonRequest::Ping;
-        let response = timeout(Duration::from_secs(5), async {
-            let mut delay = Duration::from_millis(10);
-            loop {
-                match client.send_request(&request).await {
-                    Ok(r) => break r,
-                    Err(_) => {
-                        if delay > Duration::from_secs(2) {
-                            panic!("Connection timeout after retries");
-                        }
-                        tokio::time::sleep(delay).await;
-                        delay *= 2;
-                    }
-                }
-            }
-        }).await.expect("Timeout waiting for server");
+        let backoff = backoff::ExponentialBackoffBuilder::new()
+            .with_initial_interval(Duration::from_millis(10))
+            .with_max_interval(Duration::from_secs(2))
+            .with_max_elapsed_time(Some(Duration::from_secs(5)))
+            .build();
+
+        let response = retry(backoff, || async {
+            client.send_request(&request).await.map_err(backoff::Error::transient)
+        }).await;
+
+        let response = match response {
+            Ok(r) => r,
+            Err(e) => panic!("Connection timeout after retries: {}", e),
+        };
 
         // Verify response
         assert!(matches!(response, DaemonResponse::Pong));
@@ -198,21 +198,20 @@ mod ipc_tests {
 
         // Send request with exponential backoff
         let request = DaemonRequest::Ping;
-        let response = timeout(Duration::from_secs(5), async {
-            let mut delay = Duration::from_millis(10);
-            loop {
-                match client.send_request(&request).await {
-                    Ok(r) => break r,
-                    Err(_) => {
-                        if delay > Duration::from_secs(2) {
-                            panic!("Connection timeout after retries");
-                        }
-                        tokio::time::sleep(delay).await;
-                        delay *= 2;
-                    }
-                }
-            }
-        }).await.expect("Timeout waiting for server");
+        let backoff = backoff::ExponentialBackoffBuilder::new()
+            .with_initial_interval(Duration::from_millis(10))
+            .with_max_interval(Duration::from_secs(2))
+            .with_max_elapsed_time(Some(Duration::from_secs(5)))
+            .build();
+
+        let response = retry(backoff, || async {
+            client.send_request(&request).await.map_err(backoff::Error::transient)
+        }).await;
+
+        let response = match response {
+            Ok(r) => r,
+            Err(e) => panic!("Connection timeout after retries: {}", e),
+        };
 
         // Verify large content was transferred correctly
         assert!(matches!(response, DaemonResponse::ToolResult(_)));

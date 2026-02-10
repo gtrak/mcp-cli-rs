@@ -12,7 +12,8 @@ use mcp_cli_rs::daemon::orphan::{cleanup_orphaned_daemon, read_daemon_pid, write
 use mcp_cli_rs::daemon::protocol::{DaemonRequest, DaemonResponse};
 use tempfile::TempDir;
 use tokio::process::Command;
-use tokio::time::{sleep, Duration, timeout};
+use tokio::time::Duration;
+use backoff::future::retry;
 
 /// Create a config from content.
 fn create_config_from_content(content: &str) -> Config {
@@ -27,12 +28,10 @@ fn create_config_from_content(content: &str) -> Config {
 async fn shutdown_daemon_gracefully(config: &Config) -> Result<(), std::io::Error> {
     let config_arc = std::sync::Arc::new(config.clone());
     if let Ok(mut client) = create_ipc_client(config_arc) {
-        if let Ok(response) = timeout(Duration::from_secs(5),
+        if let Ok(response) = tokio::time::timeout(Duration::from_secs(5),
             client.send_request(&DaemonRequest::Shutdown)
         ).await {
             if matches!(response, Ok(DaemonResponse::ShutdownAck)) {
-                // Give daemon time to clean up
-                sleep(Duration::from_millis(500)).await;
                 return Ok(());
             }
         }
@@ -53,32 +52,27 @@ async fn start_daemon(config: &Config, ttl_secs: u64) -> Result<tokio::process::
         .kill_on_drop(true)
         .spawn()?;
 
-    // Wait for daemon to be ready with exponential backoff
-    let max_wait = Duration::from_secs(10);
-    let mut wait_time = Duration::from_millis(100);
-    let mut connected = false;
+    let backoff = backoff::ExponentialBackoffBuilder::new()
+        .with_initial_interval(Duration::from_millis(100))
+        .with_max_interval(Duration::from_secs(1))
+        .with_max_elapsed_time(Some(Duration::from_secs(10)))
+        .build();
 
-    while wait_time < max_wait {
-        sleep(wait_time).await;
-        let config_arc = std::sync::Arc::new(config.clone());
-        if let Ok(mut client) = create_ipc_client(config_arc) {
-            if let Ok(response) = timeout(Duration::from_secs(1), 
-                client.send_request(&DaemonRequest::Ping)
-            ).await {
-                if matches!(response, Ok(DaemonResponse::Pong)) {
-                    connected = true;
-                    break;
-                }
-            }
+    let config_arc = std::sync::Arc::new(config.clone());
+    let operation = || async {
+        let mut client = create_ipc_client(config_arc.clone())?;
+        client.send_request(&DaemonRequest::Ping)
+            .await
+            .map(|_| ())
+            .map_err(|e| backoff::Error::transient(e))
+    };
+
+    match retry(backoff, operation).await {
+        Ok(_) => Ok(child),
+        Err(_) => {
+            let _ = child.kill().await;
+            Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "Daemon failed to start"))
         }
-        wait_time *= 2;
-    }
-
-    if connected {
-        Ok(child)
-    } else {
-        let _ = child.kill().await;
-        Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "Daemon failed to start"))
     }
 }
 
@@ -171,7 +165,7 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
              "Should respond to Ping when actively connected");
 
     // Wait for TTL to expire (3 seconds + buffer)
-    sleep(Duration::from_secs(5)).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     // Daemon should have exited after TTL
     let status = daemon.try_wait();

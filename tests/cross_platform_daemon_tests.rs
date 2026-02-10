@@ -8,9 +8,9 @@
 use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
+use backoff::future::retry;
 use mcp_cli_rs::daemon::protocol::{DaemonRequest, DaemonResponse};
-use mcp_cli_rs::ipc::IpcClient; // Import IpcClient trait
-use tokio::time::{timeout, sleep};
+use mcp_cli_rs::ipc::IpcClient;
 
 /// Get a temporary socket/pipe path for testing
 fn get_test_socket_path() -> PathBuf {
@@ -131,21 +131,20 @@ async fn test_unix_socket_client_server_roundtrip() {
         .expect("Failed to create IPC client");
 
     let request = DaemonRequest::Ping;
-    let response = timeout(Duration::from_secs(5), async {
-        let mut delay = Duration::from_millis(10);
-        loop {
-            match client.send_request(&request).await {
-                Ok(r) => break r,
-                Err(_) => {
-                    if delay > Duration::from_secs(2) {
-                        return DaemonResponse::Error { code: 1, message: "timeout".to_string() };
-                    }
-                    tokio::time::sleep(delay).await;
-                    delay *= 2;
-                }
-            }
-        }
-    }).await.expect("Timeout waiting for server");
+    let backoff = backoff::ExponentialBackoffBuilder::new()
+        .with_initial_interval(Duration::from_millis(10))
+        .with_max_interval(Duration::from_secs(2))
+        .with_max_elapsed_time(Some(Duration::from_secs(5)))
+        .build();
+
+    let response = Retry::spawn(backoff, || async {
+        client.send_request(&request).await.map_err(backoff::Error::transient)
+    }).await;
+
+    let response = match response {
+        Ok(r) => r,
+        Err(_) => DaemonResponse::Error { code: 1, message: "timeout".to_string() },
+    };
 
     // Verify response
     assert!(matches!(response, DaemonResponse::Pong),
@@ -414,21 +413,20 @@ async fn test_windows_named_pipe_client_server_roundtrip() {
     // Client already created at the start of the test with the correct pipe path
 
     let request = DaemonRequest::Ping;
-    let response = timeout(Duration::from_secs(5), async {
-        let mut delay = Duration::from_millis(10);
-        loop {
-            match client.send_request(&request).await {
-                Ok(r) => break r,
-                Err(_) => {
-                    if delay > Duration::from_secs(2) {
-                        return DaemonResponse::Error { code: 1, message: "timeout".to_string() };
-                    }
-                    tokio::time::sleep(delay).await;
-                    delay *= 2;
-                }
-            }
-        }
-    }).await.expect("Timeout waiting for server");
+    let backoff = backoff::ExponentialBackoffBuilder::new()
+        .with_initial_interval(Duration::from_millis(10))
+        .with_max_interval(Duration::from_secs(2))
+        .with_max_elapsed_time(Some(Duration::from_secs(5)))
+        .build();
+
+    let response = Retry::spawn(backoff, || async {
+        client.send_request(&request).await.map_err(backoff::Error::transient)
+    }).await;
+
+    let response = match response {
+        Ok(r) => r,
+        Err(_) => DaemonResponse::Error { code: 1, message: "timeout".to_string() },
+    };
 
     // Verify response
     assert!(matches!(response, DaemonResponse::Pong),
@@ -488,22 +486,21 @@ async fn test_windows_named_pipe_multiple_sequential_connections() {
 
     // Send 3 sequential requests with exponential backoff
     for i in 0..3 {
-        let request = DaemonRequest::Ping;
-        let response = timeout(Duration::from_secs(5), async {
-            let mut delay = Duration::from_millis(10);
-            loop {
-                match client.send_request(&request).await {
-                    Ok(r) => break r,
-                    Err(_) => {
-                        if delay > Duration::from_secs(2) {
-                            return DaemonResponse::Error { code: 1, message: "timeout".to_string() };
-                        }
-                        tokio::time::sleep(delay).await;
-                        delay *= 2;
-                    }
-                }
-            }
-        }).await.expect("Timeout waiting for server");
+    let request = DaemonRequest::Ping;
+    let backoff = backoff::ExponentialBackoffBuilder::new()
+        .with_initial_interval(Duration::from_millis(10))
+        .with_max_interval(Duration::from_secs(2))
+        .with_max_elapsed_time(Some(Duration::from_secs(5)))
+        .build();
+
+    let response = retry(backoff, || async {
+        client.send_request(&request).await.map_err(backoff::Error::transient)
+    }).await;
+
+    let response = match response {
+        Ok(r) => r,
+        Err(_) => DaemonResponse::Error { code: 1, message: "timeout".to_string() },
+    };
 
         assert!(matches!(response, DaemonResponse::Pong),
                  "Expected Pong response for request {}, got {:?}", i, response);
@@ -564,21 +561,20 @@ async fn test_windows_named_pipe_large_message_transfer() {
 
     // Send request with exponential backoff
     let request = DaemonRequest::Ping;
-    let response = timeout(Duration::from_secs(5), async {
-        let mut delay = Duration::from_millis(10);
-        loop {
-            match client.send_request(&request).await {
-                Ok(r) => break r,
-                Err(_) => {
-                    if delay > Duration::from_secs(2) {
-                        return DaemonResponse::Error { code: 1, message: "timeout".to_string() };
-                    }
-                    tokio::time::sleep(delay).await;
-                    delay *= 2;
-                }
-            }
-        }
-    }).await.expect("Timeout waiting for server");
+    let backoff = backoff::ExponentialBackoffBuilder::new()
+        .with_initial_interval(Duration::from_millis(10))
+        .with_max_interval(Duration::from_secs(2))
+        .with_max_elapsed_time(Some(Duration::from_secs(5)))
+        .build();
+
+    let response = retry(backoff, || async {
+        client.send_request(&request).await.map_err(backoff::Error::transient)
+    }).await;
+
+    let response = match response {
+        Ok(r) => r,
+        Err(_) => DaemonResponse::Error { code: 1, message: "timeout".to_string() },
+    };
 
     // Verify large content was transferred correctly
     assert!(matches!(response, DaemonResponse::ToolResult(_)),
@@ -626,21 +622,15 @@ async fn test_windows_named_pipe_security_flags() {
         .expect("Failed to create IPC client");
 
     let request = DaemonRequest::Ping;
-    let _response = timeout(Duration::from_secs(5), async {
-        let mut delay = Duration::from_millis(10);
-        loop {
-            match client.send_request(&request).await {
-                Ok(r) => break r,
-                Err(_) => {
-                    if delay > Duration::from_secs(2) {
-                        return DaemonResponse::Error { code: 1, message: "timeout".to_string() };
-                    }
-                    tokio::time::sleep(delay).await;
-                    delay *= 2;
-                }
-            }
-        }
-    }).await.expect("Timeout waiting for server");
+    let backoff = backoff::ExponentialBackoffBuilder::new()
+        .with_initial_interval(Duration::from_millis(10))
+        .with_max_interval(Duration::from_secs(2))
+        .with_max_elapsed_time(Some(Duration::from_secs(5)))
+        .build();
+
+    let _response = retry(backoff, || async {
+        client.send_request(&request).await.map_err(backoff::Error::transient)
+    }).await;
 
     // Wait for server to complete
     server_handle.await.expect("Server task failed to join");
