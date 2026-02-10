@@ -7,6 +7,9 @@ pub mod commands;
 pub mod daemon;
 pub mod filter;
 
+// Re-export DetailLevel from format module
+pub use crate::format::DetailLevel;
+
 pub use commands::{
     cmd_list_servers,
     cmd_server_info,

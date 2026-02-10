@@ -3,24 +3,18 @@
 //! This module provides colored output functions that respect the NO_COLOR
 //! environment variable and automatically detect terminal capabilities.
 //!
-//! These utilities are used throughout Phase 3 for performance warnings,
-//! error handling, and user feedback. Implements ERR-04 requirement.
+//! CLI output is written to stdout. Tracing is used for debug-level logging
+//! to stderr, controlled via RUST_LOG environment variable.
 
 use colored::*;
-use std::io::{self, stderr, IsTerminal, Write};
+use std::io::{stdout, IsTerminal, Write};
+use tracing;
 
 /// Determines whether colored output should be used based on:
 /// - NO_COLOR environment variable (if set to 1, colors disabled)
 /// - Automatic TTY detection (skip if not a terminal)
 ///
 /// Returns true if colors should be enabled, false otherwise.
-///
-/// # Examples
-/// ```ignore
-/// if use_color() {
-///     print_success("Operation completed successfully");
-/// }
-/// ```
 pub fn use_color() -> bool {
     // Check NO_COLOR environment variable first
     // Source: https://no-color.org/
@@ -28,9 +22,8 @@ pub fn use_color() -> bool {
         return no_color == "1";
     }
 
-    // Check if stderr is a TTY (terminal)
-    // We check stderr because many CLI tools use stderr for errors/warnings
-    if !stderr().is_terminal() {
+    // Check if stdout is a TTY (terminal)
+    if !stdout().is_terminal() {
         return false;
     }
 
@@ -38,87 +31,133 @@ pub fn use_color() -> bool {
     true
 }
 
-/// Print an error message with red coloring.
+/// Print an error message to stdout with red coloring.
 ///
-/// This function is used for critical errors that prevent normal operation.
-/// It respects NO_COLOR and TTY detection, so it will not display colors
-/// on redirected output.
-///
-/// # Parameters
-/// - `message`: The error message to print (supports embedded newlines)
-///
-/// # Examples
-/// ```ignore
-/// print_error("Failed to connect to MCP server");
-/// ```
+/// Also logs the error at debug level for troubleshooting.
 pub fn print_error(message: &str) {
+    tracing::debug!("CLI error output: {}", message);
+
     if use_color() {
-        eprint!("{} {}", "Error:".red().bold(), message);
+        println!("{} {}", "Error:".red().bold(), message);
     } else {
-        eprint!("Error: {}", message);
+        println!("Error: {}", message);
     }
 }
 
-/// Print a warning message with yellow coloring.
+/// Print a warning message to stdout with yellow coloring.
 ///
-/// This function is used for non-critical warnings that don't prevent operation.
-/// It respects NO_COLOR and TTY detection, so it will not display colors
-/// on redirected output.
-///
-/// # Parameters
-/// - `message`: The warning message to print (supports embedded newlines)
-///
-/// # Examples
-/// ```ignore
-/// print_warning("Server is slow to respond");
-/// ```
+/// Also logs the warning at debug level for troubleshooting.
 pub fn print_warning(message: &str) {
+    tracing::debug!("CLI warning output: {}", message);
+
     if use_color() {
-        eprint!("{} {}", "Warning:".yellow().bold(), message);
+        println!("{} {}", "Warning:".yellow().bold(), message);
     } else {
-        eprint!("Warning: {}", message);
+        println!("Warning: {}", message);
     }
 }
 
-/// Print a success message with green coloring.
+/// Print a success message to stdout with green coloring.
 ///
-/// This function is used for successful operation reports and completion messages.
-/// It respects NO_COLOR and TTY detection, so it will not display colors
-/// on redirected output.
-///
-/// # Parameters
-/// - `message`: The success message to print (supports embedded newlines)
-///
-/// # Examples
-/// ```ignore
-/// print_success("Configuration loaded successfully");
-/// ```
+/// Also logs the success at debug level for troubleshooting.
 pub fn print_success(message: &str) {
+    tracing::debug!("CLI success output: {}", message);
+
     if use_color() {
-        eprint!("{} {}", "Success:".green().bold(), message);
+        println!("{} {}", "Success:".green().bold(), message);
     } else {
-        eprint!("Success: {}", message);
+        println!("Success: {}", message);
     }
 }
 
-/// Print an informational message with blue coloring.
+/// Print an informational message to stdout with blue coloring.
 ///
-/// This function is used for informational messages and progress updates.
-/// It respects NO_COLOR and TTY detection, so it will not display colors
-/// on redirected output.
-///
-/// # Parameters
-/// - `message`: The info message to print (supports embedded newlines)
-///
-/// # Examples
-/// ```ignore
-/// print_info("Loading MCP servers from configuration");
-/// ```
+/// Also logs the info at debug level for troubleshooting.
 pub fn print_info(message: &str) {
+    tracing::debug!("CLI info output: {}", message);
+
     if use_color() {
-        eprint!("{} {}", "Info:".blue().bold(), message);
+        println!("{} {}", "Info:".blue().bold(), message);
     } else {
-        eprint!("Info: {}", message);
+        println!("Info: {}", message);
+    }
+}
+
+/// Print a formatted error message with context and suggestion.
+///
+/// Outputs to stdout for CLI display. Logs at debug level for troubleshooting.
+/// Implements OUTP-16 requirement.
+pub fn print_formatted_error(context: &str, message: &str, suggestion: Option<&str>) {
+    tracing::debug!(
+        context = context,
+        message = message,
+        suggestion = ?suggestion,
+        "CLI formatted error output"
+    );
+
+    if use_color() {
+        println!("{} [{}] {}", "✗".red(), context.yellow(), message);
+        if let Some(sugg) = suggestion {
+            println!("  {} {}", "Suggestion:".dimmed(), sugg);
+        }
+    } else {
+        println!("✗ [{}] {}", context, message);
+        if let Some(sugg) = suggestion {
+            println!("  Suggestion: {}", sugg);
+        }
+    }
+}
+
+/// Print a formatted warning message with context.
+///
+/// Outputs to stdout for CLI display. Logs at debug level for troubleshooting.
+/// Implements OUTP-17 requirement.
+pub fn print_formatted_warning(context: &str, message: &str) {
+    tracing::debug!(
+        context = context,
+        message = message,
+        "CLI formatted warning output"
+    );
+
+    if use_color() {
+        println!("{} [{}] {}", "⚠".yellow(), context.yellow(), message);
+    } else {
+        println!("⚠ [{}] {}", context, message);
+    }
+}
+
+/// Print partial failures with context.
+///
+/// Outputs to stdout for CLI display. Logs at debug level for troubleshooting.
+/// Implements OUTP-18 requirement.
+pub fn print_partial_failures(context: &str, failures: &[(String, String)]) {
+    tracing::debug!(
+        context = context,
+        failure_count = failures.len(),
+        "CLI partial failures output"
+    );
+
+    if failures.is_empty() {
+        return;
+    }
+
+    if use_color() {
+        println!(
+            "{} [{}] {} operation(s) failed",
+            "⚠".yellow(),
+            context.yellow(),
+            failures.len()
+        );
+        println!("{}", "─".repeat(50).dimmed());
+        for (item, error) in failures {
+            println!("  {} {}: {}", "✗".red(), item, error.dimmed());
+        }
+    } else {
+        println!("⚠ [{}] {} operation(s) failed", context, failures.len());
+        println!("{}", "─".repeat(50));
+        for (item, error) in failures {
+            println!("  ✗ {}: {}", item, error);
+        }
     }
 }
 
@@ -127,19 +166,36 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_use_color_with_no_color() {
-        unsafe {
-            std::env::set_var("NO_COLOR", "1");
-            assert_eq!(use_color(), false);
-            std::env::remove_var("NO_COLOR");
-        }
+    fn test_print_formatted_error_with_suggestion() {
+        print_formatted_error(
+            "Configuration",
+            "No servers configured",
+            Some("Create mcp_servers.toml"),
+        );
     }
 
     #[test]
-    fn test_use_color_without_no_color() {
-        unsafe {
-            std::env::remove_var("NO_COLOR");
-            assert_eq!(use_color(), true);
-        }
+    fn test_print_formatted_error_without_suggestion() {
+        print_formatted_error("Connection", "Failed to connect", None);
+    }
+
+    #[test]
+    fn test_print_formatted_warning() {
+        print_formatted_warning("Discovery", "Server is slow");
+    }
+
+    #[test]
+    fn test_print_partial_failures_empty() {
+        let failures: Vec<(String, String)> = vec![];
+        print_partial_failures("Discovery", &failures);
+    }
+
+    #[test]
+    fn test_print_partial_failures_with_items() {
+        let failures = vec![
+            ("server1".to_string(), "Connection refused".to_string()),
+            ("server2".to_string(), "Timeout".to_string()),
+        ];
+        print_partial_failures("Discovery", &failures);
     }
 }

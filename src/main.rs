@@ -7,6 +7,7 @@ use mcp_cli_rs::shutdown::{GracefulShutdown, run_with_graceful_shutdown};
 use mcp_cli_rs::ipc::{ProtocolClient, get_socket_path, create_ipc_client};
 use std::sync::Arc;
 use std::time::Duration;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser)]
 #[command(name = "mcp")]
@@ -46,9 +47,13 @@ enum Commands {
 
     /// List all servers and their available tools (CLI-01, DISC-01)
     List {
-        /// Include tool descriptions
+        /// Show detailed descriptions and parameters
         #[arg(short = 'd', long)]
-        with_descriptions: bool,
+        describe: bool,
+        
+        /// Show verbose output with full schema
+        #[arg(short = 'v', long)]
+        verbose: bool,
     },
 
     /// Show details for a specific server (DISC-02)
@@ -62,6 +67,14 @@ enum Commands {
         /// Tool identifier (server/tool or server tool)
         #[arg(value_name = "TOOL")]
         tool: String,
+        
+        /// Show detailed descriptions and parameters
+        #[arg(short = 'd', long)]
+        describe: bool,
+        
+        /// Show verbose output with full schema
+        #[arg(short = 'v', long)]
+        verbose: bool,
     },
 
     /// Execute a tool (EXEC-01, EXEC-02)
@@ -80,6 +93,14 @@ enum Commands {
         /// Glob pattern to match tool names
         #[arg(value_name = "PATTERN")]
         pattern: String,
+        
+        /// Show detailed descriptions and parameters
+        #[arg(short = 'd', long)]
+        describe: bool,
+        
+        /// Show verbose output with full schema
+        #[arg(short = 'v', long)]
+        verbose: bool,
     },
 }
 
@@ -89,10 +110,51 @@ async fn main() {
     // CLI-01: Display help with --help (handled by clap)
 
     let cli = Cli::parse();
+    
+    // Initialize tracing based on mode (daemon vs CLI)
+    // Daemon mode logs to file, CLI mode logs to stderr
+    let is_daemon_mode = matches!(cli.command, Some(Commands::Daemon { .. }));
+    init_tracing(is_daemon_mode);
 
     if let Err(e) = run(cli).await {
         eprintln!("error: {}", e);
         std::process::exit(exit_code(&e));
+    }
+}
+
+/// Initialize tracing subscriber with appropriate output
+/// - Daemon mode: logs to file (~/.cache/mcp-cli/daemon.log)
+/// - CLI mode: logs to stderr (controlled by RUST_LOG env var)
+fn init_tracing(is_daemon: bool) {
+    if is_daemon {
+        // Daemon mode: log to file
+        let log_dir = dirs::cache_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join("mcp-cli");
+        
+        let _ = std::fs::create_dir_all(&log_dir);
+        let log_file = log_dir.join("daemon.log");
+        
+        let file_appender = tracing_subscriber::fmt::layer()
+            .with_writer(move || {
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&log_file)
+                    .unwrap_or_else(|_| std::fs::File::create(&log_file).expect("Failed to create log file"))
+            })
+            .with_ansi(false);
+        
+        tracing_subscriber::registry()
+            .with(file_appender)
+            .with(tracing_subscriber::EnvFilter::new("debug"))
+            .init();
+    } else {
+        // CLI mode: log to stderr
+        tracing_subscriber::fmt()
+            .with_writer(std::io::stderr)
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .init();
     }
 }
 
@@ -191,23 +253,44 @@ async fn execute_command(cli: &Cli, mut client: Box<dyn mcp_cli_rs::ipc::Protoco
             // Shutdown subcommand is handled separately in run()
             Ok(())
         }
-        Some(Commands::List { with_descriptions }) => {
-            cmd_list_servers(client, with_descriptions).await
+        Some(Commands::List { describe, verbose }) => {
+            let detail_level = if verbose {
+                mcp_cli_rs::cli::DetailLevel::Verbose
+            } else if describe {
+                mcp_cli_rs::cli::DetailLevel::WithDescriptions
+            } else {
+                mcp_cli_rs::cli::DetailLevel::Summary
+            };
+            cmd_list_servers(client, detail_level).await
         }
         Some(Commands::Info { name }) => {
             cmd_server_info(client, &name).await
         }
-        Some(Commands::Tool { tool }) => {
-            cmd_tool_info(client, &tool).await
+        Some(Commands::Tool { tool, describe, verbose }) => {
+            let detail_level = if verbose {
+                mcp_cli_rs::cli::DetailLevel::Verbose
+            } else if describe {
+                mcp_cli_rs::cli::DetailLevel::WithDescriptions
+            } else {
+                mcp_cli_rs::cli::DetailLevel::Summary
+            };
+            cmd_tool_info(client, &tool, detail_level).await
         }
         Some(Commands::Call { tool, args }) => {
             cmd_call_tool(client, &tool, args.as_deref()).await
         }
-        Some(Commands::Search { pattern }) => {
-            cmd_search_tools(client, &pattern).await
+        Some(Commands::Search { pattern, describe, verbose }) => {
+            let detail_level = if verbose {
+                mcp_cli_rs::cli::DetailLevel::Verbose
+            } else if describe {
+                mcp_cli_rs::cli::DetailLevel::WithDescriptions
+            } else {
+                mcp_cli_rs::cli::DetailLevel::Summary
+            };
+            cmd_search_tools(client, &pattern, detail_level).await
         }
         None => {
-            cmd_list_servers(client, false).await
+            cmd_list_servers(client, mcp_cli_rs::cli::DetailLevel::Summary).await
         }
     }
 }
@@ -295,7 +378,7 @@ pub async fn run_auto_daemon_mode(
     cli: &Cli,
     config: Arc<mcp_cli_rs::config::Config>,
 ) -> mcp_cli_rs::error::Result<()> {
-    eprintln!("DEBUG: run_auto_daemon_mode called");
+    tracing::debug!("run_auto_daemon_mode called");
     // Check if daemon is running
     let socket_path = get_socket_path();
 
@@ -313,13 +396,13 @@ pub async fn run_auto_daemon_mode(
             let ttl = config.daemon_ttl;
 
             // Spawn daemon as background task
-            eprintln!("DEBUG: Spawning daemon with TTL={}s...", ttl);
+            tracing::debug!("Spawning daemon with TTL={}s...", ttl);
             let config_clone = Arc::clone(&config);
             tokio::spawn(async move {
-                eprintln!("DEBUG: Inside tokio::spawn, about to spawn daemon...");
+                tracing::debug!("Inside tokio::spawn, about to spawn daemon...");
                 match spawn_background_daemon(config_clone, ttl).await {
-                    Ok(_) => eprintln!("DEBUG: spawn_background_daemon returned Ok"),
-                    Err(e) => eprintln!("DEBUG: spawn_background_daemon failed: {}", e),
+                    Ok(_) => tracing::debug!("spawn_background_daemon returned Ok"),
+                    Err(e) => tracing::debug!("spawn_background_daemon failed: {}", e),
                 }
             });
 
@@ -407,7 +490,7 @@ async fn spawn_background_daemon(_config: Arc<mcp_cli_rs::config::Config>, ttl: 
     // Spawn the daemon process
     tracing::info!("Spawning daemon process: {:?} daemon (TTL: {}s)", current_exe, ttl);
     
-    eprintln!("DEBUG: Spawning daemon: {:?} with args: {:?}", current_exe, args);
+    tracing::debug!("Spawning daemon: {:?} with args: {:?}", current_exe, args);
     
     // Get current working directory so daemon can find config
     let current_dir = std::env::current_dir()
@@ -437,7 +520,7 @@ async fn spawn_background_daemon(_config: Arc<mcp_cli_rs::config::Config>, ttl: 
                 source: std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to spawn daemon: {}", e)),
             })?;
         
-        eprintln!("DEBUG: Daemon spawned with PID: {:?}", _child.id());
+        tracing::debug!("Daemon spawned with PID: {:?}", _child.id());
     }
     
     #[cfg(not(windows))]
@@ -455,12 +538,12 @@ async fn spawn_background_daemon(_config: Arc<mcp_cli_rs::config::Config>, ttl: 
                 source: std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to spawn daemon: {}", e)),
             })?;
         
-        eprintln!("DEBUG: Daemon spawned with PID: {:?}", _child.id());
+        tracing::debug!("Daemon spawned with PID: {:?}", _child.id());
     }
     
     // Give the daemon time to create the named pipe
     // This is critical - the daemon needs time to start the IPC server
-    eprintln!("DEBUG: Waiting for daemon to initialize...");
+    tracing::debug!("Waiting for daemon to initialize...");
     tokio::time::sleep(Duration::from_millis(1000)).await;
     
     Ok(())

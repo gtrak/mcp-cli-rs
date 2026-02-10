@@ -157,7 +157,7 @@ pub async fn run_daemon(config: Config, socket_path: PathBuf, lifecycle: DaemonL
         state: DaemonState,
     ) {
         use tokio::io::BufReader;
-        eprintln!("DEBUG DAEMON: New client connected");
+        tracing::debug!("Daemon: New client connected");
 
         // Update activity timestamp
         state.update_activity();
@@ -167,30 +167,30 @@ pub async fn run_daemon(config: Config, socket_path: PathBuf, lifecycle: DaemonL
         let mut buf_reader = BufReader::new(reader);
 
         // Read request from stream
-        eprintln!("DEBUG DAEMON: Reading request...");
+        tracing::debug!("Daemon: Reading request...");
         let request = match crate::daemon::protocol::receive_request(&mut buf_reader).await {
             Ok(req) => {
-                eprintln!("DEBUG DAEMON: Got request: {:?}", req);
+                tracing::debug!("Daemon: Got request: {:?}", req);
                 req
             },
             Err(e) => {
-                eprintln!("DEBUG DAEMON: Error reading request: {}", e);
+                tracing::debug!("Daemon: Error reading request: {}", e);
                 return;
             }
         };
 
         // Handle request
-        eprintln!("DEBUG DAEMON: Handling request...");
+        tracing::debug!("Daemon: Handling request...");
         let response = handle_request(request, &state).await;
-        eprintln!("DEBUG DAEMON: Generated response: {:?}", response);
+        tracing::debug!("Daemon: Generated response: {:?}", response);
 
         // Send response
-        eprintln!("DEBUG DAEMON: Sending response...");
+        tracing::debug!("Daemon: Sending response...");
         if let Err(e) = crate::daemon::protocol::send_response(&mut writer, &response).await {
-            eprintln!("DEBUG DAEMON: Error sending response: {}", e);
+            tracing::debug!("Daemon: Error sending response: {}", e);
             return;
         }
-        eprintln!("DEBUG DAEMON: Response sent");
+        tracing::debug!("Daemon: Response sent");
 
         // Update activity timestamp
         state.update_activity();

@@ -1,7 +1,9 @@
 //! CLI commands for MCP CLI tool.
 
+use crate::cli::DetailLevel;
 use crate::config::{ServerConfig, ServerTransport};
 use crate::error::{McpError, Result};
+use crate::format::{extract_params_from_schema, format_param_list};
 use crate::transport::Transport;
 use crate::client::ToolInfo;
 use std::io::{self, Read, IsTerminal};
@@ -9,33 +11,47 @@ use std::sync::Arc;
 use crate::ipc::ProtocolClient;
 use crate::parallel::{ParallelExecutor, list_tools_parallel};
 use crate::output::{print_error, print_warning, print_info};
-use crate::retry::{retry_with_backoff, timeout_wrapper, RetryConfig};
+use crate::retry::{retry_with_backoff, RetryConfig};
+use colored::Colorize;
 use futures_util::FutureExt;
 use tokio::sync::Mutex;
 
 /// Execute the list servers command.
 ///
-/// Lists all configured MCP servers and their tool availability.
+/// Lists all configured MCP servers and their tool availability with visual hierarchy.
 /// Implements DISC-01: discovery of available tools.
 /// Implements DISC-05: parallel server discovery with configurable concurrency.
 /// Implements ERR-07: partial failure warnings.
+/// Implements OUTP-01, OUTP-03, OUTP-04, OUTP-11, OUTP-12, OUTP-13, OUTP-15, OUTP-18
 ///
 /// # Arguments
 /// * `daemon` - Daemon IPC client
-/// * `with_descriptions` - If true, show tool descriptions (DISC-06)
+/// * `detail_level` - Level of detail for tool listings
 ///
 /// # Errors
 /// Returns McpError::ConfigParseError if config file is invalid
-pub async fn cmd_list_servers(mut daemon: Box<dyn ProtocolClient>, with_descriptions: bool) -> Result<()> {
+pub async fn cmd_list_servers(mut daemon: Box<dyn ProtocolClient>, detail_level: DetailLevel) -> Result<()> {
     let config = daemon.config();
 
+    // Empty state handling (OUTP-15)
     if config.is_empty() {
-        print_error("No servers configured. Please create a config file.");
+        println!("{}", "No servers configured".bold());
+        println!("{}", "─".repeat(50).dimmed());
+        println!();
+        println!("To get started, create a configuration file:");
+        println!();
+        println!("  {}", "mcp_servers.toml".cyan());
+        println!();
+        println!("Example configuration:");
+        println!("{}", r#"
+[[servers]]
+name = "filesystem"
+transport = "stdio"
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
+"#.dimmed());
         return Ok(());
     }
-
-    print_info(&format!("Configured servers:"));
-    println!();
 
     // Get server names from daemon
     let server_names = daemon.list_servers().await
@@ -47,14 +63,13 @@ pub async fn cmd_list_servers(mut daemon: Box<dyn ProtocolClient>, with_descript
     // Create parallel executor with concurrency limit from config
     let executor = ParallelExecutor::new(config.concurrency_limit);
 
-    // Create daemon client for parallel execution (daemon is moved here and not used again)
+    // Create daemon client for parallel execution
     let daemon_arc = Arc::new(Mutex::new(daemon));
 
     // List tools from all servers in parallel with filtering
     let (successes, failures): (Vec<(String, Vec<ToolInfo>)>, Vec<String>) = {
         list_tools_parallel(
             server_names,
-            // Closure that lists tools for a single server
             |server| {
                 let daemon_arc = daemon_arc.clone();
                 async move {
@@ -84,38 +99,177 @@ pub async fn cmd_list_servers(mut daemon: Box<dyn ProtocolClient>, with_descript
         .await?
     };
 
-    // Display successful results
+    // Header (OUTP-03, OUTP-04)
+    let connected_count = successes.len();
+    let failed_count = failures.len();
+    println!("{} {}", 
+        "MCP Servers".bold(),
+        format!("({} connected, {} failed)", connected_count, failed_count).dimmed()
+    );
+    println!("{}", "─".repeat(50).dimmed());
+    println!();
+
+    // Display successful results with visual hierarchy
     for (server_name, tools) in &successes {
-        // Get server info from config for display
-        {
+        // Get server info from config
+        let server_config = {
             let daemon_guard = daemon_arc.lock().await;
-            if let Some(server_config) = daemon_guard.config().get_server(&server_name) {
-                println!("{} {} ({})", server_name, server_config.description.as_deref().unwrap_or(""), server_config.transport.type_name());
-            } else {
-                println!("{} (unknown)", server_name);
-            }
+            daemon_guard.config().get_server(&server_name).cloned()
+        };
+
+        // Server header with status indicator (OUTP-13)
+        let has_filtered_tools = server_config.as_ref()
+            .map(|s| s.disabled_tools.as_ref().map_or(false, |d| !d.is_empty()))
+            .unwrap_or(false);
+
+        let status_icon = if has_filtered_tools {
+            "⚠".yellow()
+        } else {
+            "✓".green()
+        };
+
+        if let Some(ref server_config) = server_config {
+            println!("{} {} {}",
+                status_icon,
+                server_name.bold(),
+                format!("({})", server_config.transport.type_name()).dimmed()
+            );
+        } else {
+            println!("{} {} {}",
+                status_icon,
+                server_name.bold(),
+                "(unknown)".dimmed()
+            );
         }
-        print_info(&format!("    Tools: {}", tools.len()));
-        if with_descriptions && !tools.is_empty() {
-            for tool in tools {
-                println!("      - {}: {}", tool.name, tool.description.as_deref().unwrap_or(""));
-            }
+        println!("{}", "═".repeat(50).dimmed());
+
+        // Server description (OUTP-11)
+        if let Some(ref server_config) = server_config {
+            let desc = server_config.description.as_deref().unwrap_or("No description");
+            println!("Description: {}", desc);
         }
+        println!("Tools: {}", tools.len());
+        println!();
+
+        // Tool listings based on detail level (OUTP-01, OUTP-02)
+        if !tools.is_empty() {
+            match detail_level {
+                DetailLevel::Summary => {
+                    // Default view: tool name, description, parameter overview
+                    for tool in tools {
+                        let desc = tool.description.as_deref().unwrap_or("No description");
+                        let truncated_desc = if desc.len() > 60 {
+                            format!("{}...", &desc[..57])
+                        } else {
+                            desc.to_string()
+                        };
+
+                        // Parameter overview
+                        let params = extract_params_from_schema(&tool.input_schema);
+                        let param_str = format_param_list(&params, detail_level);
+
+                        println!("  • {}: {}", tool.name.bold(), truncated_desc);
+                        println!("    Usage: {} {}", tool.name, param_str.dimmed());
+                    }
+                    println!();
+                    println!("{}", "Use 'mcp info <server>/<tool>' for full schema".dimmed());
+                }
+                DetailLevel::WithDescriptions => {
+                    // Detailed view: full descriptions and parameter details
+                    for tool in tools {
+                        println!("  {}", tool.name.bold());
+                        let desc = tool.description.as_deref().unwrap_or("No description");
+                        println!("    Description: {}", desc);
+
+                        let params = extract_params_from_schema(&tool.input_schema);
+                        if !params.is_empty() {
+                            println!("    Parameters:");
+                            for param in &params {
+                                let type_str = if param.required {
+                                    format!("<{}>", param.param_type)
+                                } else {
+                                    format!("[{}]", param.param_type)
+                                };
+                                let req_str = if param.required { "Required" } else { "Optional" };
+
+                                if let Some(ref param_desc) = param.description {
+                                    println!("      {} {}  {}. {}",
+                                        param.name.cyan(),
+                                        type_str.dimmed(),
+                                        req_str.dimmed(),
+                                        param_desc
+                                    );
+                                } else {
+                                    println!("      {} {}  {}",
+                                        param.name.cyan(),
+                                        type_str.dimmed(),
+                                        req_str.dimmed()
+                                    );
+                                }
+                            }
+                        }
+                        println!();
+                    }
+                }
+                DetailLevel::Verbose => {
+                    // Verbose view: everything plus full schema
+                    for tool in tools {
+                        println!("  {}", tool.name.bold());
+                        let desc = tool.description.as_deref().unwrap_or("No description");
+                        println!("    Description: {}", desc);
+
+                        let params = extract_params_from_schema(&tool.input_schema);
+                        if !params.is_empty() {
+                            println!("    Parameters:");
+                            for param in &params {
+                                let type_str = if param.required {
+                                    format!("<{}>", param.param_type)
+                                } else {
+                                    format!("[{}]", param.param_type)
+                                };
+                                let req_str = if param.required { "Required" } else { "Optional" };
+
+                                if let Some(ref param_desc) = param.description {
+                                    println!("      {} {}  {}. {}",
+                                        param.name.cyan(),
+                                        type_str.dimmed(),
+                                        req_str.dimmed(),
+                                        param_desc
+                                    );
+                                } else {
+                                    println!("      {} {}  {}",
+                                        param.name.cyan(),
+                                        type_str.dimmed(),
+                                        req_str.dimmed()
+                                    );
+                                }
+                            }
+                        }
+                        println!("    Schema:");
+                        println!("{}", serde_json::to_string_pretty(&tool.input_schema).unwrap_or_default().dimmed());
+                        println!();
+                    }
+                }
+            }
+        } else {
+            // Empty state for no tools on server (OUTP-15)
+            println!("  {}", "No tools available on this server".dimmed());
+        }
+
         println!();
     }
 
-    // Warn about partial failures (ERR-07)
+    // Partial failure reporting (OUTP-18)
     if !failures.is_empty() {
-        print_warning(&format!(
-            "Failed to connect to {} of {} servers: {}",
-            failures.len(),
-            successes.len() + failures.len(),
-            failures.join(", ")
-        ));
+        println!("{} {}", "⚠".yellow(), format!("Connection Issues ({} servers)", failures.len()).bold());
+        println!("{}", "─".repeat(50).dimmed());
+        for server_name in &failures {
+            println!("  {} {}: {}", "✗".red(), server_name, "Connection failed".dimmed());
+        }
         println!();
     }
 
-    // Check if partial filtering was applied (disableTools without allowedTools)
+    // Filter warning
     let has_disabled_tools = config.servers.iter().any(|s| {
         s.disabled_tools.as_ref().map_or(false, |d| !d.is_empty())
     });
@@ -124,9 +278,7 @@ pub async fn cmd_list_servers(mut daemon: Box<dyn ProtocolClient>, with_descript
     });
 
     if has_disabled_tools && !has_allowed_tools {
-        print_warning(&format!(
-            "Server filtering enabled: disabled tools will be blocked when allowed_tools is empty"
-        ));
+        println!("{} {}", "⚠".yellow(), "Note: Some tools are disabled by configuration".dimmed());
         println!();
     }
 
@@ -195,16 +347,17 @@ pub async fn cmd_server_info(daemon: Box<dyn ProtocolClient>, server_name: &str)
 ///
 /// Displays detailed information about a specific tool including its JSON Schema.
 /// Implements DISC-03: inspection of tool details.
-/// Implements TASK-03: colored output for error cases.
+/// Implements OUTP-05, OUTP-11, OUTP-14: consistent formatting and descriptions
 ///
 /// # Arguments
 /// * `daemon` - Daemon IPC client
 /// * `tool_id` - Tool identifier in format "server/tool" or "server tool"
+/// * `detail_level` - Level of detail for display
 ///
 /// # Errors
 /// Returns McpError::ToolNotFound if tool doesn't exist (ERR-02)
 /// Returns McpError::AmbiguousCommand if tool_id format is unclear (ERR-06)
-pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str) -> Result<()> {
+pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, detail_level: DetailLevel) -> Result<()> {
     let (server_name, tool_name) = parse_tool_id(tool_id)?;
 
     let _server = daemon.config().get_server(&server_name)
@@ -229,10 +382,119 @@ pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str) -
             }
         })?;
 
-    print_info(&format!("Tool: {}", tool.name));
-    println!("Description: {}", tool.description);
-    println!("Input schema (JSON Schema):");
-    println!("{}", serde_json::to_string_pretty(&tool.input_schema)?);
+    // Get server config for transport info
+    let config = daemon.config();
+    let server_config = config.get_server(&server_name);
+    let transport_name = server_config
+        .map(|s| s.transport.type_name())
+        .unwrap_or("unknown");
+
+    // Header with visual hierarchy
+    println!("{} {}", "Tool:".bold(), tool.name.bold());
+    println!("{}", "═".repeat(50).dimmed());
+    println!("{} {} {}",
+        "Server:".bold(),
+        server_name,
+        format!("({})", transport_name).dimmed()
+    );
+    println!();
+
+    // Description (OUTP-11)
+    let description = if tool.description.is_empty() {
+        "No description available"
+    } else {
+        &tool.description
+    };
+    println!("{} {}", "Description:".bold(), description);
+    println!();
+
+    // Extract parameters from schema
+    let params = extract_params_from_schema(&tool.input_schema);
+
+    // Format based on detail level (OUTP-02)
+    match detail_level {
+        DetailLevel::Summary => {
+            // Parameter overview
+            if params.is_empty() {
+                println!("{}", "This tool takes no parameters".dimmed());
+            } else {
+                let param_str = format_param_list(&params, detail_level);
+                println!("{} {}", "Parameters:".bold(), param_str);
+            }
+            println!();
+            println!("{}", format!("Usage: mcp call {}/{} [args]", server_name, tool_name).dimmed());
+            println!("{}", "Use -d for parameter details, -v for full schema".dimmed());
+        }
+        DetailLevel::WithDescriptions => {
+            // Detailed parameter list
+            if params.is_empty() {
+                println!("{}", "Parameters: none".dimmed());
+            } else {
+                println!("{}", "Parameters:".bold());
+                for param in &params {
+                    let type_str = if param.required {
+                        format!("<{}>", param.param_type)
+                    } else {
+                        format!("[{}]", param.param_type)
+                    };
+                    let req_str = if param.required { "Required" } else { "Optional" };
+
+                    if let Some(ref param_desc) = param.description {
+                        println!("  {} {}  {}. {}",
+                            param.name.cyan(),
+                            type_str.dimmed(),
+                            req_str.dimmed(),
+                            param_desc
+                        );
+                    } else {
+                        println!("  {} {}  {}",
+                            param.name.cyan(),
+                            type_str.dimmed(),
+                            req_str.dimmed()
+                        );
+                    }
+                }
+            }
+            println!();
+            println!("{} {}", "Usage:".bold(), format!("mcp call {}/{} '{{...}}'", server_name, tool_name));
+        }
+        DetailLevel::Verbose => {
+            // Full details including schema
+            if params.is_empty() {
+                println!("{}", "Parameters: none".dimmed());
+            } else {
+                println!("{}", "Parameters:".bold());
+                for param in &params {
+                    let type_str = if param.required {
+                        format!("<{}>", param.param_type)
+                    } else {
+                        format!("[{}]", param.param_type)
+                    };
+                    let req_str = if param.required { "Required" } else { "Optional" };
+
+                    if let Some(ref param_desc) = param.description {
+                        println!("  {} {}  {}. {}",
+                            param.name.cyan(),
+                            type_str.dimmed(),
+                            req_str.dimmed(),
+                            param_desc
+                        );
+                    } else {
+                        println!("  {} {}  {}",
+                            param.name.cyan(),
+                            type_str.dimmed(),
+                            req_str.dimmed()
+                        );
+                    }
+                }
+            }
+            println!();
+            println!("{}", "JSON Schema:".bold());
+            println!("{}", serde_json::to_string_pretty(&tool.input_schema).unwrap_or_default().dimmed());
+            println!();
+            println!("{} {}", "Usage:".bold(), format!("mcp call {}/{} '{{...}}'", server_name, tool_name));
+        }
+    }
 
     Ok(())
 }
@@ -393,24 +655,40 @@ pub async fn cmd_call_tool(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, a
 ///
 /// Search for tools using glob patterns with parallel server discovery.
 /// Implements DISC-04: search of tools using glob patterns.
-/// Implements TASK-02: parallel server discovery for cmd_search_tools.
-/// Implements TASK-03: colored output for error cases.
+/// Implements OUTP-14: context-rich search results
+/// Implements OUTP-05: consistent formatting
 ///
 /// # Arguments
-/// * `daemon` - Daemon IPC client (IpcClientWrapper<UnixIpcClient>)
+/// * `daemon` - Daemon IPC client
 /// * `pattern` - Glob pattern to search for (e.g., "*", "search*", "tool-*")
+/// * `detail_level` - Level of detail for display
 ///
 /// # Errors
 /// Returns empty result if no tools match
-pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str) -> Result<()> {
+pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str, detail_level: DetailLevel) -> Result<()> {
     let config = daemon.config();
 
-    if config.is_empty() {
-        print_error("No servers configured. Please create a config file.");
+    // Empty pattern handling
+    if pattern.trim().is_empty() {
+        println!("{}", "No search pattern provided".bold());
+        println!();
+        println!("Usage: mcp grep <pattern>");
+        println!("Examples:");
+        println!("  mcp grep 'read*'      # Tools starting with 'read'");
+        println!("  mcp grep '*file*'     # Tools containing 'file'");
+        println!("  mcp grep '*'          # All tools");
         return Ok(());
     }
 
-    print_info(&format!("Searching for tools matching '{}':", pattern));
+    if config.is_empty() {
+        println!("{}", "No servers configured".bold());
+        println!("{}", "─".repeat(50).dimmed());
+        println!();
+        println!("To get started, create a configuration file:");
+        println!();
+        println!("  {}", "mcp_servers.toml".cyan());
+        return Ok(());
+    }
 
     let executor = ParallelExecutor::new(config.concurrency_limit);
 
@@ -421,14 +699,13 @@ pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str
             e
         })?;
 
-    // Create daemon client for parallel execution (daemon is moved here and not used again)
+    // Create daemon client for parallel execution
     let daemon_arc = Arc::new(Mutex::new(daemon));
 
     // List tools from all servers in parallel with filtering
     let (successes, failures): (Vec<(String, Vec<ToolInfo>)>, Vec<String>) = {
         list_tools_parallel(
             server_names,
-            // Closure that lists tools for a single server
             |server| {
                 let daemon_arc = daemon_arc.clone();
                 async move {
@@ -458,66 +735,171 @@ pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str
         .await?
     };
 
-    let mut matches_found = false;
+    // Parse glob pattern
     let pattern_obj = match glob::Pattern::new(pattern) {
         Ok(p) => p,
         Err(_) => {
-            print_warning(&format!("Invalid glob pattern '{}': {}", pattern, "Using substring matching instead"));
+            print_warning(&format!("Invalid glob pattern '{}' - using substring matching", pattern));
             glob::Pattern::new("*").unwrap()
         }
     };
 
-    // Display successful matches
+    // Search header
+    println!("{} {}", "Search Results for".bold(), format!("'{}'", pattern).cyan());
+    println!("{}", "═".repeat(50).dimmed());
+
+    // Track matches across servers
+    let mut total_matches = 0;
+    let mut servers_with_matches = 0;
+
+    // Display matching tools by server
     for (server_name, tools) in &successes {
-        // Match tool names against the glob pattern
+        // Get server config for transport info
+        let server_config = {
+            let daemon_guard = daemon_arc.lock().await;
+            daemon_guard.config().get_server(&server_name).cloned()
+        };
+
+        // Filter matching tools
         let matched_tools: Vec<_> = tools.iter()
-            .filter(|tool| {
-                let tool_name = &tool.name;
-                pattern_obj.matches(tool_name)
-            })
+            .filter(|tool| pattern_obj.matches(&tool.name))
             .collect();
 
         if !matched_tools.is_empty() {
-            matches_found = true;
-            print_info(&format!("Server: {}:", server_name));
-            println!("  - {} tool(s) match '{}':", matched_tools.len(), pattern);
+            servers_with_matches += 1;
+            total_matches += matched_tools.len();
+
+            // Server header with context
+            let transport_name = server_config
+                .as_ref()
+                .map(|s| s.transport.type_name())
+                .unwrap_or("unknown");
+
+            if servers_with_matches > 1 {
+                println!();
+            }
+
+            println!("{} {} {}",
+                server_name.bold(),
+                format!("({})", transport_name).dimmed(),
+                format!("- {} tool(s)", matched_tools.len()).dimmed()
+            );
+            println!("{}", "─".repeat(50).dimmed());
+
+            // Display tools based on detail level
             for tool in matched_tools {
-                println!("      - {}: {}", tool.name, tool.description.as_deref().unwrap_or(""));
+                match detail_level {
+                    DetailLevel::Summary => {
+                        let desc = tool.description.as_deref().unwrap_or("No description");
+                        let truncated_desc = if desc.len() > 60 {
+                            format!("{}...", &desc[..57])
+                        } else {
+                            desc.to_string()
+                        };
+
+                        let params = extract_params_from_schema(&tool.input_schema);
+                        let param_str = format_param_list(&params, detail_level);
+
+                        println!("  • {}: {}", tool.name.bold(), truncated_desc);
+                        println!("    Usage: {} {}", tool.name, param_str.dimmed());
+                    }
+                    DetailLevel::WithDescriptions => {
+                        println!("  {}", tool.name.bold());
+                        let desc = tool.description.as_deref().unwrap_or("No description");
+                        println!("    Description: {}", desc);
+
+                        let params = extract_params_from_schema(&tool.input_schema);
+                        if !params.is_empty() {
+                            println!("    Parameters:");
+                            for param in &params {
+                                let type_str = if param.required {
+                                    format!("<{}>", param.param_type)
+                                } else {
+                                    format!("[{}]", param.param_type)
+                                };
+                                let req_str = if param.required { "Required" } else { "Optional" };
+
+                                if let Some(ref param_desc) = param.description {
+                                    println!("      {} {}  {}. {}",
+                                        param.name.cyan(),
+                                        type_str.dimmed(),
+                                        req_str.dimmed(),
+                                        param_desc
+                                    );
+                                } else {
+                                    println!("      {} {}  {}",
+                                        param.name.cyan(),
+                                        type_str.dimmed(),
+                                        req_str.dimmed()
+                                    );
+                                }
+                            }
+                        }
+                        println!();
+                    }
+                    DetailLevel::Verbose => {
+                        println!("  {}", tool.name.bold());
+                        let desc = tool.description.as_deref().unwrap_or("No description");
+                        println!("    Description: {}", desc);
+
+                        let params = extract_params_from_schema(&tool.input_schema);
+                        if !params.is_empty() {
+                            println!("    Parameters:");
+                            for param in &params {
+                                let type_str = if param.required {
+                                    format!("<{}>", param.param_type)
+                                } else {
+                                    format!("[{}]", param.param_type)
+                                };
+                                let req_str = if param.required { "Required" } else { "Optional" };
+
+                                if let Some(ref param_desc) = param.description {
+                                    println!("      {} {}  {}. {}",
+                                        param.name.cyan(),
+                                        type_str.dimmed(),
+                                        req_str.dimmed(),
+                                        param_desc
+                                    );
+                                } else {
+                                    println!("      {} {}  {}",
+                                        param.name.cyan(),
+                                        type_str.dimmed(),
+                                        req_str.dimmed()
+                                    );
+                                }
+                            }
+                        }
+                        println!("    Schema: {}", serde_json::to_string(&tool.input_schema).unwrap_or_default().dimmed());
+                        println!();
+                    }
+                }
             }
         }
     }
 
-    // Warn about partial failures
-    if !failures.is_empty() {
-        print_warning(&format!(
-            "Search limited to {} servers ({} failed): {}",
-            successes.len(),
-            failures.len(),
-            failures.join(", ")
-        ));
+    // Summary footer
+    println!();
+    println!("{}", "─".repeat(50).dimmed());
+    if total_matches == 0 {
+        println!("{} {}", "✗".red(), format!("No tools matching '{}' found", pattern));
         println!();
-    }
-
-    // Check if partial filtering was applied (disableTools without allowedTools)
-    let has_disabled_tools = config.servers.iter().any(|s| {
-        s.disabled_tools.as_ref().map_or(false, |d| !d.is_empty())
-    });
-    let has_allowed_tools = config.servers.iter().any(|s| {
-        s.allowed_tools.as_ref().map_or(false, |a| !a.is_empty())
-    });
-
-    if has_disabled_tools && !has_allowed_tools {
-        print_warning(&format!(
-            "Server filtering enabled: disabled tools will be blocked when allowed_tools is empty"
-        ));
-        println!();
-    }
-
-    if !matches_found {
-        print_error("No matching tools found.");
+        println!("Suggestions:");
+        println!("  • Try a broader pattern (e.g., '*' for all tools)");
+        println!("  • Use wildcards: 'read*' for tools starting with 'read'");
+        println!("  • Use '*file*' for tools containing 'file'");
     } else {
+        println!("Found {} matching tool(s) across {} server(s)",
+            total_matches.to_string().bold(),
+            servers_with_matches.to_string().bold()
+        );
         println!();
-        print_info(&format!("Total matches: {}", successes.iter().filter(|(_, t)| !t.is_empty()).count()));
+        println!("{}", format!("Use 'mcp info <server>/<tool>' for detailed information").dimmed());
+    }
+
+    // Partial failure reporting
+    if !failures.is_empty() {
+        println!();
+        println!("{} {}", "⚠".yellow(), format!("Search limited - {} server(s) unavailable", failures.len()).dimmed());
     }
 
     Ok(())

@@ -52,21 +52,21 @@ impl ConnectionPool {
 
     /// Take a connection from the pool for use
     pub async fn take(&self, server_name: &str) -> Result<Option<PooledConnection>> {
-        eprintln!("DEBUG: take() called for server: {}", server_name);
+        tracing::debug!("take() called for server: {}", server_name);
         let mut connections = self.connections.lock().unwrap();
-        eprintln!("DEBUG: Got lock, checking for existing connection");
+        tracing::debug!("Got lock, checking for existing connection");
 
         if let Some(mut conn) = connections.remove(server_name) {
-            eprintln!("DEBUG: Found existing connection for: {}", server_name);
+            tracing::debug!("Found existing connection for: {}", server_name);
             if conn.is_healthy() {
                 conn.touch();
-                eprintln!("DEBUG: Connection is healthy, returning it");
+                tracing::debug!("Connection is healthy, returning it");
                 return Ok(Some(conn));
             }
-            eprintln!("DEBUG: Connection is unhealthy, discarding");
+            tracing::debug!("Connection is unhealthy, discarding");
         }
 
-        eprintln!("DEBUG: No existing connection, creating new one for: {}", server_name);
+        tracing::debug!("No existing connection, creating new one for: {}", server_name);
         drop(connections); // Release lock before creating transport
 
         let transport = self.create_transport(server_name)?;
@@ -89,12 +89,12 @@ impl ConnectionPool {
 
     /// Execute a tool using cached or new connection
     pub async fn execute(&self, server_name: &str, tool_name: &str, arguments: serde_json::Value) -> Result<serde_json::Value> {
-        eprintln!("DEBUG: execute() called for server: {}, tool: {}", server_name, tool_name);
+        tracing::debug!("execute() called for server: {}, tool: {}", server_name, tool_name);
         let mut conn = match self.take(server_name).await? {
             Some(c) => c,
             None => return Err(McpError::ServerNotFound { server: server_name.to_string() }),
         };
-        eprintln!("DEBUG: Got connection, initializing MCP connection");
+        tracing::debug!("Got connection, initializing MCP connection");
 
         // MCP Protocol: Send initialize request first
         let init_request = serde_json::json!({
@@ -132,7 +132,7 @@ impl ConnectionPool {
                 message: format!("Failed to send initialized notification: {}", e) 
             })?;
 
-        eprintln!("DEBUG: MCP connection initialized, sending tools/call request");
+        tracing::debug!("MCP connection initialized, sending tools/call request");
 
         let mcp_request = serde_json::json!({
             "jsonrpc": "2.0",
@@ -161,12 +161,12 @@ impl ConnectionPool {
 
     /// List tools using cached or new connection
     pub async fn list_tools(&self, server_name: &str) -> Result<Vec<ToolInfo>> {
-        eprintln!("DEBUG: list_tools() called for server: {}", server_name);
+        tracing::debug!("list_tools() called for server: {}", server_name);
         let mut conn = match self.take(server_name).await? {
             Some(c) => c,
             None => return Err(McpError::ServerNotFound { server: server_name.to_string() }),
         };
-        eprintln!("DEBUG: Got connection, initializing MCP connection");
+        tracing::debug!("Got connection, initializing MCP connection");
 
         // MCP Protocol: Send initialize request first
         let init_request = serde_json::json!({
@@ -204,7 +204,7 @@ impl ConnectionPool {
                 message: format!("Failed to send initialized notification: {}", e) 
             })?;
 
-        eprintln!("DEBUG: MCP connection initialized, sending tools/list request");
+        tracing::debug!("MCP connection initialized, sending tools/list request");
 
         let mcp_request = serde_json::json!({
             "jsonrpc": "2.0",
@@ -214,7 +214,7 @@ impl ConnectionPool {
 
         let result = match conn.transport.send(mcp_request).await {
             Ok(response) => {
-                eprintln!("DEBUG: Got response: {:?}", response);
+                tracing::debug!("Got response: {:?}", response);
                 if let Some(result) = response.get("result") {
                     let tools: Vec<ToolInfo> = if let Some(tools_array) = result.get("tools").and_then(|t| t.as_array()) {
                         tools_array.iter().filter_map(|tool| {
@@ -243,16 +243,16 @@ impl ConnectionPool {
     }
 
     fn create_transport(&self, server_name: &str) -> Result<BoxedTransport> {
-        eprintln!("DEBUG: Creating transport for server: {}", server_name);
+        tracing::debug!("Creating transport for server: {}", server_name);
         let server_config = self.config.servers.iter()
             .find(|s| s.name.as_str() == server_name)
             .ok_or_else(|| McpError::ServerNotFound { server: server_name.to_string() })?;
 
-        eprintln!("DEBUG: Found server config: name={}", server_config.name);
+        tracing::debug!("Found server config: name={}", server_config.name);
         let result = server_config.create_transport(server_name);
         match &result {
-            Ok(_) => eprintln!("DEBUG: Transport created successfully"),
-            Err(e) => eprintln!("DEBUG: Transport creation failed: {}", e),
+            Ok(_) => tracing::debug!("Transport created successfully"),
+            Err(e) => tracing::debug!("Transport creation failed: {}", e),
         }
         result.map_err(|e|
             McpError::ConnectionError {
