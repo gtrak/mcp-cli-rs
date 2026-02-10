@@ -94,7 +94,45 @@ impl ConnectionPool {
             Some(c) => c,
             None => return Err(McpError::ServerNotFound { server: server_name.to_string() }),
         };
-        eprintln!("DEBUG: Got connection, sending request");
+        eprintln!("DEBUG: Got connection, initializing MCP connection");
+
+        // MCP Protocol: Send initialize request first
+        let init_request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {
+                    "roots": {},
+                    "sampling": {},
+                    "tools": {}
+                },
+                "clientInfo": {
+                    "name": "mcp-cli-rs",
+                    "version": env!("CARGO_PKG_VERSION")
+                }
+            }
+        });
+
+        // Send initialize and get response
+        conn.transport.send(init_request).await
+            .map_err(|e| McpError::InvalidProtocol { 
+                message: format!("Initialize request failed: {}", e) 
+            })?;
+
+        // Send initialized notification
+        let initialized_notification = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+        });
+        
+        conn.transport.send_notification(initialized_notification).await
+            .map_err(|e| McpError::InvalidProtocol { 
+                message: format!("Failed to send initialized notification: {}", e) 
+            })?;
+
+        eprintln!("DEBUG: MCP connection initialized, sending tools/call request");
 
         let mcp_request = serde_json::json!({
             "jsonrpc": "2.0",
@@ -128,7 +166,45 @@ impl ConnectionPool {
             Some(c) => c,
             None => return Err(McpError::ServerNotFound { server: server_name.to_string() }),
         };
-        eprintln!("DEBUG: Got connection, sending tools/list request");
+        eprintln!("DEBUG: Got connection, initializing MCP connection");
+
+        // MCP Protocol: Send initialize request first
+        let init_request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {
+                    "roots": {},
+                    "sampling": {},
+                    "tools": {}
+                },
+                "clientInfo": {
+                    "name": "mcp-cli-rs",
+                    "version": env!("CARGO_PKG_VERSION")
+                }
+            }
+        });
+
+        // Send initialize and get response
+        conn.transport.send(init_request).await
+            .map_err(|e| McpError::InvalidProtocol { 
+                message: format!("Initialize request failed: {}", e) 
+            })?;
+
+        // Send initialized notification
+        let initialized_notification = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+        });
+        
+        conn.transport.send_notification(initialized_notification).await
+            .map_err(|e| McpError::InvalidProtocol { 
+                message: format!("Failed to send initialized notification: {}", e) 
+            })?;
+
+        eprintln!("DEBUG: MCP connection initialized, sending tools/list request");
 
         let mcp_request = serde_json::json!({
             "jsonrpc": "2.0",
@@ -254,6 +330,9 @@ struct DummyTransport;
 impl crate::transport::Transport for DummyTransport {
     async fn send(&mut self, _request: serde_json::Value) -> crate::error::Result<serde_json::Value> {
         Ok(serde_json::json!({"result": "success"}))
+    }
+    async fn send_notification(&mut self, _notification: serde_json::Value) -> crate::error::Result<()> {
+        Ok(())
     }
     async fn receive_notification(&mut self) -> crate::error::Result<serde_json::Value> {
         Ok(serde_json::json!({"method": "notifications/initialized"}))

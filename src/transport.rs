@@ -21,6 +21,13 @@ pub trait Transport: Send + Sync {
     /// and returns the parsed response.
     async fn send(&mut self, request: Value) -> Result<Value>;
 
+    /// Send a JSON-RPC notification without expecting a response.
+    ///
+    /// This method serializes notification to JSON, sends it to server,
+    /// and doesn't wait for a response. Used for notifications like
+    /// "notifications/initialized" in MCP protocol.
+    async fn send_notification(&mut self, notification: Value) -> Result<()>;
+
     /// Receive a JSON-RPC notification from the server.
     ///
     /// This method reads unsolicited notifications sent by the server,

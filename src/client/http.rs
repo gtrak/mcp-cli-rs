@@ -112,6 +112,53 @@ impl Transport for HttpTransport {
         Ok(response_json)
     }
 
+    async fn send_notification(&mut self, notification: serde_json::Value) -> Result<()> {
+        // Convert HashMap to HeaderMap
+        let mut headers = HeaderMap::new();
+        for (key, value) in &self.headers {
+            headers.insert(key.parse::<HeaderName>().unwrap(), value.parse::<HeaderValue>().unwrap());
+        }
+
+        // Send notification without expecting response
+        let body = serde_json::to_string(&notification).map_err(|e| {
+            McpError::InvalidProtocol {
+                message: format!("Failed to serialize notification: {}", e),
+            }
+        })?;
+        
+        self.client
+            .post(&self.base_url)
+            .header("Content-Type", "application/json")
+            .headers(headers)
+            .body(body)
+            .timeout(Duration::from_secs(30))
+            .send()
+            .await
+            .map_err(|e| {
+                // Check for HTTP errors
+                if let Some(status) = e.status() {
+                    if status.is_client_error() || status.is_server_error() {
+                        return McpError::ConnectionError {
+                            server: "http".to_string(),
+                            source: std::io::Error::new(
+                                std::io::ErrorKind::InvalidInput,
+                                format!("HTTP {}: {}", status, e.to_string()),
+                            ),
+                        };
+                    }
+                }
+                McpError::ConnectionError {
+                    server: "http".to_string(),
+                    source: std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("HTTP error: {}", e),
+                    ),
+                }
+            })?;
+
+        Ok(())
+    }
+
     async fn ping(&self) -> Result<()> {
         // Create a minimal ping request
         let request = serde_json::json!({

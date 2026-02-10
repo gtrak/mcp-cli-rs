@@ -216,6 +216,34 @@ impl Transport for StdioTransport {
         Ok(response)
     }
 
+    async fn send_notification(&mut self, notification: serde_json::Value) -> Result<()> {
+        // Send notification using write! + newline (newline-delimited JSON)
+        let notification_str = notification.to_string();
+        use tokio::io::AsyncWriteExt;
+        self.stdin
+            .write_all(notification_str.as_bytes())
+            .await
+            .map_err(|e| {
+                McpError::connection_error("stdio", e)
+            })?;
+        self.stdin
+            .write_all(b"\n")
+            .await
+            .map_err(|e| {
+                McpError::connection_error("stdio", e)
+            })?;
+
+        // Flush stdin to ensure message is sent
+        self.stdin
+            .flush()
+            .await
+            .map_err(|e| {
+                McpError::connection_error("stdio", e)
+            })?;
+
+        Ok(())
+    }
+
     async fn ping(&self) -> Result<()> {
         // Create a minimal ping request
         let _request = serde_json::json!({
