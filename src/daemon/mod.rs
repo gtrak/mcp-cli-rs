@@ -210,83 +210,9 @@ pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, sta
         crate::daemon::protocol::DaemonRequest::ExecuteTool { server_name, tool_name, arguments } => {
             tracing::info!("ExecuteTool: server={}, tool={}", server_name, tool_name);
 
-            // Get transport from connection pool
-            let mut transport: Box<dyn crate::transport::Transport + Send + Sync> = match state.connection_pool.get(&server_name).await {
-                Ok(t) => t,
-                Err(e) => {
-                    tracing::error!("Failed to get transport for {}: {}", server_name, e);
-                    return crate::daemon::protocol::DaemonResponse::Error {
-                        code: 2,
-                        message: format!("Server not found or connection failed: {}", e),
-                    };
-                }
-            };
-
-            // MCP Protocol: Send initialize request first
-            let init_request = serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": 0,
-                "method": "initialize",
-                "params": {
-                    "protocolVersion": "2024-11-05",
-                    "capabilities": {
-                        "roots": {},
-                        "sampling": {},
-                        "tools": {}
-                    },
-                    "clientInfo": {
-                        "name": "mcp-cli-rs-daemon",
-                        "version": env!("CARGO_PKG_VERSION")
-                    }
-                }
-            });
-
-            // Send initialize and get response
-            if let Err(e) = transport.send(init_request).await {
-                tracing::error!("Failed to initialize MCP connection for {}: {}", server_name, e);
-                return crate::daemon::protocol::DaemonResponse::Error {
-                    code: 3,
-                    message: format!("Failed to initialize MCP connection: {}", e),
-                };
-            }
-
-            // Build MCP tools/call JSON-RPC request
-            let mcp_request = serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "tools/call",
-                "params": {
-                    "name": tool_name,
-                    "arguments": arguments
-                }
-            });
-
-            // Send request and get response
-            match transport.send(mcp_request).await {
-                Ok(response) => {
-                    // Parse JSON-RPC response
-                    if let Some(result) = response.get("result") {
-                        // Success - return tool result
-                        crate::daemon::protocol::DaemonResponse::ToolResult(result.clone())
-                    } else if let Some(error) = response.get("error") {
-                        // MCP server returned error
-                        let message = error.get("message")
-                            .and_then(|m: &serde_json::Value| m.as_str())
-                            .unwrap_or("Unknown error");
-                        tracing::error!("Tool execution failed: {}", message);
-                        crate::daemon::protocol::DaemonResponse::Error {
-                            code: error.get("code").and_then(|c: &serde_json::Value| c.as_u64()).unwrap_or(3) as u32,
-                            message: message.to_string(),
-                        }
-                    } else {
-                        // Invalid response format
-                        tracing::error!("Invalid MCP response: missing result and error fields");
-                        crate::daemon::protocol::DaemonResponse::Error {
-                            code: 3,
-                            message: "Invalid MCP response format".to_string(),
-                        }
-                    }
-                }
+            // Execute tool using connection pool's execute method
+            match state.connection_pool.execute(&server_name, &tool_name, arguments).await {
+                Ok(result) => crate::daemon::protocol::DaemonResponse::ToolResult(result),
                 Err(e) => {
                     tracing::error!("Tool execution failed: {}", e);
                     crate::daemon::protocol::DaemonResponse::Error {
@@ -300,99 +226,9 @@ pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, sta
         crate::daemon::protocol::DaemonRequest::ListTools { server_name } => {
             tracing::info!("ListTools: server={}", server_name);
 
-            // Get transport from connection pool
-            let mut transport: Box<dyn crate::transport::Transport + Send + Sync> = match state.connection_pool.get(&server_name).await {
-                Ok(t) => t,
-                Err(e) => {
-                    tracing::error!("Failed to get transport for {}: {}", server_name, e);
-                    return crate::daemon::protocol::DaemonResponse::Error {
-                        code: 2,
-                        message: format!("Server not found or connection failed: {}", e),
-                    };
-                }
-            };
-
-            // MCP Protocol: Send initialize request first
-            let init_request = serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": 0,
-                "method": "initialize",
-                "params": {
-                    "protocolVersion": "2024-11-05",
-                    "capabilities": {
-                        "roots": {},
-                        "sampling": {},
-                        "tools": {}
-                    },
-                    "clientInfo": {
-                        "name": "mcp-cli-rs-daemon",
-                        "version": env!("CARGO_PKG_VERSION")
-                    }
-                }
-            });
-
-            // Send initialize and get response
-            if let Err(e) = transport.send(init_request).await {
-                tracing::error!("Failed to initialize MCP connection for {}: {}", server_name, e);
-                return crate::daemon::protocol::DaemonResponse::Error {
-                    code: 3,
-                    message: format!("Failed to initialize MCP connection: {}", e),
-                };
-            }
-
-            // Build MCP tools/list JSON-RPC request
-            let mcp_request = serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "tools/list"
-            });
-
-            // Send request and get response
-            match transport.send(mcp_request).await {
-                Ok(response) => {
-                    // Parse JSON-RPC response
-                    if let Some(result) = response.get("result") {
-                        // Extract tools array from result
-                        let tools = if let Some(tools_array) = result.get("tools").and_then(|t: &serde_json::Value| t.as_array()) {
-                            tools_array.iter().filter_map(|tool: &serde_json::Value| {
-                                Some(crate::daemon::protocol::ToolInfo {
-                                    name: tool.get("name")
-                                        .and_then(|n: &serde_json::Value| n.as_str())
-                                        .unwrap_or("unknown")
-                                        .to_string(),
-                                    description: tool.get("description")
-                                        .and_then(|d: &serde_json::Value| d.as_str())
-                                        .unwrap_or("")
-                                        .to_string(),
-                                    input_schema: tool.get("inputSchema")
-                                        .cloned()
-                                        .unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
-                                })
-                            }).collect()
-                        } else {
-                            Vec::new()
-                        };
-
-                        crate::daemon::protocol::DaemonResponse::ToolList(tools)
-                    } else if let Some(error) = response.get("error") {
-                        // MCP server returned error
-                        let message = error.get("message")
-                            .and_then(|m: &serde_json::Value| m.as_str())
-                            .unwrap_or("Unknown error");
-                        tracing::error!("List tools failed: {}", message);
-                        crate::daemon::protocol::DaemonResponse::Error {
-                            code: error.get("code").and_then(|c: &serde_json::Value| c.as_u64()).unwrap_or(3) as u32,
-                            message: message.to_string(),
-                        }
-                    } else {
-                        // Invalid response format
-                        tracing::error!("Invalid MCP response: missing result and error fields");
-                        crate::daemon::protocol::DaemonResponse::Error {
-                            code: 3,
-                            message: "Invalid MCP response format".to_string(),
-                        }
-                    }
-                }
+            // Get list of tools using connection pool's list_tools method
+            match state.connection_pool.list_tools(&server_name).await {
+                Ok(tools) => crate::daemon::protocol::DaemonResponse::ToolList(tools),
                 Err(e) => {
                     tracing::error!("List tools failed: {}", e);
                     crate::daemon::protocol::DaemonResponse::Error {

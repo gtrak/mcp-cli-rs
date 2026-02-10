@@ -254,6 +254,7 @@ pub async fn run_auto_daemon_mode(
     cli: &Cli,
     config: Arc<mcp_cli_rs::config::Config>,
 ) -> mcp_cli_rs::error::Result<()> {
+    eprintln!("DEBUG: run_auto_daemon_mode called");
     // Check if daemon is running
     let socket_path = get_socket_path();
 
@@ -271,10 +272,13 @@ pub async fn run_auto_daemon_mode(
             let ttl = config.daemon_ttl;
 
             // Spawn daemon as background task
+            eprintln!("DEBUG: Spawning daemon with TTL={}s...", ttl);
             let config_clone = Arc::clone(&config);
             tokio::spawn(async move {
-                if let Err(e) = spawn_background_daemon(config_clone, ttl).await {
-                    tracing::error!("Failed to spawn daemon: {}", e);
+                eprintln!("DEBUG: Inside tokio::spawn, about to spawn daemon...");
+                match spawn_background_daemon(config_clone, ttl).await {
+                    Ok(_) => eprintln!("DEBUG: spawn_background_daemon returned Ok"),
+                    Err(e) => eprintln!("DEBUG: spawn_background_daemon failed: {}", e),
                 }
             });
 
@@ -356,8 +360,13 @@ async fn spawn_background_daemon(_config: Arc<mcp_cli_rs::config::Config>, ttl: 
             source: std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to get executable path: {}", e)),
         })?;
     
+    // Build arguments for daemon subcommand
+    let args = vec!["daemon".to_string()];
+    
     // Spawn the daemon process
     tracing::info!("Spawning daemon process: {:?} daemon (TTL: {}s)", current_exe, ttl);
+    
+    eprintln!("DEBUG: Spawning daemon: {:?} with args: {:?}", current_exe, args);
     
     // Get current working directory so daemon can find config
     let current_dir = std::env::current_dir()
@@ -365,15 +374,33 @@ async fn spawn_background_daemon(_config: Arc<mcp_cli_rs::config::Config>, ttl: 
             source: std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to get current directory: {}", e)),
         })?;
     
-    // Spawn daemon as truly independent process
+    // On Windows, we need to use a different approach to spawn a truly independent process
+    // Using CREATE_NEW_PROCESS_GROUP and CREATE_NO_WINDOW flags
     #[cfg(windows)]
     {
-        spawn_windows_daemon(&current_exe, ttl, &current_dir)?;
+        use std::os::windows::process::CommandExt;
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        
+        let mut cmd = std::process::Command::new(&current_exe);
+        cmd.args(&args)
+            .env("MCP_DAEMON_TTL", ttl.to_string())
+            .current_dir(&current_dir)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW);
+        
+        let _child = cmd.spawn()
+            .map_err(|e| mcp_cli_rs::error::McpError::IOError {
+                source: std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to spawn daemon: {}", e)),
+            })?;
+        
+        eprintln!("DEBUG: Daemon spawned with PID: {:?}", _child.id());
     }
     
     #[cfg(not(windows))]
     {
-        let args = vec!["daemon".to_string()];
         let _child = tokio::process::Command::new(&current_exe)
             .args(&args)
             .env("MCP_DAEMON_TTL", ttl.to_string())
@@ -387,96 +414,13 @@ async fn spawn_background_daemon(_config: Arc<mcp_cli_rs::config::Config>, ttl: 
                 source: std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to spawn daemon: {}", e)),
             })?;
         
-        tracing::info!("Daemon spawned with PID: {:?}", _child.id());
+        eprintln!("DEBUG: Daemon spawned with PID: {:?}", _child.id());
     }
     
-    // Give the daemon time to start up before returning
-    tokio::time::sleep(Duration::from_millis(1500)).await;
-    
-    Ok(())
-}
-
-/// Spawn daemon process on Windows using windows-rs APIs
-#[cfg(windows)]
-fn spawn_windows_daemon(
-    current_exe: &std::path::Path,
-    ttl: u64,
-    current_dir: &std::path::Path,
-) -> mcp_cli_rs::error::Result<()> {
-    use windows::Win32::Foundation::CloseHandle;
-    use windows::Win32::System::Threading::{CreateProcessW, CREATE_UNICODE_ENVIRONMENT, CREATE_NO_WINDOW, STARTUPINFOW, PROCESS_INFORMATION, STARTF_USESHOWWINDOW};
-    use windows::Win32::UI::WindowsAndMessaging::SW_HIDE;
-    use std::ffi::OsStr;
-    use std::os::windows::ffi::OsStrExt;
-    
-    // Check if debug mode is enabled
-    let debug_mode = std::env::var("MCP_DAEMON_DEBUG").is_ok();
-    
-    // Build command line: executable daemon --ttl {ttl}
-    let cmd_line = format!(r#""{}" daemon --ttl {}"#, current_exe.display(), ttl);
-    let cmd_wide: Vec<u16> = OsStr::new(&cmd_line)
-        .encode_wide()
-        .chain(Some(0))
-        .collect();
-    
-    // Current directory as wide string
-    let dir_wide: Vec<u16> = current_dir
-        .as_os_str()
-        .encode_wide()
-        .chain(Some(0))
-        .collect();
-    
-    // Startup info - hide window properly
-    let mut startup_info = STARTUPINFOW {
-        cb: std::mem::size_of::<STARTUPINFOW>() as u32,
-        ..Default::default()
-    };
-    
-    // If not in debug mode, hide the window completely
-    if !debug_mode {
-        startup_info.dwFlags = STARTF_USESHOWWINDOW;
-        startup_info.wShowWindow = SW_HIDE.0 as u16;
-    }
-    
-    let mut process_info = PROCESS_INFORMATION::default();
-    
-    // Creation flags: hide window unless debugging
-    let creation_flags = if debug_mode {
-        CREATE_UNICODE_ENVIRONMENT
-    } else {
-        CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT
-    };
-    
-    unsafe {
-        CreateProcessW(
-            None,  // Application name (use command line)
-            windows::core::PWSTR(cmd_wide.as_ptr() as *mut u16),
-            None,  // Process security attributes
-            None,  // Thread security attributes
-            false, // Inherit handles
-            creation_flags,
-            None,  // Environment (inherit)
-            windows::core::PCWSTR(dir_wide.as_ptr()),
-            &startup_info,
-            &mut process_info,
-        )
-        .map_err(|e| mcp_cli_rs::error::McpError::IOError {
-            source: std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to spawn daemon process: {}", e)
-            ),
-        })?;
-        
-        // Close handles immediately - we don't need them and the process will continue running
-        let _ = CloseHandle(process_info.hProcess);
-        let _ = CloseHandle(process_info.hThread);
-        
-        if debug_mode {
-            tracing::info!("Daemon spawned with visible console (debug mode), PID: {}", process_info.dwProcessId);
-        } else {
-            tracing::info!("Daemon spawned with hidden console, PID: {}", process_info.dwProcessId);
-        }
-    }
+    // Give the daemon time to create the named pipe
+    // This is critical - the daemon needs time to start the IPC server
+    eprintln!("DEBUG: Waiting for daemon to initialize...");
+    tokio::time::sleep(Duration::from_millis(1000)).await;
     
     Ok(())
 }
