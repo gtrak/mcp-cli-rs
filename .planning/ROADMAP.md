@@ -263,7 +263,13 @@ Plans:
 - Unclear server state (visual indicators make status obvious)
 - Missing context in search results (server + tool shown together)
 
-**Plans:** TBD (to be planned)
+**Plans:** 4 plans in 3 waves
+
+Plans:
+- [x] 06-01-PLAN.md — Formatting infrastructure (schema parsing, parameter formatting)
+- [x] 06-02-PLAN.md — Enhanced list command with visual hierarchy
+- [x] 06-03-PLAN.md — Info and grep commands with consistent formatting
+- [x] 06-04-PLAN.md — Error/warning display enhancement
 
 ---
 
@@ -298,7 +304,13 @@ Plans:
 - Breaking changes to JSON schema (versioned or documented structure)
 - Escape sequence pollution in piped output (proper TTY detection)
 
-**Plans:** TBD (to be planned)
+**Plans:** 4 plans in 3 waves
+
+Plans:
+- [ ] 07-01-PLAN.md — Add --json flag infrastructure and OutputMode enum
+- [ ] 07-02-PLAN.md — Implement JSON output for discovery commands (list, info, search)
+- [ ] 07-03-PLAN.md — Implement JSON output for tool execution (call command)
+- [ ] 07-04-PLAN.md — Integration tests and schema documentation
 
 ---
 
@@ -311,11 +323,11 @@ Plans:
 | 3 | Performance & Reliability | Complete | 100% |
 | 4 | Tool Filtering & Cross-Platform Validation | Complete | 100% |
 | 5 | Unified Daemon Architecture | Complete | 100% |
-| 6 | Output Formatting & Visual Hierarchy | Planned | 0% |
-| 7 | JSON Output & Machine-Readable Modes | Planned | 0% |
+| 6 | Output Formatting & Visual Hierarchy | Complete | 100% |
+| 7     | JSON Output & Machine-Readable Modes | Planned | 4 plans ready |
 
 **v1.2 Coverage:** 18/18 requirements mapped ✓
 
 ---
 
-**Last updated:** 2026-02-10 (Phase 6-7 roadmap created for v1.2 milestone)
+**Last updated:** 2026-02-10 (Phase 6 complete - Output Formatting & Visual Hierarchy)
