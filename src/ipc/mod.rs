@@ -225,8 +225,9 @@ pub fn get_socket_path() -> std::path::PathBuf {
 /// Returns a PathBuf for the socket file on Windows systems
 #[cfg(windows)]
 pub fn get_socket_path() -> std::path::PathBuf {
-    // Windows implementation to be added in future wave
-    std::path::PathBuf::from(format!("\\\\.\\pipe\\mcp-cli-daemon-{}", std::process::id()))
+    // Use a fixed named pipe name for daemon-client communication
+    // The pipe name must be the same for both daemon and client processes
+    std::path::PathBuf::from(r"\\.\pipe\mcp-cli-daemon-socket")
 }
 
 /// Re-export platform-specific implementations

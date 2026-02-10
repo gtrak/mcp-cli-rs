@@ -171,19 +171,3 @@ Which phases cover which requirements. Updated during roadmap creation.
 ---
 *Requirements defined: 2025-02-06*
 *Last updated: 2025-02-06 after roadmap creation*
-
-### Unified Daemon Architecture (v1.1)
-
-- [ ] **DAEMON-01**: Remove separate daemon binary (src/bin/daemon.rs)
-- [ ] **DAEMON-02**: Add `mcp daemon` command to start standalone daemon
-- [ ] **DAEMON-03**: Support configurable TTL via --ttl flag for standalone daemon
-- [ ] **DAEMON-04**: Implement auto-spawn mode (--auto-daemon flag)
-- [ ] **DAEMON-05**: Auto-spawn mode spawns daemon if not running before executing command
-- [ ] **DAEMON-06**: Auto-spawn mode uses configurable TTL (default 60s)
-- [ ] **DAEMON-07**: Implement require-daemon mode (--require-daemon flag)
-- [ ] **DAEMON-08**: Require-daemon mode fails with clear error if daemon not running
-- [ ] **DAEMON-09**: Default mode (no flags) uses auto-spawn behavior
-- [ ] **DAEMON-10**: TTL configurable via MCP_DAEMON_TTL environment variable
-- [ ] **DAEMON-11**: TTL configurable via config file daemon_ttl field
-- [ ] **DAEMON-12**: Single binary distribution (no separate executable)
-
