@@ -4,7 +4,6 @@
 
 use mcp_cli_rs::config::loader;
 use mcp_cli_rs::config::{Config, ServerConfig, ServerTransport};
-use mcp_cli_rs::error::McpError;
 
 #[cfg(test)]
 mod tests {
@@ -13,13 +12,14 @@ mod tests {
     #[test]
     fn test_config_parsing_with_allowed_tools() {
         let toml = r#"
-[servers]
-[[servers.config]]
+[[servers]]
 name = "my_server"
-transport = "stdio"
+allowed_tools = ["*"]
+
+[servers.transport]
+type = "stdio"
 command = "python"
 args = ["-m", "mcp_server"]
-allowed_tools = ["*"]
 "#;
 
         let config: Config = toml::from_str(toml).unwrap();
@@ -33,13 +33,14 @@ allowed_tools = ["*"]
     #[test]
     fn test_config_parsing_with_disabled_tools() {
         let toml = r#"
-[servers]
-[[servers.config]]
+[[servers]]
 name = "my_server"
-transport = "stdio"
+disabled_tools = ["password_*"]
+
+[servers.transport]
+type = "stdio"
 command = "python"
 args = ["-m", "mcp_server"]
-disabled_tools = ["password_*"]
 "#;
 
         let config: Config = toml::from_str(toml).unwrap();
@@ -53,14 +54,15 @@ disabled_tools = ["password_*"]
     #[test]
     fn test_config_parsing_with_both_allowed_and_disabled() {
         let toml = r#"
-[servers]
-[[servers.config]]
+[[servers]]
 name = "my_server"
-transport = "stdio"
-command = "python"
-args = ["-m", "mcp_server"]
 allowed_tools = ["list_*", "search_*"]
 disabled_tools = ["password_*", "sudo_*"]
+
+[servers.transport]
+type = "stdio"
+command = "python"
+args = ["-m", "mcp_server"]
 "#;
 
         let config: Config = toml::from_str(toml).unwrap();
@@ -80,10 +82,11 @@ disabled_tools = ["password_*", "sudo_*"]
     #[test]
     fn test_config_parsing_without_tool_filtering() {
         let toml = r#"
-[servers]
-[[servers.config]]
+[[servers]]
 name = "my_server"
-transport = "stdio"
+
+[servers.transport]
+type = "stdio"
 command = "python"
 args = ["-m", "mcp_server"]
 "#;
@@ -99,14 +102,15 @@ args = ["-m", "mcp_server"]
     #[test]
     fn test_config_validation_empty_tool_filtering() {
         let toml = r#"
-[servers]
-[[servers.config]]
+[[servers]]
 name = "my_server"
-transport = "stdio"
-command = "python"
-args = ["-m", "mcp_server"]
 allowed_tools = []
 disabled_tools = []
+
+[servers.transport]
+type = "stdio"
+command = "python"
+args = ["-m", "mcp_server"]
 "#;
 
         let config: Config = toml::from_str(toml).unwrap();
@@ -122,14 +126,15 @@ disabled_tools = []
     #[test]
     fn test_config_validation_with_valid_tool_filtering() {
         let toml = r#"
-[servers]
-[[servers.config]]
+[[servers]]
 name = "my_server"
-transport = "stdio"
-command = "python"
-args = ["-m", "mcp_server"]
 allowed_tools = ["*"]
 disabled_tools = ["password_*"]
+
+[servers.transport]
+type = "stdio"
+command = "python"
+args = ["-m", "mcp_server"]
 "#;
 
         let config: Config = toml::from_str(toml).unwrap();
@@ -141,20 +146,23 @@ disabled_tools = ["password_*"]
     #[test]
     fn test_config_validation_multiple_servers() {
         let toml = r#"
-[servers]
-[[servers.config]]
+[[servers]]
 name = "server1"
-transport = "stdio"
-command = "python"
-args = ["-m", "server1"]
 allowed_tools = ["*"]
 
-[[servers.config]]
+[servers.transport]
+type = "stdio"
+command = "python"
+args = ["-m", "server1"]
+
+[[servers]]
 name = "server2"
-transport = "stdio"
+disabled_tools = ["password_*"]
+
+[servers.transport]
+type = "stdio"
 command = "python"
 args = ["-m", "server2"]
-disabled_tools = ["password_*"]
 "#;
 
         let config: Config = toml::from_str(toml).unwrap();
@@ -189,6 +197,7 @@ disabled_tools = ["password_*"]
             retry_max: 3,
             retry_delay_ms: 1000,
             timeout_secs: 1800,
+            daemon_ttl: 60,
         };
 
         // Clone should work with new fields

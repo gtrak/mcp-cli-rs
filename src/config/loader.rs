@@ -213,6 +213,48 @@ pub async fn load_config(path: &std::path::Path) -> Result<Config, McpError> {
     Ok(config)
 }
 
+/// Synchronous version of load_config for use in tests and sync contexts.
+///
+/// # Arguments
+/// * `path` - Path to the configuration file
+///
+/// # Returns
+/// * `Ok(Config)` if config parsed successfully
+/// * `Err(McpError)` if parsing fails
+pub fn load_config_sync(path: &std::path::Path) -> Result<Config, McpError> {
+    let content = std::fs::read_to_string(path).map_err(|e| {
+        debug!("Failed to read config file {}: {}", path.display(), e);
+        McpError::config_read(path, e)
+    })?;
+
+    debug!("Config file loaded successfully: {}", path.display());
+
+    let config: Config = toml::from_str(&content).map_err(|e| {
+        debug!("Failed to parse TOML from {}: {}", path.display(), e);
+        McpError::ConfigParseError {
+            path: path.to_path_buf(),
+            source: Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e.to_string(),
+            )),
+        }
+    })?;
+
+    validate_config(&config, &path.to_string_lossy())?;
+
+    if config.is_empty() {
+        tracing::warn!("Config file '{}' contains no server definitions", path.display());
+    } else {
+        debug!(
+            "Config file '{}' parsed successfully with {} server(s)",
+            path.display(),
+            config.servers.len()
+        );
+    }
+
+    Ok(config)
+}
+
 /// Combines config discovery and loading into a single operation.
 ///
 /// This is the main entry point for loading configuration from all possible sources.

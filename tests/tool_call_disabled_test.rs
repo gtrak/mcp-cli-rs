@@ -30,6 +30,7 @@ mod tests {
         retry_max: 3,
         retry_delay_ms: 1000,
         timeout_secs: 1800,
+        daemon_ttl: 60,
     };
 
     let server_config = config.get_server("test-server").unwrap();
@@ -65,6 +66,7 @@ async fn test_allowed_tool_execution_unblocked() {
         retry_max: 3,
         retry_delay_ms: 1000,
         timeout_secs: 1800,
+        daemon_ttl: 60,
     };
 
     let server_config = config.get_server("test-server").unwrap();
@@ -99,6 +101,7 @@ async fn test_disabled_tool_precedence_over_allowed() {
         retry_max: 3,
         retry_delay_ms: 1000,
         timeout_secs: 1800,
+        daemon_ttl: 60,
     };
 
     let server_config = config.get_server("test-server").unwrap();
@@ -142,6 +145,7 @@ async fn test_error_message_includes_details() {
         retry_max: 3,
         retry_delay_ms: 1000,
         timeout_secs: 1800,
+        daemon_ttl: 60,
     };
 
     let server_config = config.get_server("secure-server").unwrap();

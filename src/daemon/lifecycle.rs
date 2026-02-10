@@ -35,9 +35,14 @@ impl DaemonLifecycle {
         *last_activity = Instant::now();
     }
 
-    /// Check if the daemon should shutdown due to idle timeout
-    /// Call this periodically (e.g., every 1 second) in a separate task
+    /// Check if the daemon should shutdown
+    /// Returns true if idle timeout exceeded OR shutdown was explicitly requested
     pub fn should_shutdown(&self) -> bool {
+        // Check if explicit shutdown was requested
+        if !self.running.load(std::sync::atomic::Ordering::SeqCst) {
+            return true;
+        }
+        // Check idle timeout
         let last_activity = self.last_activity.lock().unwrap();
         let elapsed = last_activity.elapsed();
         elapsed > self.idle_timeout
@@ -145,13 +150,18 @@ mod tests {
     #[test]
     fn test_default_timeout() {
         let lifecycle = DaemonLifecycle::default();
-        assert_eq!(lifecycle.elapsed_since_last_activity(), Duration::ZERO);
+        // Elapsed time should be very small (just created), not exactly ZERO
+        let elapsed = lifecycle.elapsed_since_last_activity();
+        assert!(elapsed < Duration::from_millis(100), "Elapsed time should be near zero immediately after creation");
     }
 
     #[test]
     fn test_custom_ttl_value() {
         let lifecycle = DaemonLifecycle::new(120);
-        assert_eq!(lifecycle.time_until_idle().unwrap(), Duration::from_secs(120));
+        // Time until idle should be close to 120 seconds (minus tiny elapsed time)
+        let time_until = lifecycle.time_until_idle().unwrap();
+        assert!(time_until > Duration::from_secs(119), "Time until idle should be close to 120s");
+        assert!(time_until <= Duration::from_secs(120), "Time until idle should not exceed 120s");
     }
 
     #[test]
@@ -174,9 +184,14 @@ mod tests {
     fn test_elapsed_since_last_activity() {
         let lifecycle = DaemonLifecycle::new(30);
         lifecycle.update_activity();
+        // Immediately after update, elapsed should be very small
         let elapsed = lifecycle.elapsed_since_last_activity();
-        assert!(elapsed < Duration::from_secs(1));
-        assert!(elapsed > Duration::from_millis(100));
+        assert!(elapsed < Duration::from_millis(100), "Elapsed should be small immediately after activity update");
+        
+        // After sleeping, elapsed should be measurable
+        std::thread::sleep(Duration::from_millis(50));
+        let elapsed = lifecycle.elapsed_since_last_activity();
+        assert!(elapsed >= Duration::from_millis(50), "Elapsed should account for sleep time");
     }
 
     #[test]
@@ -184,14 +199,16 @@ mod tests {
         let lifecycle = DaemonLifecycle::new(60);
         lifecycle.update_activity();
         let time_until = lifecycle.time_until_idle().unwrap();
-        assert!(time_until > Duration::from_secs(59));
-        assert!(time_until < Duration::from_secs(61));
+        // Should be close to 60 seconds minus tiny elapsed time
+        assert!(time_until > Duration::from_secs(59), "Time until idle should be close to 60s");
+        assert!(time_until <= Duration::from_secs(60), "Time until idle should not exceed 60s");
     }
 
     #[test]
     fn test_time_until_idle_without_activity() {
-        let lifecycle = DaemonLifecycle::new(30);
-        std::thread::sleep(Duration::from_secs(1));
-        assert!(lifecycle.time_until_idle().is_none());
+        let lifecycle = DaemonLifecycle::new(2); // Use short 2 second timeout
+        std::thread::sleep(Duration::from_secs(3)); // Sleep longer than timeout
+        // After sleeping past the timeout, should return None
+        assert!(lifecycle.time_until_idle().is_none(), "Should return None when past idle timeout");
     }
 }

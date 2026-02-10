@@ -30,6 +30,7 @@ mod tests {
             retry_max: 3,
             retry_delay_ms: 1000,
             timeout_secs: 1800,
+            daemon_ttl: 60,
         };
 
         let executor = ParallelExecutor::new(5);
@@ -91,6 +92,7 @@ mod tests {
             retry_max: 3,
             retry_delay_ms: 1000,
             timeout_secs: 1800,
+            daemon_ttl: 60,
         };
 
         let executor = ParallelExecutor::new(5);
@@ -152,6 +154,7 @@ mod tests {
             retry_max: 3,
             retry_delay_ms: 1000,
             timeout_secs: 1800,
+            daemon_ttl: 60,
         };
 
         let executor = ParallelExecutor::new(5);
@@ -212,6 +215,7 @@ mod tests {
             retry_max: 3,
             retry_delay_ms: 1000,
             timeout_secs: 1800,
+            daemon_ttl: 60,
         };
 
         let executor = ParallelExecutor::new(5);

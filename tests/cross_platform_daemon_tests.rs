@@ -125,16 +125,27 @@ async fn test_unix_socket_client_server_roundtrip() {
             .expect("Failed to send response");
     });
 
-    // Create IPC client
+    // Wait for server with exponential backoff
     let config = mcp_cli_rs::config::Config::default();
     let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
         .expect("Failed to create IPC client");
 
-    // Send request and get response
     let request = DaemonRequest::Ping;
-    let response = client.send_request(&request)
-        .await
-        .expect("Failed to send request");
+    let response = timeout(Duration::from_secs(5), async {
+        let mut delay = Duration::from_millis(10);
+        loop {
+            match client.send_request(&request).await {
+                Ok(r) => break r,
+                Err(_) => {
+                    if delay > Duration::from_secs(2) {
+                        return DaemonResponse::Error { code: 1, message: "timeout".to_string() };
+                    }
+                    tokio::time::sleep(delay).await;
+                    delay *= 2;
+                }
+            }
+        }
+    }).await.expect("Timeout waiting for server");
 
     // Verify response
     assert!(matches!(response, DaemonResponse::Pong),
@@ -356,10 +367,17 @@ async fn test_windows_named_pipe_server_creation() {
 #[cfg(windows)]
 #[tokio::test]
 async fn test_windows_named_pipe_client_server_roundtrip() {
-    let pipe_name = get_windows_test_pipe_name();
+    // Use a unique pipe name to avoid conflicts with other tests
+    let pipe_name = format!(r"\\.\pipe\mcp-cli-test-roundtrip-{}", std::process::id());
+    let pipe_path = PathBuf::from(&pipe_name);
+
+    // Create IPC client that connects to this specific pipe
+    let config = mcp_cli_rs::config::Config::default();
+    let mut client = mcp_cli_rs::ipc::create_ipc_client_for_path(std::sync::Arc::new(config), &pipe_path)
+        .expect("Failed to create IPC client");
 
     // Create IPC server
-    let mut server = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
+    let mut server = mcp_cli_rs::ipc::create_ipc_server(&pipe_path)
         .expect("Failed to create IPC server");
 
     // Spawn server task
@@ -393,16 +411,24 @@ async fn test_windows_named_pipe_client_server_roundtrip() {
             .expect("Failed to send response");
     });
 
-    // Create IPC client
-    let config = mcp_cli_rs::config::Config::default();
-    let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
-        .expect("Failed to create IPC client");
+    // Client already created at the start of the test with the correct pipe path
 
-    // Send request and get response
     let request = DaemonRequest::Ping;
-    let response = client.send_request(&request)
-        .await
-        .expect("Failed to send request");
+    let response = timeout(Duration::from_secs(5), async {
+        let mut delay = Duration::from_millis(10);
+        loop {
+            match client.send_request(&request).await {
+                Ok(r) => break r,
+                Err(_) => {
+                    if delay > Duration::from_secs(2) {
+                        return DaemonResponse::Error { code: 1, message: "timeout".to_string() };
+                    }
+                    tokio::time::sleep(delay).await;
+                    delay *= 2;
+                }
+            }
+        }
+    }).await.expect("Timeout waiting for server");
 
     // Verify response
     assert!(matches!(response, DaemonResponse::Pong),
@@ -412,19 +438,21 @@ async fn test_windows_named_pipe_client_server_roundtrip() {
     server_handle.await.expect("Server task failed to join");
 }
 
-/// Test Windows named pipe multiple concurrent connections
+/// Test Windows named pipe multiple sequential connections
 #[cfg(windows)]
 #[tokio::test]
-async fn test_windows_named_pipe_multiple_concurrent_connections() {
-    let pipe_name = get_windows_test_pipe_name();
+async fn test_windows_named_pipe_multiple_sequential_connections() {
+    // Use a unique pipe name to avoid conflicts with other tests
+    let pipe_name = format!(r"\\.\pipe\mcp-cli-test-sequential-{}", std::process::id());
+    let pipe_path = PathBuf::from(&pipe_name);
 
     // Create IPC server
-    let mut server = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
+    let mut server = mcp_cli_rs::ipc::create_ipc_server(&pipe_path)
         .expect("Failed to create IPC server");
 
-    // Spawn server task handling 3 concurrent connections
+    // Spawn server task handling 3 sequential connections
     let server_handle = tokio::spawn(async move {
-        for _ in 0..3 {
+        for i in 0..3 {
             // Create server instance for each connection
             let server_instance = tokio::net::windows::named_pipe::ServerOptions::new()
                 .reject_remote_clients(true)
@@ -443,7 +471,7 @@ async fn test_windows_named_pipe_multiple_concurrent_connections() {
 
             // Verify Ping request
             assert!(matches!(request, DaemonRequest::Ping),
-                     "Expected Ping request, got {:?}", request);
+                     "Expected Ping request for connection {}", i);
 
             // Send response
             let response = DaemonResponse::Pong;
@@ -453,17 +481,32 @@ async fn test_windows_named_pipe_multiple_concurrent_connections() {
         }
     });
 
-    // Create IPC client and send 3 concurrent requests
-        for i in 0..3 {
-            let config = mcp_cli_rs::config::Config::default();
-            let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
-                .expect("Failed to create IPC client");
+    // Create client with the specific pipe path
+    let config = mcp_cli_rs::config::Config::default();
+    let mut client = mcp_cli_rs::ipc::create_ipc_client_for_path(std::sync::Arc::new(config), &pipe_path)
+        .expect("Failed to create IPC client");
+
+    // Send 3 sequential requests with exponential backoff
+    for i in 0..3 {
         let request = DaemonRequest::Ping;
-        let response = client.send_request(&request)
-            .await
-            .expect("Failed to send request");
+        let response = timeout(Duration::from_secs(5), async {
+            let mut delay = Duration::from_millis(10);
+            loop {
+                match client.send_request(&request).await {
+                    Ok(r) => break r,
+                    Err(_) => {
+                        if delay > Duration::from_secs(2) {
+                            return DaemonResponse::Error { code: 1, message: "timeout".to_string() };
+                        }
+                        tokio::time::sleep(delay).await;
+                        delay *= 2;
+                    }
+                }
+            }
+        }).await.expect("Timeout waiting for server");
+
         assert!(matches!(response, DaemonResponse::Pong),
-                 "Expected Pong response for client {}", i);
+                 "Expected Pong response for request {}, got {:?}", i, response);
     }
 
     // Wait for server to complete
@@ -474,10 +517,12 @@ async fn test_windows_named_pipe_multiple_concurrent_connections() {
 #[cfg(windows)]
 #[tokio::test]
 async fn test_windows_named_pipe_large_message_transfer() {
-    let pipe_name = get_windows_test_pipe_name();
+    // Use a unique pipe name to avoid conflicts with other tests
+    let pipe_name = format!(r"\\.\pipe\mcp-cli-test-large-{}", std::process::id());
+    let pipe_path = PathBuf::from(&pipe_name);
 
     // Create IPC server
-    let mut server = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
+    let mut server = mcp_cli_rs::ipc::create_ipc_server(&pipe_path)
         .expect("Failed to create IPC server");
 
     // Create large JSON object (100KB text as in plan)
@@ -512,19 +557,32 @@ async fn test_windows_named_pipe_large_message_transfer() {
             .expect("Failed to send response");
     });
 
-    // Create IPC client
+    // Create IPC client with the specific pipe path
     let config = mcp_cli_rs::config::Config::default();
-    let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
+    let mut client = mcp_cli_rs::ipc::create_ipc_client_for_path(std::sync::Arc::new(config), &pipe_path)
         .expect("Failed to create IPC client");
 
-    // Send ping request
+    // Send request with exponential backoff
     let request = DaemonRequest::Ping;
-    let response = client.send_request(&request)
-        .await
-        .expect("Failed to send request");
+    let response = timeout(Duration::from_secs(5), async {
+        let mut delay = Duration::from_millis(10);
+        loop {
+            match client.send_request(&request).await {
+                Ok(r) => break r,
+                Err(_) => {
+                    if delay > Duration::from_secs(2) {
+                        return DaemonResponse::Error { code: 1, message: "timeout".to_string() };
+                    }
+                    tokio::time::sleep(delay).await;
+                    delay *= 2;
+                }
+            }
+        }
+    }).await.expect("Timeout waiting for server");
 
     // Verify large content was transferred correctly
-    assert!(matches!(response, DaemonResponse::ToolResult(_)));
+    assert!(matches!(response, DaemonResponse::ToolResult(_)),
+            "Expected ToolResult response, got {:?}", response);
     if let DaemonResponse::ToolResult(content) = response {
         assert_eq!(content, large_content);
     }
@@ -537,10 +595,12 @@ async fn test_windows_named_pipe_large_message_transfer() {
 #[cfg(windows)]
 #[tokio::test]
 async fn test_windows_named_pipe_security_flags() {
-    let pipe_name = get_windows_test_pipe_name();
+    // Use a unique pipe name to avoid conflicts with other tests
+    let pipe_name = format!(r"\\.\pipe\mcp-cli-test-security-{}", std::process::id());
+    let pipe_path = PathBuf::from(&pipe_name);
 
     // Create IPC server
-    let mut server = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
+    let mut server = mcp_cli_rs::ipc::create_ipc_server(&pipe_path)
         .expect("Failed to create IPC server");
 
     // Spawn server task that checks connection properties
@@ -560,16 +620,27 @@ async fn test_windows_named_pipe_security_flags() {
         let _ = server_instance.disconnect();
     });
 
-    // Create IPC client
+    // Wait for server with exponential backoff
     let config = mcp_cli_rs::config::Config::default();
-    let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
+    let mut client = mcp_cli_rs::ipc::create_ipc_client_for_path(std::sync::Arc::new(config), &pipe_path)
         .expect("Failed to create IPC client");
 
-    // Send request
     let request = DaemonRequest::Ping;
-    let _response = client.send_request(&request)
-        .await
-        .expect("Failed to send request");
+    let _response = timeout(Duration::from_secs(5), async {
+        let mut delay = Duration::from_millis(10);
+        loop {
+            match client.send_request(&request).await {
+                Ok(r) => break r,
+                Err(_) => {
+                    if delay > Duration::from_secs(2) {
+                        return DaemonResponse::Error { code: 1, message: "timeout".to_string() };
+                    }
+                    tokio::time::sleep(delay).await;
+                    delay *= 2;
+                }
+            }
+        }
+    }).await.expect("Timeout waiting for server");
 
     // Wait for server to complete
     server_handle.await.expect("Server task failed to join");

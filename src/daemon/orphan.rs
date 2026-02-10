@@ -280,9 +280,10 @@ mod tests {
         assert_eq!(get_pid_file_path(&socket), PathBuf::from("/tmp/mcp.pid"));
 
         let socket = PathBuf::from("C:\\tmp\\mcp.pipe");
+        // set_extension replaces the extension, so mcp.pipe becomes mcp.pid
         assert_eq!(
             get_pid_file_path(&socket),
-            PathBuf::from("C:\\tmp\\mcp.pipe.pid")
+            PathBuf::from("C:\\tmp\\mcp.pid")
         );
     }
 

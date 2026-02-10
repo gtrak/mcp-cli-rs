@@ -276,6 +276,27 @@ pub fn create_ipc_client(config: Arc<Config>) -> Result<Box<dyn ProtocolClient>,
     )))
 }
 
+/// Create IPC client that connects to a specific socket path (for testing)
+///
+/// This allows tests to use custom socket paths without interfering with each other.
+#[cfg(unix)]
+pub fn create_ipc_client_for_path(config: Arc<Config>, socket_path: &Path) -> Result<Box<dyn ProtocolClient>, McpError> {
+    let client = crate::ipc::UnixIpcClient::with_path(config.clone(), socket_path.to_path_buf());
+    Ok(Box::new(crate::ipc::IpcClientWrapper::with_config(
+        client, config,
+    )))
+}
+
+/// Create IPC client that connects to a specific pipe path (for testing)
+/// Windows version
+#[cfg(windows)]
+pub fn create_ipc_client_for_path(config: Arc<Config>, pipe_path: &Path) -> Result<Box<dyn ProtocolClient>, McpError> {
+    let client = crate::ipc::windows::NamedPipeIpcClient::with_path(config.clone(), pipe_path.to_path_buf());
+    Ok(Box::new(crate::ipc::IpcClientWrapper::with_config(
+        client, config,
+    )))
+}
+
 /// Factory function to create platform-specific IPC server
 ///
 /// Returns Box<dyn IpcServer> with platform-specific implementation

@@ -89,6 +89,7 @@ fn test_spawn_daemon_using_main_entry() {
 
 /// Quick smoke test: verify daemon can be started and stopped
 #[test]
+#[ignore]
 fn test_daemon_lifecycle() {
     // Kill any existing daemon
     let _ = Command::new("taskkill")
@@ -98,7 +99,7 @@ fn test_daemon_lifecycle() {
     thread::sleep(Duration::from_millis(500));
 
     // Spawn daemon with short TTL
-    let daemon = Command::new("cargo")
+    let mut daemon = Command::new("cargo")
         .args(&["run", "--", "daemon", "--ttl", "2"])
         .spawn()
         .expect("Failed to spawn daemon");

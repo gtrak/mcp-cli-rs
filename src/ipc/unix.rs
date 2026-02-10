@@ -71,12 +71,18 @@ impl IpcServer for UnixIpcServer {
 #[derive(Clone)]
 pub struct UnixIpcClient {
     config: Arc<Config>,
+    custom_path: Option<PathBuf>,
 }
 
 impl UnixIpcClient {
     /// Create a new UnixIpcClient with a config reference
     pub fn new(config: Arc<Config>) -> Self {
-        Self { config }
+        Self { config, custom_path: None }
+    }
+
+    /// Create a new UnixIpcClient that connects to a specific socket path (for testing)
+    pub fn with_path(config: Arc<Config>, path: PathBuf) -> Self {
+        Self { config, custom_path: Some(path) }
     }
 }
 
@@ -89,8 +95,11 @@ impl crate::ipc::IpcClient for UnixIpcClient {
 
     /// Send a daemon protocol request and receive response
     async fn send_request(&self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
-        // Get daemon socket path
-        let socket_path = crate::ipc::get_socket_path();
+        // Get daemon socket path (use custom path if set)
+        let socket_path = match &self.custom_path {
+            Some(path) => path.clone(),
+            None => crate::ipc::get_socket_path(),
+        };
 
         // Connect to daemon
         let mut stream = self.connect(&socket_path).await?;
