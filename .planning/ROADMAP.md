@@ -331,3 +331,125 @@ Plans:
 ---
 
 **Last updated:** 2026-02-11 (Phase 7 complete - JSON Output & Machine-Readable Modes)
+
+---
+
+## Phase 8: Fix Phase 4 Windows Tests (XP-01)
+
+**Goal:** Fix Windows process spawning tests to compile and verify XP-01 requirement
+
+**Dependencies:**
+- Phase 4: Tool Filtering & Cross-Platform Validation (complete)
+
+**Tech Debt Addressed:**
+- XP-01: Windows tests don't compile (13 compilation errors)
+
+**Success Criteria:**
+1. Windows process tests compile without errors
+2. AsyncBufReadExt import issue resolved
+3. Result type generic parameters fixed
+4. AsyncWriter replaced with correct tokio::io type
+5. Tests pass on Windows to verify no zombie processes
+
+**Tasks:**
+- Fix missing AsyncBufReadExt import
+- Fix Result type generic parameters
+- Replace AsyncWriter with correct tokio::io type
+- Verify tests compile and pass on Windows
+
+---
+
+## Phase 9: Cross-Platform Verification (XP-02, XP-04)
+
+**Goal:** Document XP-02 security implementation and verify daemon works across all platforms
+
+**Dependencies:**
+- Phase 8: Fix Phase 4 Windows Tests (complete)
+
+**Tech Debt Addressed:**
+- XP-02: Security flags implementation unclear
+- XP-04: Cross-platform daemon needs runtime verification
+
+**Success Criteria:**
+1. XP-02 security approach documented in code
+2. Daemon tested on Linux, macOS, and Windows
+3. No platform-specific behavior differences
+4. Verification results documented
+
+**Tasks:**
+- Document XP-02 security approach (reject_remote_clients vs security_qos_flags)
+- Run daemon tests on Linux
+- Run daemon tests on macOS
+- Run daemon tests on Windows
+- Document verification results
+
+---
+
+## Phase 10: Phase 6 Verification Documentation
+
+**Goal:** Create VERIFICATION.md documenting Phase 6 output formatting completion
+
+**Dependencies:**
+- Phase 9: Cross-Platform Verification (complete)
+
+**Tech Debt Addressed:**
+- Documentation: No VERIFICATION.md file for Phase 6
+
+**Success Criteria:**
+1. VERIFICATION.md created for Phase 6
+2. Goal-backward analysis documented
+3. All 14 v1.2 requirements verified
+4. Evidence from plan summaries included
+
+**Tasks:**
+- Create VERIFICATION.md with goal-backward analysis
+- Document all 14 v1.2 requirements satisfied
+- Add evidence from plan summaries
+- Document any deviations
+
+---
+
+## Phase 11: Code Quality Cleanup
+
+**Goal:** Clean up minor code quality issues
+
+**Dependencies:**
+- Phase 10: Phase 6 Verification Documentation (complete)
+
+**Tech Debt Addressed:**
+- Minor: Unused imports in commands.rs
+- Minor: Commented-out code in src/cli/daemon.rs
+
+**Success Criteria:**
+1. No unused imports in commands.rs
+2. No commented-out code in src/cli/daemon.rs
+3. Code passes clippy/format checks
+
+**Tasks:**
+- Remove unused imports in commands.rs
+- Remove commented-out code in src/cli/daemon.rs
+- Run clippy and fmt checks
+
+---
+
+## Progress
+
+| Phase | Name | Status | Completion |
+|-------|------|--------|------------|
+| 1 | Core Protocol & Configuration | Complete | 100% |
+| 2 | Connection Daemon & Cross-Platform IPC | Complete | 100% |
+| 3 | Performance & Reliability | Complete | 100% |
+| 4 | Tool Filtering & Cross-Platform Validation | Complete | 100% |
+| 5 | Unified Daemon Architecture | Complete | 100% |
+| 6 | Output Formatting & Visual Hierarchy | Complete | 100% |
+| 7 | JSON Output & Machine-Readable Modes | Complete | 100% |
+| 8 | Fix Phase 4 Windows Tests (XP-01) | Pending | 0% |
+| 9 | Cross-Platform Verification (XP-02, XP-04) | Pending | 0% |
+| 10 | Phase 6 Verification Documentation | Pending | 0% |
+| 11 | Code Quality Cleanup | Pending | 0% |
+
+**v1.2 Tech Debt Coverage:** 4/4 items pending
+
+---
+
+**Last updated:** 2026-02-11 (Gap closure phases 8-11 added)
