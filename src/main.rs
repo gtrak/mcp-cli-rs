@@ -264,7 +264,7 @@ async fn execute_command(
             };
             cmd_list_servers(client, detail_level, output_mode).await
         }
-        Some(Commands::Info { name }) => cmd_server_info(client, &name).await,
+        Some(Commands::Info { name }) => cmd_server_info(client, &name, output_mode).await,
         Some(Commands::Tool {
             tool,
             describe,

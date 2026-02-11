@@ -469,14 +469,20 @@ async fn cmd_list_servers_json(mut daemon: Box<dyn ProtocolClient>) -> Result<()
 /// Displays detailed information about a specific server.
 /// Implements DISC-02: inspection of server details.
 /// Implements TASK-03: colored output for error cases.
+/// Implements OUTP-07, OUTP-08: JSON output mode
 ///
 /// # Arguments
 /// * `daemon` - Daemon IPC client
 /// * `server_name` - Name of the server to inspect
+/// * `output_mode` - Output format (human or JSON)
 ///
 /// # Errors
 /// Returns McpError::ServerNotFound if server doesn't exist (ERR-02)
-pub async fn cmd_server_info(daemon: Box<dyn ProtocolClient>, server_name: &str) -> Result<()> {
+pub async fn cmd_server_info(daemon: Box<dyn ProtocolClient>, server_name: &str, output_mode: OutputMode) -> Result<()> {
+    // Handle JSON mode separately
+    if output_mode == OutputMode::Json {
+        return cmd_server_info_json(daemon, server_name).await;
+    }
     let config = daemon.config();
     let server = config.get_server(server_name).ok_or_else(|| {
         print_error(&format!("Server '{}' not found", server_name));
@@ -523,6 +529,71 @@ pub async fn cmd_server_info(daemon: Box<dyn ProtocolClient>, server_name: &str)
         }
     }
 
+    Ok(())
+}
+
+/// Execute the server info command in JSON mode.
+///
+/// Outputs server configuration details as structured JSON for programmatic use.
+/// Implements OUTP-07: --json flag support
+/// Implements OUTP-08: consistent JSON schema with complete server details
+async fn cmd_server_info_json(daemon: Box<dyn ProtocolClient>, server_name: &str) -> Result<()> {
+    let config = daemon.config();
+    let server = config.get_server(server_name).ok_or_else(|| McpError::ServerNotFound {
+        server: server_name.to_string(),
+    })?;
+
+    // Build transport details based on type
+    let transport_details = match &server.transport {
+        ServerTransport::Stdio {
+            command,
+            args,
+            env,
+            cwd,
+        } => {
+            let mut details = serde_json::json!({
+                "type": "stdio",
+                "command": command,
+            });
+            if !args.is_empty() {
+                details["args"] = serde_json::Value::Array(
+                    args.iter().cloned().map(serde_json::Value::String).collect()
+                );
+            }
+            if !env.is_empty() {
+                let env_map: serde_json::Value = env.iter()
+                    .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+                    .collect();
+                details["env"] = env_map;
+            }
+            if let Some(cwd_path) = cwd {
+                details["cwd"] = serde_json::Value::String(cwd_path.clone());
+            }
+            details
+        }
+        ServerTransport::Http { url, headers } => {
+            let mut details = serde_json::json!({
+                "type": "http",
+                "url": url,
+            });
+            if !headers.is_empty() {
+                let headers_map: serde_json::Value = headers.iter()
+                    .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+                    .collect();
+                details["headers"] = headers_map;
+            }
+            details
+        }
+    };
+
+    let output = ServerDetailOutput {
+        name: server.name.clone(),
+        description: server.description.clone(),
+        transport_type: server.transport.type_name().to_string(),
+        transport: transport_details,
+    };
+
+    print_json(&output);
     Ok(())
 }
 
@@ -943,7 +1014,7 @@ pub async fn cmd_call_tool(
 /// Implements OUTP-08: consistent JSON schema with complete execution results
 /// Implements OUTP-10: error responses are valid JSON
 async fn cmd_call_tool_json(
-    mut daemon: Box<dyn ProtocolClient>,
+    daemon: Box<dyn ProtocolClient>,
     tool_id: &str,
     args_json: Option<&str>,
 ) -> Result<()> {
