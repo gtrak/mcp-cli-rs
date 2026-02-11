@@ -81,10 +81,8 @@ pub struct NamedPipeIpcClient {
 
 impl NamedPipeIpcClient {
     /// Create a new NamedPipeIpcClient with a config reference (convenience method)
-    pub fn with_config(config: &Config) -> Self {
-        Self {
-            config: config.clone().into(),
-        }
+    pub fn with_config(config: Arc<Config>) -> Self {
+        Self { config }
     }
 }
 
@@ -100,12 +98,12 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
         &mut self,
         request: &crate::daemon::protocol::DaemonRequest,
     ) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
-        // Get daemon named pipe path from config
-        let pipe_path = &self.config.socket_path;
-        tracing::debug!("IPC: Connecting to pipe at {:?}", pipe_path);
+        let path_str = self.config.socket_path.to_string_lossy().to_string();
+        tracing::debug!("IPC: Connecting to pipe at {:?}", path_str);
 
         // Connect to daemon
-        let stream = self.connect(pipe_path).await?;
+        let path = Path::new(&path_str);
+        let stream = self.connect(path).await?;
         tracing::debug!("IPC: Connected to pipe");
 
         // Split stream for reading and writing

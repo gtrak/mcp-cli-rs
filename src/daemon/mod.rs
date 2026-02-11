@@ -11,7 +11,7 @@ use crate::daemon::pool::ConnectionPool;
 use crate::ipc::{IpcServer, create_ipc_server};
 
 pub mod lifecycle;
-
+pub mod orphan;
 pub mod pool;
 pub mod protocol;
 

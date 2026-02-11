@@ -6,6 +6,7 @@ pub mod cli;
 pub mod client;
 pub use client::{McpClient, ToolInfo};
 pub mod config;
+pub mod config_fingerprint;
 pub mod error;
 pub use error::{exit_code, McpError, Result as DaemonResult};
 

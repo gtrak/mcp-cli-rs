@@ -127,7 +127,7 @@ async fn test_unix_socket_client_server_roundtrip() {
     });
 
     // Create IPC client
-    let config = mcp_cli_rs::config::Config::default();
+    let config = std::sync::Arc::new(mcp_cli_rs::config::Config::default());
     let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
         .expect("Failed to create IPC client");
 
@@ -195,7 +195,7 @@ async fn test_unix_socket_multiple_concurrent_connections() {
     });
 
     // Create IPC client and send 3 concurrent requests
-    let config = mcp_cli_rs::config::Config::default();
+    let config = std::sync::Arc::new(mcp_cli_rs::config::Config::default());
     let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
         .expect("Failed to create IPC client");
     let request = DaemonRequest::Ping;
@@ -259,7 +259,7 @@ async fn test_unix_socket_large_message_transfer() {
     });
 
     // Create IPC client
-    let config = mcp_cli_rs::config::Config::default();
+    let config = std::sync::Arc::new(mcp_cli_rs::config::Config::default());
     let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
         .expect("Failed to create IPC client");
 
@@ -711,7 +711,7 @@ async fn test_ipc_client_trait_consistency() {
     #[cfg(unix)]
     {
         let socket_path = get_unix_test_socket_path();
-        let config = mcp_cli_rs::config::Config::default();
+        let config = std::sync::Arc::new(mcp_cli_rs::config::Config::default());
 
         let client = mcp_cli_rs::ipc::UnixIpcClient::new(std::sync::Arc::new(config));
 
@@ -725,9 +725,9 @@ async fn test_ipc_client_trait_consistency() {
     // Test on Windows
     #[cfg(windows)]
     {
-        let config = mcp_cli_rs::config::Config::default();
+        let config = std::sync::Arc::new(mcp_cli_rs::config::Config::default());
 
-        let client = mcp_cli_rs::ipc::windows::NamedPipeIpcClient::with_config(&config);
+        let client = mcp_cli_rs::ipc::windows::NamedPipeIpcClient::with_config(config);
 
         // Verify trait methods are implemented
         assert!(

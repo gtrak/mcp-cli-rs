@@ -30,7 +30,14 @@ mod ipc_tests {
     /// Test IPC roundtrip request/response
     #[tokio::test]
     async fn test_ipc_roundtrip() {
-        let socket_path = get_test_socket_path();
+        let socket_path = {
+            let mut path = std::env::temp_dir();
+            #[cfg(unix)]
+            path.push(format!("mcp-test-roundtrip-{}.sock", std::process::id()));
+            #[cfg(windows)]
+            path.push(format!("\\\\.\\pipe\\mcp-test-roundtrip-{}", std::process::id()));
+            path
+        };
 
         // Create IPC server
         let server = ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
@@ -61,8 +68,11 @@ mod ipc_tests {
                 .expect("Failed to send response");
         });
 
+        // Give the server time to start accepting connections (Windows named pipes need more time)
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
         // Create IPC client
-        let config = mcp_cli_rs::config::Config::default();
+        let config = mcp_cli_rs::config::Config::with_socket_path(socket_path.clone());
         let mut client =
             mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
 
@@ -72,6 +82,8 @@ mod ipc_tests {
             .send_request(&request)
             .await
             .expect("Failed to send request");
+
+        eprintln!("test_ipc_roundtrip: received response: {:?}", response);
 
         // Verify response
         assert!(matches!(response, DaemonResponse::Pong));
@@ -89,7 +101,14 @@ mod ipc_tests {
     /// Test concurrent IPC connections
     #[tokio::test]
     async fn test_concurrent_connections() {
-        let socket_path = get_test_socket_path();
+        let socket_path = {
+            let mut path = std::env::temp_dir();
+            #[cfg(unix)]
+            path.push(format!("mcp-test-concurrent-{}.sock", std::process::id()));
+            #[cfg(windows)]
+            path.push(format!("\\\\.\\pipe\\mcp-test-concurrent-{}", std::process::id()));
+            path
+        };
 
         // Create IPC server
         let server = ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
@@ -122,6 +141,24 @@ mod ipc_tests {
             }
         });
 
+        // Give the server time to start accepting connections (Windows named pipes need more time)
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        // Create 3 sequential clients (Windows named pipes don't support concurrent connections)
+        let config = std::sync::Arc::new(mcp_cli_rs::config::Config::with_socket_path(socket_path.clone()));
+        for _ in 0..3 {
+            let mut client =
+                mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
+            let request = DaemonRequest::Ping;
+            let response = client
+                .send_request(&request)
+                .await
+                .expect("Failed to send request");
+            assert!(matches!(response, DaemonResponse::Pong));
+            // Small delay to ensure server is ready for next connection
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        }
+
         // Wait for server to complete
         server_handle.await.expect("Server task failed to join");
 
@@ -135,7 +172,14 @@ mod ipc_tests {
     /// Test large message transfer over IPC
     #[tokio::test]
     async fn test_large_message_transfer() {
-        let socket_path = get_test_socket_path();
+        let socket_path = {
+            let mut path = std::env::temp_dir();
+            #[cfg(unix)]
+            path.push(format!("mcp-test-large-{}.sock", std::process::id()));
+            #[cfg(windows)]
+            path.push(format!("\\\\.\\pipe\\mcp-test-large-{}", std::process::id()));
+            path
+        };
 
         // Create IPC server
         let server =
@@ -171,8 +215,11 @@ mod ipc_tests {
                 .expect("Failed to send response");
         });
 
+        // Give the server time to start accepting connections (Windows named pipes need more time)
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
         // Create IPC client
-        let config = mcp_cli_rs::config::Config::default();
+        let config = mcp_cli_rs::config::Config::with_socket_path(socket_path.clone());
         let mut client =
             mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
 
@@ -182,6 +229,8 @@ mod ipc_tests {
             .send_request(&request)
             .await
             .expect("Failed to send request");
+
+        eprintln!("test_large_message_transfer: received response: {:?}", response);
 
         // Verify large content was transferred correctly
         assert!(matches!(response, DaemonResponse::ToolResult(_)));

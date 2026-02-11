@@ -256,10 +256,10 @@ impl<T: IpcClient + Send + Sync + Clone> ProtocolClient for IpcClientWrapper<T> 
 ///
 /// Returns Box<dyn ProtocolClient> with platform-specific implementation
 #[cfg(unix)]
-pub fn create_ipc_client(config: Config) -> Result<Box<dyn ProtocolClient>, McpError> {
-    let client = crate::ipc::UnixIpcClient::new(config.clone());
+pub fn create_ipc_client(config: &Config) -> Result<Box<dyn ProtocolClient>, McpError> {
+    let client = crate::ipc::UnixIpcClient::new(config.clone().into());
     Ok(Box::new(crate::ipc::IpcClientWrapper::with_config(
-        client, config,
+        client, config.clone(),
     )))
 }
 
@@ -268,10 +268,10 @@ pub fn create_ipc_client(config: Config) -> Result<Box<dyn ProtocolClient>, McpE
 /// Returns Box<dyn ProtocolClient> with platform-specific implementation
 #[cfg(windows)]
 pub fn create_ipc_client(config: &Config) -> Result<Box<dyn ProtocolClient>, McpError> {
-    let client = crate::ipc::NamedPipeIpcClient::with_config(config);
-    Ok(Box::new(crate::ipc::IpcClientWrapper::with_config(
+    let client = crate::ipc::NamedPipeIpcClient::with_config(config.clone().into());
+    Ok(Box::new(crate::ipc::IpcClientWrapper::new(
         client,
-        config.clone(),
+        config.clone().into(),
     )))
 }
 

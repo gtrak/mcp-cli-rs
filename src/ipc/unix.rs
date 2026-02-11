@@ -89,11 +89,8 @@ impl crate::ipc::IpcClient for UnixIpcClient {
 
     /// Send a daemon protocol request and receive response
     async fn send_request(&self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
-        // Get daemon socket path from config
-        let socket_path = &self.config.socket_path;
-
         // Connect to daemon
-        let stream = self.connect(socket_path).await?;
+        let stream = self.connect(&self.config.socket_path).await?;
 
         // Split stream for reading and writing
         use tokio::io::{BufReader};

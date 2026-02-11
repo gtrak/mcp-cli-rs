@@ -7,10 +7,10 @@ use tokio::sync::Mutex;
 #[derive(Clone)]
 pub struct DaemonLifecycle {
     /// Last timestamp when activity was detected
-    last_activity: Arc<Mutex<Instant>>,
+    pub last_activity: Arc<Mutex<Instant>>,
     /// Time after which daemon should shutdown
-    idle_timeout: Duration,
-    shutting_down: bool,
+    pub idle_timeout: Duration,
+    pub shutting_down: bool,
 }
 
 impl DaemonLifecycle {
@@ -65,6 +65,42 @@ impl DaemonLifecycle {
     pub async fn elapsed_since_last_activity(&self) -> Duration {
         let last_activity = self.last_activity.lock().await;
         last_activity.elapsed()
+    }
+
+    /// Get the current idle timeout value
+    pub fn get_idle_timeout(&self) -> Duration {
+        self.idle_timeout.clone()
+    }
+
+    /// Check if the daemon is shutting down
+    pub fn is_shutting_down(&self) -> bool {
+        self.shutting_down
+    }
+
+    /// Get the current config hash
+    pub fn get_config_hash(&self) -> Option<String> {
+        Some(String::from(""))
+    }
+
+    /// Set the current config hash
+    pub fn set_config_hash(&mut self, hash: &str) {
+        // Implementation placeholder - currently not used
+        let _ = hash;
+    }
+
+    /// Get the current resource count
+    pub fn get_resource_count(&self) -> Option<u64> {
+        None
+    }
+
+    /// Check if shutdown has proceeded
+    pub fn shutdown_proceeded(&self) -> bool {
+        self.shutting_down
+    }
+
+    /// Get error state
+    pub fn get_error(&self) -> Option<String> {
+        None
     }
 }
 
