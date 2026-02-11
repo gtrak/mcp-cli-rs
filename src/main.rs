@@ -279,7 +279,7 @@ async fn execute_command(
             };
             cmd_tool_info(client, &tool, detail_level, output_mode).await
         }
-        Some(Commands::Call { tool, args }) => cmd_call_tool(client, &tool, args.as_deref()).await,
+        Some(Commands::Call { tool, args }) => cmd_call_tool(client, &tool, args.as_deref(), output_mode).await,
         Some(Commands::Search {
             pattern,
             describe,
