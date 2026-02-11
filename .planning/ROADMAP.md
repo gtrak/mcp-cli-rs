@@ -336,26 +336,25 @@ Plans:
 
 ## Phase 8: Fix Phase 4 Windows Tests (XP-01)
 
-**Goal:** Fix Windows process spawning tests to compile and verify XP-01 requirement
+**Goal:** Create missing Windows process integration tests to complete XP-01 validation
 
 **Dependencies:**
 - Phase 4: Tool Filtering & Cross-Platform Validation (complete)
 
 **Tech Debt Addressed:**
-- XP-01: Windows tests don't compile (13 compilation errors)
+- XP-01: Windows integration tests file (windows_process_spawn_tests.rs) was promised but never created in Phase 4
 
 **Success Criteria:**
-1. Windows process tests compile without errors
-2. AsyncBufReadExt import issue resolved
-3. Result type generic parameters fixed
-4. AsyncWriter replaced with correct tokio::io type
-5. Tests pass on Windows to verify no zombie processes
+1. Missing integration test file created (tests/windows_process_spawn_tests.rs)
+2. All 9 integration test scenarios implemented (CLI, concurrency, timeouts, daemon, batch, errors)
+3. Tests compile without errors (correct tokio::io traits and types)
+4. Both Windows test files (unit + integration) exist and work together
+5. XP-01 validated through comprehensive test coverage
 
-**Tasks:**
-- Fix missing AsyncBufReadExt import
-- Fix Result type generic parameters
-- Replace AsyncWriter with correct tokio::io type
-- Verify tests compile and pass on Windows
+**Plans:** 1 plan in 1 wave
+
+Plans:
+- [ ] 08-01-PLAN.md — Create Windows process spawning integration tests
 
 ---
 
@@ -443,7 +442,7 @@ Plans:
 | 5 | Unified Daemon Architecture | Complete | 100% |
 | 6 | Output Formatting & Visual Hierarchy | Complete | 100% |
 | 7 | JSON Output & Machine-Readable Modes | Complete | 100% |
-| 8 | Fix Phase 4 Windows Tests (XP-01) | Pending | 0% |
+| 8 | Fix Phase 4 Windows Tests (XP-01) | Planned | ready (1 plan in 1 wave) |
 | 9 | Cross-Platform Verification (XP-02, XP-04) | Pending | 0% |
 | 10 | Phase 6 Verification Documentation | Pending | 0% |
 | 11 | Code Quality Cleanup | Pending | 0% |
