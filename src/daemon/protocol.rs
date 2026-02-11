@@ -67,6 +67,66 @@ impl ToolInfo {
     }
 }
 
+/// Server information for JSON output
+#[derive(Debug, Clone, Serialize)]
+pub struct ServerInfo {
+    pub name: String,
+    pub status: String,
+    pub tool_count: usize,
+    pub tools: Vec<ToolInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// Top-level structure for list command JSON output
+#[derive(Debug, Serialize)]
+pub struct ListOutput {
+    pub servers: Vec<ServerInfo>,
+    pub total_servers: usize,
+    pub connected_servers: usize,
+    pub failed_servers: usize,
+    pub total_tools: usize,
+}
+
+/// Parameter detail for tool info JSON output
+#[derive(Debug, Serialize)]
+pub struct ParameterDetail {
+    pub name: String,
+    pub param_type: String,
+    pub required: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+/// Top-level structure for tool info JSON output
+#[derive(Debug, Serialize)]
+pub struct ToolDetailOutput {
+    pub name: String,
+    pub description: String,
+    pub server: String,
+    pub transport: String,
+    pub parameters: Vec<ParameterDetail>,
+    pub input_schema: serde_json::Value,
+}
+
+/// Match entry for search JSON output
+#[derive(Debug, Serialize)]
+pub struct SearchMatch {
+    pub server: String,
+    pub name: String,
+    pub description: String,
+}
+
+/// Top-level structure for search JSON output
+#[derive(Debug, Serialize)]
+pub struct SearchOutput {
+    pub pattern: String,
+    pub total_matches: usize,
+    pub match_count: usize,
+    pub matches: Vec<SearchMatch>,
+    pub failed_servers: Vec<String>,
+}
+
 /// Send a NDJSON-encoded request to daemon
 pub async fn send_request<W>(writer: &mut W, request: &DaemonRequest) -> Result<()>
 where
