@@ -1,7 +1,7 @@
 //! Daemon lifecycle and functionality tests.
 
-use mcp_cli_rs::config::loader::{find_and_load, load_config};
 use mcp_cli_rs::config::Config;
+use mcp_cli_rs::config::loader::load_config;
 use mcp_cli_rs::daemon::fingerprint::calculate_fingerprint;
 use mcp_cli_rs::daemon::orphan::{read_daemon_pid, write_daemon_pid};
 use tempfile::TempDir;

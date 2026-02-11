@@ -4,7 +4,6 @@
 
 use mcp_cli_rs::client::ToolInfo;
 use mcp_cli_rs::config::{Config, ServerConfig, ServerTransport};
-use mcp_cli_rs::parallel::{filter_tools, ParallelExecutor};
 
 #[cfg(test)]
 mod tests {
@@ -32,8 +31,6 @@ mod tests {
             timeout_secs: 1800,
             daemon_ttl: 60,
         };
-
-        let executor = ParallelExecutor::new(5);
 
         // Simulate listing tools from server1
         let tools = vec![
@@ -95,8 +92,6 @@ mod tests {
             daemon_ttl: 60,
         };
 
-        let executor = ParallelExecutor::new(5);
-
         // Simulate listing tools from server1
         let tools = vec![
             ToolInfo {
@@ -157,8 +152,6 @@ mod tests {
             daemon_ttl: 60,
         };
 
-        let executor = ParallelExecutor::new(5);
-
         // Simulate listing tools from server1
         let tools = vec![
             ToolInfo {
@@ -217,8 +210,6 @@ mod tests {
             timeout_secs: 1800,
             daemon_ttl: 60,
         };
-
-        let executor = ParallelExecutor::new(5);
 
         // Simulate listing tools from server1
         let tools = vec![

@@ -7,7 +7,7 @@
 //! to stderr, controlled via RUST_LOG environment variable.
 
 use colored::*;
-use std::io::{stdout, IsTerminal, Write};
+use std::io::{IsTerminal, stdout};
 use tracing;
 
 /// Determines whether colored output should be used based on:
@@ -18,7 +18,7 @@ use tracing;
 pub fn use_color() -> bool {
     // Check NO_COLOR environment variable first
     // Source: https://no-color.org/
-    if let Some(no_color) = std::env::var("NO_COLOR").ok() {
+    if let Ok(no_color) = std::env::var("NO_COLOR") {
         return no_color == "1";
     }
 

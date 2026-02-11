@@ -76,11 +76,6 @@ impl<T: Clone + IpcClient> IpcClientWrapper<T> {
         Self { client, config }
     }
 
-    /// Get the configuration associated with this client
-    fn config(&self) -> Arc<Config> {
-        Arc::clone(&self.config)
-    }
-
     /// List all configured servers
     pub async fn list_servers(&mut self) -> Result<Vec<String>, McpError> {
         let response = self

@@ -1,19 +1,19 @@
 //! CLI commands for MCP CLI tool.
 
 use crate::cli::DetailLevel;
+use crate::client::ToolInfo;
 use crate::config::{ServerConfig, ServerTransport};
 use crate::error::{McpError, Result};
 use crate::format::{extract_params_from_schema, format_param_list};
-use crate::transport::Transport;
-use crate::client::ToolInfo;
-use std::io::{self, Read, IsTerminal};
-use std::sync::Arc;
 use crate::ipc::ProtocolClient;
+use crate::output::{print_error, print_info, print_warning};
 use crate::parallel::{ParallelExecutor, list_tools_parallel};
-use crate::output::{print_error, print_warning, print_info};
-use crate::retry::{retry_with_backoff, RetryConfig};
+use crate::retry::{RetryConfig, retry_with_backoff};
+use crate::transport::Transport;
 use colored::Colorize;
 use futures_util::FutureExt;
+use std::io::{self, IsTerminal, Read};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
 /// Execute the list servers command.
@@ -30,7 +30,10 @@ use tokio::sync::Mutex;
 ///
 /// # Errors
 /// Returns McpError::ConfigParseError if config file is invalid
-pub async fn cmd_list_servers(mut daemon: Box<dyn ProtocolClient>, detail_level: DetailLevel) -> Result<()> {
+pub async fn cmd_list_servers(
+    mut daemon: Box<dyn ProtocolClient>,
+    detail_level: DetailLevel,
+) -> Result<()> {
     let config = daemon.config();
 
     // Empty state handling (OUTP-15)
@@ -43,22 +46,25 @@ pub async fn cmd_list_servers(mut daemon: Box<dyn ProtocolClient>, detail_level:
         println!("  {}", "mcp_servers.toml".cyan());
         println!();
         println!("Example configuration:");
-        println!("{}", r#"
+        println!(
+            "{}",
+            r#"
 [[servers]]
 name = "filesystem"
 transport = "stdio"
 command = "npx"
 args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
-"#.dimmed());
+"#
+            .dimmed()
+        );
         return Ok(());
     }
 
     // Get server names from daemon
-    let server_names = daemon.list_servers().await
-        .map_err(|e| {
-            print_error(&format!("Failed to get servers list: {}", e));
-            e
-        })?;
+    let server_names = daemon.list_servers().await.map_err(|e| {
+        print_error(&format!("Failed to get servers list: {}", e));
+        e
+    })?;
 
     // Create parallel executor with concurrency limit from config
     let executor = ParallelExecutor::new(config.concurrency_limit);
@@ -74,7 +80,9 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
                 let daemon_arc = daemon_arc.clone();
                 async move {
                     let mut daemon_guard = daemon_arc.lock().await;
-                    daemon_guard.list_tools(&server).await
+                    daemon_guard
+                        .list_tools(&server)
+                        .await
                         .map_err(|e| {
                             tracing::warn!("Failed to list tools for {}: {}", server, e);
                             e
@@ -82,12 +90,10 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
                         .map(|protocol_tools| {
                             protocol_tools
                                 .into_iter()
-                                .map(|protocol_tool| {
-                                    crate::client::ToolInfo {
-                                        name: protocol_tool.name,
-                                        description: Some(protocol_tool.description),
-                                        input_schema: protocol_tool.input_schema,
-                                    }
+                                .map(|protocol_tool| crate::client::ToolInfo {
+                                    name: protocol_tool.name,
+                                    description: Some(protocol_tool.description),
+                                    input_schema: protocol_tool.input_schema,
                                 })
                                 .collect()
                         })
@@ -102,7 +108,8 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
     // Header (OUTP-03, OUTP-04)
     let connected_count = successes.len();
     let failed_count = failures.len();
-    println!("{} {}", 
+    println!(
+        "{} {}",
         "MCP Servers".bold(),
         format!("({} connected, {} failed)", connected_count, failed_count).dimmed()
     );
@@ -114,12 +121,13 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
         // Get server info from config
         let server_config = {
             let daemon_guard = daemon_arc.lock().await;
-            daemon_guard.config().get_server(&server_name).cloned()
+            daemon_guard.config().get_server(server_name).cloned()
         };
 
         // Server header with status indicator (OUTP-13)
-        let has_filtered_tools = server_config.as_ref()
-            .map(|s| s.disabled_tools.as_ref().map_or(false, |d| !d.is_empty()))
+        let has_filtered_tools = server_config
+            .as_ref()
+            .map(|s| s.disabled_tools.as_ref().is_some_and(|d| !d.is_empty()))
             .unwrap_or(false);
 
         let status_icon = if has_filtered_tools {
@@ -129,13 +137,15 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
         };
 
         if let Some(ref server_config) = server_config {
-            println!("{} {} {}",
+            println!(
+                "{} {} {}",
                 status_icon,
                 server_name.bold(),
                 format!("({})", server_config.transport.type_name()).dimmed()
             );
         } else {
-            println!("{} {} {}",
+            println!(
+                "{} {} {}",
                 status_icon,
                 server_name.bold(),
                 "(unknown)".dimmed()
@@ -145,7 +155,10 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
 
         // Server description (OUTP-11)
         if let Some(ref server_config) = server_config {
-            let desc = server_config.description.as_deref().unwrap_or("No description");
+            let desc = server_config
+                .description
+                .as_deref()
+                .unwrap_or("No description");
             println!("Description: {}", desc);
         }
         println!("Tools: {}", tools.len());
@@ -172,7 +185,10 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
                         println!("    Usage: {} {}", tool.name, param_str.dimmed());
                     }
                     println!();
-                    println!("{}", "Use 'mcp info <server>/<tool>' for full schema".dimmed());
+                    println!(
+                        "{}",
+                        "Use 'mcp info <server>/<tool>' for full schema".dimmed()
+                    );
                 }
                 DetailLevel::WithDescriptions => {
                     // Detailed view: full descriptions and parameter details
@@ -190,17 +206,23 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
                                 } else {
                                     format!("[{}]", param.param_type)
                                 };
-                                let req_str = if param.required { "Required" } else { "Optional" };
+                                let req_str = if param.required {
+                                    "Required"
+                                } else {
+                                    "Optional"
+                                };
 
                                 if let Some(ref param_desc) = param.description {
-                                    println!("      {} {}  {}. {}",
+                                    println!(
+                                        "      {} {}  {}. {}",
                                         param.name.cyan(),
                                         type_str.dimmed(),
                                         req_str.dimmed(),
                                         param_desc
                                     );
                                 } else {
-                                    println!("      {} {}  {}",
+                                    println!(
+                                        "      {} {}  {}",
                                         param.name.cyan(),
                                         type_str.dimmed(),
                                         req_str.dimmed()
@@ -227,17 +249,23 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
                                 } else {
                                     format!("[{}]", param.param_type)
                                 };
-                                let req_str = if param.required { "Required" } else { "Optional" };
+                                let req_str = if param.required {
+                                    "Required"
+                                } else {
+                                    "Optional"
+                                };
 
                                 if let Some(ref param_desc) = param.description {
-                                    println!("      {} {}  {}. {}",
+                                    println!(
+                                        "      {} {}  {}. {}",
                                         param.name.cyan(),
                                         type_str.dimmed(),
                                         req_str.dimmed(),
                                         param_desc
                                     );
                                 } else {
-                                    println!("      {} {}  {}",
+                                    println!(
+                                        "      {} {}  {}",
                                         param.name.cyan(),
                                         type_str.dimmed(),
                                         req_str.dimmed()
@@ -246,7 +274,12 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
                             }
                         }
                         println!("    Schema:");
-                        println!("{}", serde_json::to_string_pretty(&tool.input_schema).unwrap_or_default().dimmed());
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&tool.input_schema)
+                                .unwrap_or_default()
+                                .dimmed()
+                        );
                         println!();
                     }
                 }
@@ -261,24 +294,39 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
 
     // Partial failure reporting (OUTP-18)
     if !failures.is_empty() {
-        println!("{} {}", "⚠".yellow(), format!("Connection Issues ({} servers)", failures.len()).bold());
+        println!(
+            "{} {}",
+            "⚠".yellow(),
+            format!("Connection Issues ({} servers)", failures.len()).bold()
+        );
         println!("{}", "─".repeat(50).dimmed());
         for server_name in &failures {
-            println!("  {} {}: {}", "✗".red(), server_name, "Connection failed".dimmed());
+            println!(
+                "  {} {}: {}",
+                "✗".red(),
+                server_name,
+                "Connection failed".dimmed()
+            );
         }
         println!();
     }
 
     // Filter warning
-    let has_disabled_tools = config.servers.iter().any(|s| {
-        s.disabled_tools.as_ref().map_or(false, |d| !d.is_empty())
-    });
-    let has_allowed_tools = config.servers.iter().any(|s| {
-        s.allowed_tools.as_ref().map_or(false, |a| !a.is_empty())
-    });
+    let has_disabled_tools = config
+        .servers
+        .iter()
+        .any(|s| s.disabled_tools.as_ref().is_some_and(|d| !d.is_empty()));
+    let has_allowed_tools = config
+        .servers
+        .iter()
+        .any(|s| s.allowed_tools.as_ref().is_some_and(|a| !a.is_empty()));
 
     if has_disabled_tools && !has_allowed_tools {
-        println!("{} {}", "⚠".yellow(), "Note: Some tools are disabled by configuration".dimmed());
+        println!(
+            "{} {}",
+            "⚠".yellow(),
+            "Note: Some tools are disabled by configuration".dimmed()
+        );
         println!();
     }
 
@@ -299,13 +347,12 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
 /// Returns McpError::ServerNotFound if server doesn't exist (ERR-02)
 pub async fn cmd_server_info(daemon: Box<dyn ProtocolClient>, server_name: &str) -> Result<()> {
     let config = daemon.config();
-    let server = config.get_server(server_name)
-        .ok_or_else(|| {
-            print_error(&format!("Server '{}' not found", server_name));
-            McpError::ServerNotFound {
-                server: server_name.to_string(),
-            }
-        })?;
+    let server = config.get_server(server_name).ok_or_else(|| {
+        print_error(&format!("Server '{}' not found", server_name));
+        McpError::ServerNotFound {
+            server: server_name.to_string(),
+        }
+    })?;
 
     print_info(&format!("Server: {}", server.name));
     if let Some(desc) = &server.description {
@@ -314,7 +361,12 @@ pub async fn cmd_server_info(daemon: Box<dyn ProtocolClient>, server_name: &str)
     println!("Transport: {}", server.transport.type_name());
 
     match &server.transport {
-        ServerTransport::Stdio { command, args, env, cwd } => {
+        ServerTransport::Stdio {
+            command,
+            args,
+            env,
+            cwd,
+        } => {
             println!("Command: {}", command);
             if !args.is_empty() {
                 println!("Arguments: {:?}", args);
@@ -357,30 +409,37 @@ pub async fn cmd_server_info(daemon: Box<dyn ProtocolClient>, server_name: &str)
 /// # Errors
 /// Returns McpError::ToolNotFound if tool doesn't exist (ERR-02)
 /// Returns McpError::AmbiguousCommand if tool_id format is unclear (ERR-06)
-pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, detail_level: DetailLevel) -> Result<()> {
+pub async fn cmd_tool_info(
+    mut daemon: Box<dyn ProtocolClient>,
+    tool_id: &str,
+    detail_level: DetailLevel,
+) -> Result<()> {
     let (server_name, tool_name) = parse_tool_id(tool_id)?;
 
-    let _server = daemon.config().get_server(&server_name)
-        .ok_or_else(|| {
-            print_error(&format!("Tool '{}' not found on server '{}'", tool_name, server_name));
-            McpError::ToolNotFound {
-                tool: tool_name.clone(),
-                server: server_name.clone(),
-            }
-        })?;
+    let _server = daemon.config().get_server(&server_name).ok_or_else(|| {
+        print_error(&format!(
+            "Tool '{}' not found on server '{}'",
+            tool_name, server_name
+        ));
+        McpError::ToolNotFound {
+            tool: tool_name.clone(),
+            server: server_name.clone(),
+        }
+    })?;
 
     // Send ListTools request to daemon
     let tools = daemon.list_tools(&server_name).await?;
 
-    let tool = tools.iter()
-        .find(|t| t.name == tool_name)
-        .ok_or_else(|| {
-            print_error(&format!("Tool '{}' not found on server '{}'", tool_name, server_name));
-            McpError::ToolNotFound {
-                tool: tool_name.clone(),
-                server: server_name.clone(),
-            }
-        })?;
+    let tool = tools.iter().find(|t| t.name == tool_name).ok_or_else(|| {
+        print_error(&format!(
+            "Tool '{}' not found on server '{}'",
+            tool_name, server_name
+        ));
+        McpError::ToolNotFound {
+            tool: tool_name.clone(),
+            server: server_name.clone(),
+        }
+    })?;
 
     // Get server config for transport info
     let config = daemon.config();
@@ -392,7 +451,8 @@ pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, d
     // Header with visual hierarchy
     println!("{} {}", "Tool:".bold(), tool.name.bold());
     println!("{}", "═".repeat(50).dimmed());
-    println!("{} {} {}",
+    println!(
+        "{} {} {}",
         "Server:".bold(),
         server_name,
         format!("({})", transport_name).dimmed()
@@ -422,8 +482,14 @@ pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, d
                 println!("{} {}", "Parameters:".bold(), param_str);
             }
             println!();
-            println!("{}", format!("Usage: mcp call {}/{} [args]", server_name, tool_name).dimmed());
-            println!("{}", "Use -d for parameter details, -v for full schema".dimmed());
+            println!(
+                "{}",
+                format!("Usage: mcp call {}/{} [args]", server_name, tool_name).dimmed()
+            );
+            println!(
+                "{}",
+                "Use -d for parameter details, -v for full schema".dimmed()
+            );
         }
         DetailLevel::WithDescriptions => {
             // Detailed parameter list
@@ -437,17 +503,23 @@ pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, d
                     } else {
                         format!("[{}]", param.param_type)
                     };
-                    let req_str = if param.required { "Required" } else { "Optional" };
+                    let req_str = if param.required {
+                        "Required"
+                    } else {
+                        "Optional"
+                    };
 
                     if let Some(ref param_desc) = param.description {
-                        println!("  {} {}  {}. {}",
+                        println!(
+                            "  {} {}  {}. {}",
                             param.name.cyan(),
                             type_str.dimmed(),
                             req_str.dimmed(),
                             param_desc
                         );
                     } else {
-                        println!("  {} {}  {}",
+                        println!(
+                            "  {} {}  {}",
                             param.name.cyan(),
                             type_str.dimmed(),
                             req_str.dimmed()
@@ -456,7 +528,11 @@ pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, d
                 }
             }
             println!();
-            println!("{} {}", "Usage:".bold(), format!("mcp call {}/{} '{{...}}'", server_name, tool_name));
+            println!(
+                "{} {}",
+                "Usage:".bold(),
+                format_args!("mcp call {}/{} '{{...}}'", server_name, tool_name)
+            );
         }
         DetailLevel::Verbose => {
             // Full details including schema
@@ -470,17 +546,23 @@ pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, d
                     } else {
                         format!("[{}]", param.param_type)
                     };
-                    let req_str = if param.required { "Required" } else { "Optional" };
+                    let req_str = if param.required {
+                        "Required"
+                    } else {
+                        "Optional"
+                    };
 
                     if let Some(ref param_desc) = param.description {
-                        println!("  {} {}  {}. {}",
+                        println!(
+                            "  {} {}  {}. {}",
                             param.name.cyan(),
                             type_str.dimmed(),
                             req_str.dimmed(),
                             param_desc
                         );
                     } else {
-                        println!("  {} {}  {}",
+                        println!(
+                            "  {} {}  {}",
                             param.name.cyan(),
                             type_str.dimmed(),
                             req_str.dimmed()
@@ -490,9 +572,18 @@ pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, d
             }
             println!();
             println!("{}", "JSON Schema:".bold());
-            println!("{}", serde_json::to_string_pretty(&tool.input_schema).unwrap_or_default().dimmed());
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&tool.input_schema)
+                    .unwrap_or_default()
+                    .dimmed()
+            );
             println!();
-            println!("{} {}", "Usage:".bold(), format!("mcp call {}/{} '{{...}}'", server_name, tool_name));
+            println!(
+                "{} {}",
+                "Usage:".bold(),
+                format_args!("mcp call {}/{} '{{...}}'", server_name, tool_name)
+            );
         }
     }
 
@@ -536,7 +627,11 @@ pub async fn cmd_tool_info(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, d
 /// Returns McpError::UsageError if tool is disabled (FILT-04)
 /// Returns McpError::InvalidJson if arguments parsing fails
 /// Returns error on tool execution failure
-pub async fn cmd_call_tool(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, args_json: Option<&str>) -> Result<()> {
+pub async fn cmd_call_tool(
+    mut daemon: Box<dyn ProtocolClient>,
+    tool_id: &str,
+    args_json: Option<&str>,
+) -> Result<()> {
     let (server_name, tool_name) = parse_tool_id(tool_id)?;
 
     // Check if server exists
@@ -556,7 +651,9 @@ pub async fn cmd_call_tool(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, a
         None => {
             // Read from stdin if not provided (EXEC-02)
             if std::io::stdin().is_terminal() {
-                print_error("No arguments provided. Pass JSON arguments as a command-line argument, or pipe JSON to stdin.");
+                print_error(
+                    "No arguments provided. Pass JSON arguments as a command-line argument, or pipe JSON to stdin.",
+                );
                 let available_tools = match daemon.list_tools(&server_name).await {
                     Ok(tools) => {
                         let names: Vec<String> = tools.iter().map(|t| t.name.clone()).collect();
@@ -565,7 +662,10 @@ pub async fn cmd_call_tool(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, a
                     Err(_) => "(unavailable)".to_string(),
                 };
                 println!();
-                print_info(&format!("Available tools on '{}': {}", server_name, available_tools));
+                print_info(&format!(
+                    "Available tools on '{}': {}",
+                    server_name, available_tools
+                ));
                 return Ok(());
             }
 
@@ -587,7 +687,7 @@ pub async fn cmd_call_tool(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, a
                     tool_name, server_name, patterns_str
                 ));
                 return Err(McpError::UsageError {
-                    message: format!("Tool execution blocked by disabled_tools configuration. Remove patterns from disabled_tools list to allow this tool."),
+                    message: "Tool execution blocked by disabled_tools configuration. Remove patterns from disabled_tools list to allow this tool.".to_string(),
                 });
             }
         }
@@ -612,7 +712,8 @@ pub async fn cmd_call_tool(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, a
             daemon_guard
                 .execute_tool(&server_name_clone, &tool_name_clone, arguments_clone)
                 .await
-        }).boxed()
+        })
+        .boxed()
     };
 
     // Execute with retry
@@ -625,15 +726,17 @@ pub async fn cmd_call_tool(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, a
 
             // Print success message with colored output (TASK-03)
             println!();
-            print_info(&format!("Tool '{}' executed successfully on server '{}'", tool_name, server_name));
+            print_info(&format!(
+                "Tool '{}' executed successfully on server '{}'",
+                tool_name, server_name
+            ));
 
             Ok(())
         }
         Err(McpError::MaxRetriesExceeded { attempts }) => {
             print_error(&format!(
                 "Tool execution failed after {} retry attempts. Last error: {}",
-                attempts,
-                "No additional information available"
+                attempts, "No additional information available"
             ));
             Err(McpError::MaxRetriesExceeded { attempts })
         }
@@ -665,7 +768,11 @@ pub async fn cmd_call_tool(mut daemon: Box<dyn ProtocolClient>, tool_id: &str, a
 ///
 /// # Errors
 /// Returns empty result if no tools match
-pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str, detail_level: DetailLevel) -> Result<()> {
+pub async fn cmd_search_tools(
+    mut daemon: Box<dyn ProtocolClient>,
+    pattern: &str,
+    detail_level: DetailLevel,
+) -> Result<()> {
     let config = daemon.config();
 
     // Empty pattern handling
@@ -693,11 +800,10 @@ pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str
     let executor = ParallelExecutor::new(config.concurrency_limit);
 
     // Get server names from daemon
-    let server_names = daemon.list_servers().await
-        .map_err(|e| {
-            print_error(&format!("Failed to get servers list: {}", e));
-            e
-        })?;
+    let server_names = daemon.list_servers().await.map_err(|e| {
+        print_error(&format!("Failed to get servers list: {}", e));
+        e
+    })?;
 
     // Create daemon client for parallel execution
     let daemon_arc = Arc::new(Mutex::new(daemon));
@@ -710,7 +816,9 @@ pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str
                 let daemon_arc = daemon_arc.clone();
                 async move {
                     let mut daemon_guard = daemon_arc.lock().await;
-                    daemon_guard.list_tools(&server).await
+                    daemon_guard
+                        .list_tools(&server)
+                        .await
                         .map_err(|e| {
                             tracing::warn!("Failed to list tools for {}: {}", server, e);
                             e
@@ -718,12 +826,10 @@ pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str
                         .map(|protocol_tools| {
                             protocol_tools
                                 .into_iter()
-                                .map(|protocol_tool| {
-                                    crate::client::ToolInfo {
-                                        name: protocol_tool.name,
-                                        description: Some(protocol_tool.description),
-                                        input_schema: protocol_tool.input_schema,
-                                    }
+                                .map(|protocol_tool| crate::client::ToolInfo {
+                                    name: protocol_tool.name,
+                                    description: Some(protocol_tool.description),
+                                    input_schema: protocol_tool.input_schema,
                                 })
                                 .collect()
                         })
@@ -739,13 +845,20 @@ pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str
     let pattern_obj = match glob::Pattern::new(pattern) {
         Ok(p) => p,
         Err(_) => {
-            print_warning(&format!("Invalid glob pattern '{}' - using substring matching", pattern));
+            print_warning(&format!(
+                "Invalid glob pattern '{}' - using substring matching",
+                pattern
+            ));
             glob::Pattern::new("*").unwrap()
         }
     };
 
     // Search header
-    println!("{} {}", "Search Results for".bold(), format!("'{}'", pattern).cyan());
+    println!(
+        "{} {}",
+        "Search Results for".bold(),
+        format!("'{}'", pattern).cyan()
+    );
     println!("{}", "═".repeat(50).dimmed());
 
     // Track matches across servers
@@ -757,11 +870,12 @@ pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str
         // Get server config for transport info
         let server_config = {
             let daemon_guard = daemon_arc.lock().await;
-            daemon_guard.config().get_server(&server_name).cloned()
+            daemon_guard.config().get_server(server_name).cloned()
         };
 
         // Filter matching tools
-        let matched_tools: Vec<_> = tools.iter()
+        let matched_tools: Vec<_> = tools
+            .iter()
             .filter(|tool| pattern_obj.matches(&tool.name))
             .collect();
 
@@ -779,7 +893,8 @@ pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str
                 println!();
             }
 
-            println!("{} {} {}",
+            println!(
+                "{} {} {}",
                 server_name.bold(),
                 format!("({})", transport_name).dimmed(),
                 format!("- {} tool(s)", matched_tools.len()).dimmed()
@@ -817,17 +932,23 @@ pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str
                                 } else {
                                     format!("[{}]", param.param_type)
                                 };
-                                let req_str = if param.required { "Required" } else { "Optional" };
+                                let req_str = if param.required {
+                                    "Required"
+                                } else {
+                                    "Optional"
+                                };
 
                                 if let Some(ref param_desc) = param.description {
-                                    println!("      {} {}  {}. {}",
+                                    println!(
+                                        "      {} {}  {}. {}",
                                         param.name.cyan(),
                                         type_str.dimmed(),
                                         req_str.dimmed(),
                                         param_desc
                                     );
                                 } else {
-                                    println!("      {} {}  {}",
+                                    println!(
+                                        "      {} {}  {}",
                                         param.name.cyan(),
                                         type_str.dimmed(),
                                         req_str.dimmed()
@@ -851,17 +972,23 @@ pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str
                                 } else {
                                     format!("[{}]", param.param_type)
                                 };
-                                let req_str = if param.required { "Required" } else { "Optional" };
+                                let req_str = if param.required {
+                                    "Required"
+                                } else {
+                                    "Optional"
+                                };
 
                                 if let Some(ref param_desc) = param.description {
-                                    println!("      {} {}  {}. {}",
+                                    println!(
+                                        "      {} {}  {}. {}",
                                         param.name.cyan(),
                                         type_str.dimmed(),
                                         req_str.dimmed(),
                                         param_desc
                                     );
                                 } else {
-                                    println!("      {} {}  {}",
+                                    println!(
+                                        "      {} {}  {}",
                                         param.name.cyan(),
                                         type_str.dimmed(),
                                         req_str.dimmed()
@@ -869,7 +996,12 @@ pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str
                                 }
                             }
                         }
-                        println!("    Schema: {}", serde_json::to_string(&tool.input_schema).unwrap_or_default().dimmed());
+                        println!(
+                            "    Schema: {}",
+                            serde_json::to_string(&tool.input_schema)
+                                .unwrap_or_default()
+                                .dimmed()
+                        );
                         println!();
                     }
                 }
@@ -881,25 +1013,39 @@ pub async fn cmd_search_tools(mut daemon: Box<dyn ProtocolClient>, pattern: &str
     println!();
     println!("{}", "─".repeat(50).dimmed());
     if total_matches == 0 {
-        println!("{} {}", "✗".red(), format!("No tools matching '{}' found", pattern));
+        println!(
+            "{} {}",
+            "✗".red(),
+            format_args!("No tools matching '{}' found", pattern)
+        );
         println!();
         println!("Suggestions:");
         println!("  • Try a broader pattern (e.g., '*' for all tools)");
         println!("  • Use wildcards: 'read*' for tools starting with 'read'");
         println!("  • Use '*file*' for tools containing 'file'");
     } else {
-        println!("Found {} matching tool(s) across {} server(s)",
+        println!(
+            "Found {} matching tool(s) across {} server(s)",
             total_matches.to_string().bold(),
             servers_with_matches.to_string().bold()
         );
         println!();
-        println!("{}", format!("Use 'mcp info <server>/<tool>' for detailed information").dimmed());
+        println!(
+            "{}",
+            "Use 'mcp info <server>/<tool>' for detailed information"
+                .to_string()
+                .dimmed()
+        );
     }
 
     // Partial failure reporting
     if !failures.is_empty() {
         println!();
-        println!("{} {}", "⚠".yellow(), format!("Search limited - {} server(s) unavailable", failures.len()).dimmed());
+        println!(
+            "{} {}",
+            "⚠".yellow(),
+            format!("Search limited - {} server(s) unavailable", failures.len()).dimmed()
+        );
     }
 
     Ok(())
@@ -942,7 +1088,10 @@ pub fn parse_tool_id(tool_id: &str) -> Result<(String, String)> {
 
     // Ambiguous format - suggest alternatives (ERR-06)
     Err(McpError::AmbiguousCommand {
-        hint: format!("Tool identifier '{}' is ambiguous. Use format 'server/tool' or 'server tool'.", tool_id),
+        hint: format!(
+            "Tool identifier '{}' is ambiguous. Use format 'server/tool' or 'server tool'.",
+            tool_id
+        ),
     })
 }
 
@@ -956,10 +1105,12 @@ pub fn read_stdin_async() -> Result<String> {
     let mut input = String::new();
     io::stdin()
         .read_to_string(&mut input)
-        .map_err(|e| McpError::io_error(e))?;
+        .map_err(McpError::io_error)?;
 
     if input.trim().is_empty() {
-        return Err(McpError::usage_error("Stdin is empty. Pipe JSON data or pass as command-line argument."));
+        return Err(McpError::usage_error(
+            "Stdin is empty. Pipe JSON data or pass as command-line argument.",
+        ));
     }
 
     Ok(input)
@@ -993,24 +1144,31 @@ pub fn format_and_display_result(result: &serde_json::Value, server_name: &str) 
 
         if let Some(content) = content {
             if let Some(text_array) = content.get("content").and_then(|c| c.as_array()) {
-                let text_lines: Vec<String> = text_array.iter()
+                let text_lines: Vec<String> = text_array
+                    .iter()
                     .filter_map(|item| {
                         let item_obj = item.as_object()?;
-                        item_obj.get("type")?.as_str().and_then(|t| {
-                            match t {
-                                "text" => item_obj.get("text")?.as_str().map(|s| s.to_string()),
-                                "image" => item_obj.get("data")?.as_str().map(|d| format!("(image data: {} bytes, type: unknown)", d.len())),
-                                "resource" => {
-                                    item_obj.get("uri")?.as_str().map(|u| format!("(resource: {})", u))
-                                },
-                                _ => None,
-                            }
+                        item_obj.get("type")?.as_str().and_then(|t| match t {
+                            "text" => item_obj.get("text")?.as_str().map(|s| s.to_string()),
+                            "image" => item_obj
+                                .get("data")?
+                                .as_str()
+                                .map(|d| format!("(image data: {} bytes, type: unknown)", d.len())),
+                            "resource" => item_obj
+                                .get("uri")?
+                                .as_str()
+                                .map(|u| format!("(resource: {})", u)),
+                            _ => None,
                         })
                     })
                     .collect();
 
                 if text_lines.is_empty() {
-                    println!("Result: {}", serde_json::to_string_pretty(content).unwrap_or_else(|_| result.to_string()));
+                    println!(
+                        "Result: {}",
+                        serde_json::to_string_pretty(content)
+                            .unwrap_or_else(|_| result.to_string())
+                    );
                 } else {
                     println!("Result:");
                     for line in text_lines {
@@ -1018,10 +1176,16 @@ pub fn format_and_display_result(result: &serde_json::Value, server_name: &str) 
                     }
                 }
             } else {
-                println!("Result: {}", serde_json::to_string_pretty(content).unwrap_or_else(|_| result.to_string()));
+                println!(
+                    "Result: {}",
+                    serde_json::to_string_pretty(content).unwrap_or_else(|_| result.to_string())
+                );
             }
         } else {
-            println!("Result: {}", serde_json::to_string_pretty(result).unwrap_or_else(|_| result.to_string()));
+            println!(
+                "Result: {}",
+                serde_json::to_string_pretty(result).unwrap_or_else(|_| result.to_string())
+            );
         }
     } else {
         println!("Result: {}", result);
@@ -1038,7 +1202,9 @@ pub fn format_and_display_result(result: &serde_json::Value, server_name: &str) 
 ///
 /// # Returns
 /// Result<Box<dyn Transport>> for the server
-pub fn create_transport_for_server(server: &ServerConfig) -> std::result::Result<Box<dyn Transport + Send + Sync>, McpError> {
+pub fn create_transport_for_server(
+    server: &ServerConfig,
+) -> std::result::Result<Box<dyn Transport + Send + Sync>, McpError> {
     server.create_transport(server.name.as_str())
 }
 
@@ -1068,6 +1234,9 @@ mod tests {
     fn test_parse_tool_id_ambiguous() {
         let result = parse_tool_id("ambiguous");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), McpError::AmbiguousCommand { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            McpError::AmbiguousCommand { .. }
+        ));
     }
 }

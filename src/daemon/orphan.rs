@@ -39,7 +39,7 @@ pub fn get_fingerprint_file_path(socket_path: &Path) -> PathBuf {
 /// Platform-specific implementation using native APIs.
 #[cfg(unix)]
 pub fn is_daemon_running(pid: u32) -> bool {
-    use nix::sys::signal::{kill, Signal};
+    use nix::sys::signal::{Signal, kill};
     use nix::unistd::Pid;
 
     // Send signal 0 to check if process exists
@@ -52,8 +52,8 @@ pub fn is_daemon_running(pid: u32) -> bool {
 
 #[cfg(windows)]
 pub fn is_daemon_running(pid: u32) -> bool {
-    use windows_sys::Win32::System::Threading::{GetExitCodeProcess, OpenProcess};
     use windows_sys::Win32::System::Threading::PROCESS_QUERY_INFORMATION;
+    use windows_sys::Win32::System::Threading::{GetExitCodeProcess, OpenProcess};
 
     const STILL_ACTIVE: u32 = 259;
 
@@ -128,7 +128,7 @@ pub async fn cleanup_orphaned_daemon(daemon_config: &Config, socket_path: &Path)
     // Try to connect via IPC to check if daemon is running
     let ipc_result = try_connect_via_ipc(daemon_config, socket_path);
 
-    if let Ok(client) = ipc_result {
+    if let Ok(_client) = ipc_result {
         // Daemon is running, nothing to clean up
         tracing::info!("Daemon is running, no cleanup needed");
         return Ok(());
@@ -161,20 +161,19 @@ pub async fn cleanup_orphaned_daemon(daemon_config: &Config, socket_path: &Path)
 
     // Remove PID file
     let pid_file = get_pid_file_path(socket_path);
-    if pid_file.exists() {
-        if let Err(e) = fs::remove_file(&pid_file) {
-            tracing::warn!("Failed to remove PID file: {}", e);
-        }
+    if pid_file.exists()
+        && let Err(e) = fs::remove_file(&pid_file)
+    {
+        tracing::warn!("Failed to remove PID file: {}", e);
     }
 
     // Remove fingerprint file
     let fingerprint_file = get_fingerprint_file_path(socket_path);
-    if fingerprint_file.exists() {
-        if let Err(e) = fs::remove_file(&fingerprint_file) {
-            tracing::warn!("Failed to remove fingerprint file: {}", e);
-        }
+    if fingerprint_file.exists()
+        && let Err(e) = fs::remove_file(&fingerprint_file)
+    {
+        tracing::warn!("Failed to remove fingerprint file: {}", e);
     }
-
     tracing::info!("Orphaned daemon cleanup complete");
     Ok(())
 }
@@ -182,12 +181,12 @@ pub async fn cleanup_orphaned_daemon(daemon_config: &Config, socket_path: &Path)
 /// Remove PID file
 ///
 /// Public helper for daemon shutdown cleanup
-pub fn remove_pid_file(socket_path: &PathBuf) -> Result<()> {
+pub fn remove_pid_file(socket_path: &Path) -> Result<()> {
     let pid_file = get_pid_file_path(socket_path);
-    if pid_file.exists() {
-        if let Err(e) = fs::remove_file(&pid_file) {
-            tracing::warn!("Failed to remove PID file: {}", e);
-        }
+    if pid_file.exists()
+        && let Err(e) = fs::remove_file(&pid_file)
+    {
+        tracing::warn!("Failed to remove PID file: {}", e);
     }
     Ok(())
 }
@@ -195,12 +194,12 @@ pub fn remove_pid_file(socket_path: &PathBuf) -> Result<()> {
 /// Remove fingerprint file
 ///
 /// Public helper for daemon shutdown cleanup
-pub fn remove_fingerprint_file(socket_path: &PathBuf) -> Result<()> {
+pub fn remove_fingerprint_file(socket_path: &Path) -> Result<()> {
     let fp_file = get_fingerprint_file_path(socket_path);
-    if fp_file.exists() {
-        if let Err(e) = fs::remove_file(&fp_file) {
-            tracing::warn!("Failed to remove fingerprint file: {}", e);
-        }
+    if fp_file.exists()
+        && let Err(e) = fs::remove_file(&fp_file)
+    {
+        tracing::warn!("Failed to remove fingerprint file: {}", e);
     }
     Ok(())
 }
@@ -222,7 +221,7 @@ fn try_connect_via_ipc(daemon_config: &Config, _socket_path: &Path) -> Result<()
 pub fn kill_daemon_process(pid: u32) -> Result<()> {
     #[cfg(unix)]
     {
-        use nix::sys::signal::{kill, Signal};
+        use nix::sys::signal::{Signal, kill};
         use nix::unistd::Pid;
 
         kill(Pid::from_raw(pid as i32), Signal::SIGTERM)?;
@@ -231,8 +230,8 @@ pub fn kill_daemon_process(pid: u32) -> Result<()> {
 
     #[cfg(windows)]
     {
-        use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess};
         use windows_sys::Win32::System::Threading::PROCESS_TERMINATE;
+        use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess};
 
         unsafe {
             let process_handle = OpenProcess(PROCESS_TERMINATE, 0, pid);

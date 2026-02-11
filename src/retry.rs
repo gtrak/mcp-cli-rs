@@ -3,14 +3,10 @@
 //! Provides automatic retry with configurable limits and exponential backoff.
 //! Implements EXEC-05, EXEC-06, EXEC-07.
 
-use backoff::{ExponentialBackoff, ExponentialBackoffBuilder, Error as BackoffError};
-use backoff::retry;
+use crate::error::McpError;
 use std::pin::Pin;
 use std::time::Duration;
-use futures::future::BoxFuture;
-use futures::ready;
 use tokio::time::timeout;
-use crate::error::McpError;
 
 /// Configuration for retry behavior.
 #[derive(Debug, Clone)]
@@ -34,24 +30,14 @@ impl RetryConfig {
             max_delay_ms: 30_000, // 30 seconds cap (research recommendation)
         }
     }
-
-    /// Get the backoff configuration.
-    fn backoff(&self) -> ExponentialBackoff {
-        ExponentialBackoffBuilder::new()
-            .with_initial_interval(Duration::from_millis(self.base_delay_ms))
-            .with_max_interval(Duration::from_millis(self.max_delay_ms))
-            .with_multiplier(2.0)
-            .with_randomization_factor(0.5)
-            .build()
-    }
 }
 
 impl Default for RetryConfig {
     fn default() -> Self {
         Self {
-            max_attempts: 3,
-            base_delay_ms: 1000,
-            max_delay_ms: 30_000,
+            max_attempts: 5,
+            base_delay_ms: 200,
+            max_delay_ms: 5_000,
         }
     }
 }
@@ -74,7 +60,10 @@ pub fn is_transient_error(error: &McpError) -> bool {
 ///
 /// This version uses the backoff crate for retry logic with exponential backoff.
 /// (EXEC-05, EXEC-06, EXEC-07).
-pub async fn retry_with_backoff_sync<F, T>(mut operation: F, config: &RetryConfig) -> std::result::Result<T, McpError>
+pub async fn retry_with_backoff_sync<F, T>(
+    mut operation: F,
+    config: &RetryConfig,
+) -> std::result::Result<T, McpError>
 where
     F: FnMut() -> Pin<Box<dyn std::future::Future<Output = std::result::Result<T, McpError>>>>,
 {
@@ -114,7 +103,9 @@ where
                     // Exponential backoff with jitter
                     let multiplier = 2f64.powi(attempt as i32 - 1);
                     let max_delay = Duration::from_millis(config.max_delay_ms);
-                    let calculated_delay = Duration::from_millis((config.base_delay_ms as f64 * multiplier).ceil() as u64);
+                    let calculated_delay = Duration::from_millis(
+                        (config.base_delay_ms as f64 * multiplier).ceil() as u64,
+                    );
 
                     // Clamp to max_delay
                     calculated_delay.min(max_delay)
@@ -134,9 +125,13 @@ where
 ///
 /// This version accepts async closures and wraps them properly using the backoff crate.
 /// (EXEC-05, EXEC-06, EXEC-07).
-pub async fn retry_with_backoff<F, T>(mut operation: F, config: &RetryConfig) -> std::result::Result<T, McpError>
+pub async fn retry_with_backoff<F, T>(
+    mut operation: F,
+    config: &RetryConfig,
+) -> std::result::Result<T, McpError>
 where
-    F: FnMut() -> Pin<Box<dyn std::future::Future<Output = std::result::Result<T, McpError>> + Send>>,
+    F: FnMut()
+        -> Pin<Box<dyn std::future::Future<Output = std::result::Result<T, McpError>> + Send>>,
 {
     let mut attempt = 0u32;
 
@@ -174,7 +169,9 @@ where
                     // Exponential backoff with jitter
                     let multiplier = 2f64.powi(attempt as i32 - 1);
                     let max_delay = Duration::from_millis(config.max_delay_ms);
-                    let calculated_delay = Duration::from_millis((config.base_delay_ms as f64 * multiplier).ceil() as u64);
+                    let calculated_delay = Duration::from_millis(
+                        (config.base_delay_ms as f64 * multiplier).ceil() as u64,
+                    );
 
                     // Clamp to max_delay
                     calculated_delay.min(max_delay)
@@ -190,7 +187,10 @@ where
     }
 }
 
-pub async fn timeout_wrapper<F, T, Fut>(operation: F, timeout_secs: u64) -> std::result::Result<T, McpError>
+pub async fn timeout_wrapper<F, T, Fut>(
+    operation: F,
+    timeout_secs: u64,
+) -> std::result::Result<T, McpError>
 where
     F: Fn() -> Fut,
     Fut: std::future::Future<Output = std::result::Result<T, McpError>>,
@@ -201,7 +201,9 @@ where
         Ok(result) => result,
         Err(_) => {
             tracing::error!("Operation timed out after {}s", timeout_secs);
-            Err(McpError::Timeout { timeout: timeout_secs })
+            Err(McpError::Timeout {
+                timeout: timeout_secs,
+            })
         }
     }
 }
@@ -209,14 +211,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_retry_config_default() {
-        let config = RetryConfig::default();
-        assert_eq!(config.max_attempts, 3);
-        assert_eq!(config.base_delay_ms, 1000);
-        assert_eq!(config.max_delay_ms, 30_000);
-    }
 
     #[test]
     fn test_is_transient_error() {

@@ -12,15 +12,15 @@ pub trait ConnectionPoolInterface: Send + Sync {
     /// Execute a tool on a server
     fn execute_tool(
         &self,
-        server_name: &str,
-        tool_name: &str,
-        arguments: serde_json::Value,
+        _server_name: &str,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
     ) -> serde_json::Value {
         serde_json::Value::Null
     }
 
     /// List available tools on a server
-    fn list_tools(&self, server_name: &str) -> Vec<ToolInfo> {
+    fn list_tools(&self, _server_name: &str) -> Vec<ToolInfo> {
         vec![]
     }
 
@@ -31,6 +31,7 @@ pub trait ConnectionPoolInterface: Send + Sync {
 }
 
 /// Dummy connection pool for stub implementation
+#[derive(Default)]
 pub struct DummyConnectionPool;
 
 impl DummyConnectionPool {

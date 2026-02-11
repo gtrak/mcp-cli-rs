@@ -73,7 +73,8 @@ impl Transport for HttpTransport {
         }
 
         // Send POST request
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("Content-Type", "application/json")
             .headers(headers)
@@ -83,16 +84,16 @@ impl Transport for HttpTransport {
             .await
             .map_err(|e| {
                 // Check for HTTP errors
-                if let Some(status) = e.status() {
-                    if status.is_client_error() || status.is_server_error() {
-                        return McpError::ConnectionError {
-                            server: "http".to_string(),
-                            source: std::io::Error::new(
-                                std::io::ErrorKind::InvalidInput,
-                                format!("HTTP {}", status),
-                            ),
-                        };
-                    }
+                if let Some(status) = e.status()
+                    && (status.is_client_error() || status.is_server_error())
+                {
+                    return McpError::ConnectionError {
+                        server: "http".to_string(),
+                        source: std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            format!("HTTP {}", status),
+                        ),
+                    };
                 }
                 McpError::InvalidProtocol {
                     message: format!("HTTP request failed: {}", e),
@@ -100,14 +101,13 @@ impl Transport for HttpTransport {
             })?;
 
         // Parse response JSON
-        let response_json: serde_json::Value = response
-            .json()
-            .await
-            .map_err(|e| {
-                McpError::InvalidProtocol {
+        let response_json: serde_json::Value =
+            response
+                .json()
+                .await
+                .map_err(|e| McpError::InvalidProtocol {
                     message: format!("Failed to parse response: {}", e),
-                }
-            })?;
+                })?;
 
         Ok(response_json)
     }
@@ -116,16 +116,17 @@ impl Transport for HttpTransport {
         // Convert HashMap to HeaderMap
         let mut headers = HeaderMap::new();
         for (key, value) in &self.headers {
-            headers.insert(key.parse::<HeaderName>().unwrap(), value.parse::<HeaderValue>().unwrap());
+            headers.insert(
+                key.parse::<HeaderName>().unwrap(),
+                value.parse::<HeaderValue>().unwrap(),
+            );
         }
 
         // Send notification without expecting response
-        let body = serde_json::to_string(&notification).map_err(|e| {
-            McpError::InvalidProtocol {
-                message: format!("Failed to serialize notification: {}", e),
-            }
+        let body = serde_json::to_string(&notification).map_err(|e| McpError::InvalidProtocol {
+            message: format!("Failed to serialize notification: {}", e),
         })?;
-        
+
         self.client
             .post(&self.base_url)
             .header("Content-Type", "application/json")
@@ -136,23 +137,20 @@ impl Transport for HttpTransport {
             .await
             .map_err(|e| {
                 // Check for HTTP errors
-                if let Some(status) = e.status() {
-                    if status.is_client_error() || status.is_server_error() {
-                        return McpError::ConnectionError {
-                            server: "http".to_string(),
-                            source: std::io::Error::new(
-                                std::io::ErrorKind::InvalidInput,
-                                format!("HTTP {}: {}", status, e.to_string()),
-                            ),
-                        };
-                    }
+                if let Some(status) = e.status()
+                    && (status.is_client_error() || status.is_server_error())
+                {
+                    return McpError::ConnectionError {
+                        server: "http".to_string(),
+                        source: std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            format!("HTTP {}: {}", status, e),
+                        ),
+                    };
                 }
                 McpError::ConnectionError {
                     server: "http".to_string(),
-                    source: std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("HTTP error: {}", e),
-                    ),
+                    source: std::io::Error::other(format!("HTTP error: {}", e)),
                 }
             })?;
 
@@ -170,16 +168,18 @@ impl Transport for HttpTransport {
         // Convert HashMap to HeaderMap
         let mut headers = HeaderMap::new();
         for (key, value) in &self.headers {
-            headers.insert(key.parse::<HeaderName>().unwrap(), value.parse::<HeaderValue>().unwrap());
+            headers.insert(
+                key.parse::<HeaderName>().unwrap(),
+                value.parse::<HeaderValue>().unwrap(),
+            );
         }
 
         // Send request and expect HTTP 200 OK
-        let body = serde_json::to_string(&request).map_err(|e| {
-            McpError::InvalidProtocol {
-                message: format!("Failed to serialize request: {}", e),
-            }
+        let body = serde_json::to_string(&request).map_err(|e| McpError::InvalidProtocol {
+            message: format!("Failed to serialize request: {}", e),
         })?;
-        let response = self.client
+        let response = self
+            .client
             .post(&self.base_url)
             .header("Content-Type", "application/json")
             .headers(headers)
@@ -189,16 +189,16 @@ impl Transport for HttpTransport {
             .await
             .map_err(|e| {
                 // Check for HTTP errors
-                if let Some(status) = e.status() {
-                    if status.is_client_error() || status.is_server_error() {
-                        return McpError::ConnectionError {
-                            server: "http".to_string(),
-                            source: std::io::Error::new(
-                                std::io::ErrorKind::InvalidInput,
-                                format!("HTTP {}", status),
-                            ),
-                        };
-                    }
+                if let Some(status) = e.status()
+                    && (status.is_client_error() || status.is_server_error())
+                {
+                    return McpError::ConnectionError {
+                        server: "http".to_string(),
+                        source: std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            format!("HTTP {}", status),
+                        ),
+                    };
                 }
                 McpError::InvalidProtocol {
                     message: format!("HTTP request failed: {}", e),
@@ -227,7 +227,6 @@ impl Transport for HttpTransport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
 
     #[test]
     fn test_http_transport_creation() {
@@ -235,15 +234,4 @@ mod tests {
         let transport = HttpTransport::new("http://example.com/api", headers);
         assert_eq!(transport.base_url, "http://example.com/api");
     }
-
-    #[test]
-    fn test_http_send() {
-        let headers = HashMap::new();
-        let mut transport = HttpTransport::new("http://example.com/api", headers);
-        let request = json!({ "test": "data" });
-        // This would need a real server to test properly
-        // transport.send(request).await.unwrap();
-        println!("HttpTransport send structure works");
-    }
 }
-

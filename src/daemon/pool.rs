@@ -6,13 +6,13 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use crate::config::Config;
-use crate::error::Result;
-use crate::error::McpError;
-use crate::transport::{Transport, BoxedTransport};
 use crate::daemon::protocol::ToolInfo;
+use crate::error::McpError;
+use crate::error::Result;
+use crate::transport::{BoxedTransport, Transport};
 
 /// Represents a pooled MCP server connection with metadata for tracking.
 pub struct PooledConnection {
@@ -66,7 +66,10 @@ impl ConnectionPool {
             tracing::debug!("Connection is unhealthy, discarding");
         }
 
-        tracing::debug!("No existing connection, creating new one for: {}", server_name);
+        tracing::debug!(
+            "No existing connection, creating new one for: {}",
+            server_name
+        );
         drop(connections); // Release lock before creating transport
 
         let transport = self.create_transport(server_name)?;
@@ -88,11 +91,24 @@ impl ConnectionPool {
     }
 
     /// Execute a tool using cached or new connection
-    pub async fn execute(&self, server_name: &str, tool_name: &str, arguments: serde_json::Value) -> Result<serde_json::Value> {
-        tracing::debug!("execute() called for server: {}, tool: {}", server_name, tool_name);
+    pub async fn execute(
+        &self,
+        server_name: &str,
+        tool_name: &str,
+        arguments: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        tracing::debug!(
+            "execute() called for server: {}, tool: {}",
+            server_name,
+            tool_name
+        );
         let mut conn = match self.take(server_name).await? {
             Some(c) => c,
-            None => return Err(McpError::ServerNotFound { server: server_name.to_string() }),
+            None => {
+                return Err(McpError::ServerNotFound {
+                    server: server_name.to_string(),
+                });
+            }
         };
         tracing::debug!("Got connection, initializing MCP connection");
 
@@ -116,9 +132,11 @@ impl ConnectionPool {
         });
 
         // Send initialize and get response
-        conn.transport.send(init_request).await
-            .map_err(|e| McpError::InvalidProtocol { 
-                message: format!("Initialize request failed: {}", e) 
+        conn.transport
+            .send(init_request)
+            .await
+            .map_err(|e| McpError::InvalidProtocol {
+                message: format!("Initialize request failed: {}", e),
             })?;
 
         // Send initialized notification
@@ -126,10 +144,12 @@ impl ConnectionPool {
             "jsonrpc": "2.0",
             "method": "notifications/initialized"
         });
-        
-        conn.transport.send_notification(initialized_notification).await
-            .map_err(|e| McpError::InvalidProtocol { 
-                message: format!("Failed to send initialized notification: {}", e) 
+
+        conn.transport
+            .send_notification(initialized_notification)
+            .await
+            .map_err(|e| McpError::InvalidProtocol {
+                message: format!("Failed to send initialized notification: {}", e),
             })?;
 
         tracing::debug!("MCP connection initialized, sending tools/call request");
@@ -146,13 +166,22 @@ impl ConnectionPool {
                 if let Some(result) = response.get("result") {
                     Ok(result.clone())
                 } else if let Some(error) = response.get("error") {
-                    let msg = error.get("message").and_then(|m| m.as_str()).unwrap_or("Unknown");
-                    Err(McpError::InvalidProtocol { message: format!("Tool error: {}", msg) })
+                    let msg = error
+                        .get("message")
+                        .and_then(|m| m.as_str())
+                        .unwrap_or("Unknown");
+                    Err(McpError::InvalidProtocol {
+                        message: format!("Tool error: {}", msg),
+                    })
                 } else {
-                    Err(McpError::InvalidProtocol { message: "Invalid response".to_string() })
+                    Err(McpError::InvalidProtocol {
+                        message: "Invalid response".to_string(),
+                    })
                 }
             }
-            Err(e) => Err(McpError::InvalidProtocol { message: format!("Transport error: {}", e) })
+            Err(e) => Err(McpError::InvalidProtocol {
+                message: format!("Transport error: {}", e),
+            }),
         };
 
         self.put_back(conn);
@@ -164,7 +193,11 @@ impl ConnectionPool {
         tracing::debug!("list_tools() called for server: {}", server_name);
         let mut conn = match self.take(server_name).await? {
             Some(c) => c,
-            None => return Err(McpError::ServerNotFound { server: server_name.to_string() }),
+            None => {
+                return Err(McpError::ServerNotFound {
+                    server: server_name.to_string(),
+                });
+            }
         };
         tracing::debug!("Got connection, initializing MCP connection");
 
@@ -188,9 +221,11 @@ impl ConnectionPool {
         });
 
         // Send initialize and get response
-        conn.transport.send(init_request).await
-            .map_err(|e| McpError::InvalidProtocol { 
-                message: format!("Initialize request failed: {}", e) 
+        conn.transport
+            .send(init_request)
+            .await
+            .map_err(|e| McpError::InvalidProtocol {
+                message: format!("Initialize request failed: {}", e),
             })?;
 
         // Send initialized notification
@@ -198,10 +233,12 @@ impl ConnectionPool {
             "jsonrpc": "2.0",
             "method": "notifications/initialized"
         });
-        
-        conn.transport.send_notification(initialized_notification).await
-            .map_err(|e| McpError::InvalidProtocol { 
-                message: format!("Failed to send initialized notification: {}", e) 
+
+        conn.transport
+            .send_notification(initialized_notification)
+            .await
+            .map_err(|e| McpError::InvalidProtocol {
+                message: format!("Failed to send initialized notification: {}", e),
             })?;
 
         tracing::debug!("MCP connection initialized, sending tools/list request");
@@ -216,26 +253,46 @@ impl ConnectionPool {
             Ok(response) => {
                 tracing::debug!("Got response: {:?}", response);
                 if let Some(result) = response.get("result") {
-                    let tools: Vec<ToolInfo> = if let Some(tools_array) = result.get("tools").and_then(|t| t.as_array()) {
-                        tools_array.iter().filter_map(|tool| {
-                            let name = tool.get("name")?.as_str()?.to_string();
-                            let description = tool.get("description")?.as_str()?.to_string();
-                            let input_schema = tool.get("inputSchema").cloned()
-                                .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::new()));
-                            Some(ToolInfo { name, description, input_schema })
-                        }).collect()
+                    let tools: Vec<ToolInfo> = if let Some(tools_array) =
+                        result.get("tools").and_then(|t| t.as_array())
+                    {
+                        tools_array
+                            .iter()
+                            .filter_map(|tool| {
+                                let name = tool.get("name")?.as_str()?.to_string();
+                                let description = tool.get("description")?.as_str()?.to_string();
+                                let input_schema =
+                                    tool.get("inputSchema").cloned().unwrap_or_else(|| {
+                                        serde_json::Value::Object(serde_json::Map::new())
+                                    });
+                                Some(ToolInfo {
+                                    name,
+                                    description,
+                                    input_schema,
+                                })
+                            })
+                            .collect()
                     } else {
                         Vec::new()
                     };
                     Ok(tools)
                 } else if let Some(error) = response.get("error") {
-                    let msg = error.get("message").and_then(|m| m.as_str()).unwrap_or("Unknown");
-                    Err(McpError::InvalidProtocol { message: format!("List error: {}", msg) })
+                    let msg = error
+                        .get("message")
+                        .and_then(|m| m.as_str())
+                        .unwrap_or("Unknown");
+                    Err(McpError::InvalidProtocol {
+                        message: format!("List error: {}", msg),
+                    })
                 } else {
-                    Err(McpError::InvalidProtocol { message: "Invalid response".to_string() })
+                    Err(McpError::InvalidProtocol {
+                        message: "Invalid response".to_string(),
+                    })
                 }
             }
-            Err(e) => Err(McpError::InvalidProtocol { message: format!("Transport error: {}", e) })
+            Err(e) => Err(McpError::InvalidProtocol {
+                message: format!("Transport error: {}", e),
+            }),
         };
 
         self.put_back(conn);
@@ -244,9 +301,14 @@ impl ConnectionPool {
 
     fn create_transport(&self, server_name: &str) -> Result<BoxedTransport> {
         tracing::debug!("Creating transport for server: {}", server_name);
-        let server_config = self.config.servers.iter()
+        let server_config = self
+            .config
+            .servers
+            .iter()
             .find(|s| s.name.as_str() == server_name)
-            .ok_or_else(|| McpError::ServerNotFound { server: server_name.to_string() })?;
+            .ok_or_else(|| McpError::ServerNotFound {
+                server: server_name.to_string(),
+            })?;
 
         tracing::debug!("Found server config: name={}", server_config.name);
         let result = server_config.create_transport(server_name);
@@ -254,12 +316,10 @@ impl ConnectionPool {
             Ok(_) => tracing::debug!("Transport created successfully"),
             Err(e) => tracing::debug!("Transport creation failed: {}", e),
         }
-        result.map_err(|e|
-            McpError::ConnectionError {
-                server: server_name.to_string(),
-                source: std::io::Error::new(std::io::ErrorKind::Other, e.to_string()),
-            }
-        )
+        result.map_err(|e| McpError::ConnectionError {
+            server: server_name.to_string(),
+            source: std::io::Error::other(e.to_string()),
+        })
     }
 
     pub fn clear(&self) {
@@ -286,7 +346,9 @@ impl ConnectionPoolInterface for ConnectionPool {
         if let Some(conn) = self.take(server_name).await? {
             Ok(conn.transport)
         } else {
-            Err(McpError::ServerNotFound { server: server_name.to_string() })
+            Err(McpError::ServerNotFound {
+                server: server_name.to_string(),
+            })
         }
     }
 
@@ -304,10 +366,14 @@ impl ConnectionPoolInterface for ConnectionPool {
     }
 }
 
-pub struct DummyConnectionPool { count: usize }
+pub struct DummyConnectionPool {
+    count: usize,
+}
 
 impl DummyConnectionPool {
-    pub fn new() -> Self { DummyConnectionPool { count: 0 } }
+    pub fn new() -> Self {
+        DummyConnectionPool { count: 0 }
+    }
 }
 
 impl DummyConnectionPool {
@@ -317,28 +383,42 @@ impl DummyConnectionPool {
     }
     pub fn remove(&self, _server_name: &str) {}
     pub fn clear(&self) {}
-    pub fn count(&self) -> usize { self.count }
+    pub fn count(&self) -> usize {
+        self.count
+    }
 }
 
 impl Default for DummyConnectionPool {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 struct DummyTransport;
 
 #[async_trait]
 impl crate::transport::Transport for DummyTransport {
-    async fn send(&mut self, _request: serde_json::Value) -> crate::error::Result<serde_json::Value> {
+    async fn send(
+        &mut self,
+        _request: serde_json::Value,
+    ) -> crate::error::Result<serde_json::Value> {
         Ok(serde_json::json!({"result": "success"}))
     }
-    async fn send_notification(&mut self, _notification: serde_json::Value) -> crate::error::Result<()> {
+    async fn send_notification(
+        &mut self,
+        _notification: serde_json::Value,
+    ) -> crate::error::Result<()> {
         Ok(())
     }
     async fn receive_notification(&mut self) -> crate::error::Result<serde_json::Value> {
         Ok(serde_json::json!({"method": "notifications/initialized"}))
     }
-    async fn ping(&self) -> crate::error::Result<()> { Ok(()) }
-    fn transport_type(&self) -> &str { "dummy" }
+    async fn ping(&self) -> crate::error::Result<()> {
+        Ok(())
+    }
+    fn transport_type(&self) -> &str {
+        "dummy"
+    }
 }
 
 #[cfg(test)]

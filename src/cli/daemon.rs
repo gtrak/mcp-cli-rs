@@ -13,108 +13,6 @@ use crate::config::Config;
 use crate::daemon::fingerprint::calculate_fingerprint;
 use crate::daemon::orphan::{cleanup_orphaned_daemon, write_daemon_pid};
 use crate::ipc::ProtocolClient;
-use crate::error::McpError;
-
-// NOTE: These functions are implemented in src/main.rs instead
-// They are commented out here to avoid compilation errors
-
-/*
-/// Run in auto-daemon mode: spawn if needed, execute command, daemon auto-shutdowns after TTL
-pub async fn run_auto_daemon_mode(
-    cli: &Cli,
-    config: Arc<Config>,
-) -> Result<()> {
-    // Check if daemon is running
-    let socket_path = crate::ipc::get_socket_path();
-
-    match try_connect_to_daemon(config.clone(), &socket_path).await {
-        Ok(client) => {
-            // Daemon is running, use it
-            tracing::info!("Using existing daemon");
-            execute_command(cli, client).await
-        }
-        Err(_) => {
-            // Daemon not running, spawn it
-            tracing::info!("Daemon not running, spawning...");
-
-            // Resolve TTL with priority: CLI > env > config > default
-            let ttl = resolve_ttl(cli, &config);
-
-            // Spawn daemon as background task
-            let config_clone = Arc::clone(&config);
-            tokio::spawn(async move {
-                if let Err(e) = spawn_background_daemon(config_clone, ttl).await {
-                    tracing::error!("Failed to spawn daemon: {}", e);
-                }
-            });
-
-            // Wait for daemon to start
-            tokio::time::sleep(Duration::from_millis(500)).await;
-
-            // Connect and execute
-            let client = try_connect_to_daemon(config, &socket_path).await
-                .map_err(|e| {
-                    McpError::config_read(
-                        std::path::Path::new("."),
-                        std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e))
-                    ).into()
-                })?;
-
-            execute_command(cli, client).await
-        }
-    }
-}
-
-/// Resolve daemon TTL with priority: CLI flag > env var > config > default
-///
-/// Priority order:
-/// 1. CLI flag (if provided by Daemon subcommand)
-/// 2. Environment variable: MCP_DAEMON_TTL
-/// 3. Configuration file: daemon_ttl field
-/// 4. Default: 60 seconds
-fn resolve_ttl(cli: &Cli, config: &Config) -> u64 {
-    // Check if TTL is specified via CLI (Daemon subcommand)
-    if let Some(Commands::Daemon { ttl }) = &cli.command {
-        return *ttl;
-    }
-
-    // Check if TTL is set via environment variable
-    if let Ok(ttl_str) = std::env::var("MCP_DAEMON_TTL") {
-        if let Ok(ttl) = ttl_str.parse::<u64>() {
-            return ttl;
-        }
-    }
-
-    // Use TTL from configuration file
-    config.daemon_ttl
-}
-
-/// Run in require-daemon mode: fail if daemon not running
-pub async fn run_require_daemon_mode(
-    cli: &Cli,
-    config: Arc<Config>,
-) -> Result<()> {
-    let socket_path = crate::ipc::get_socket_path();
-
-    match try_connect_to_daemon(config.clone(), &socket_path).await {
-        Ok(client) => {
-            tracing::info!("Using existing daemon");
-            execute_command(cli, client).await
-        }
-            Err(_) => {
-                Err(McpError::DaemonNotRunning {
-                    message: "Daemon is not running. Start it with 'mcp daemon' or use --auto-daemon".to_string(),
-                })
-            }
-    }
-}
-*/
-
-async fn try_connect_to_daemon(config: Arc<Config>, socket_path: &Path) -> Result<Box<dyn ProtocolClient>> {
-    Ok(crate::ipc::create_ipc_client(config)?)
-}
-
-// async fn spawn_background_daemon and execute_command are implemented in main.rs instead
 
 /// Ensure daemon is running with fresh config.
 ///
@@ -149,7 +47,9 @@ pub async fn ensure_daemon(daemon_config: Arc<Config>) -> Result<Box<dyn Protoco
             // Request fingerprint from existing daemon
             let request = crate::daemon::protocol::DaemonRequest::GetConfigFingerprint;
             match client.send_request(&request).await {
-                Ok(crate::daemon::protocol::DaemonResponse::ConfigFingerprint(daemon_fingerprint)) => {
+                Ok(crate::daemon::protocol::DaemonResponse::ConfigFingerprint(
+                    daemon_fingerprint,
+                )) => {
                     tracing::debug!("Daemon fingerprint: {}", daemon_fingerprint);
                     tracing::debug!("Local fingerprint: {}", fingerprint);
 
@@ -164,7 +64,7 @@ pub async fn ensure_daemon(daemon_config: Arc<Config>) -> Result<Box<dyn Protoco
                             tracing::warn!("Failed to shutdown stale daemon: {}", e);
                         }
                         // Spawn new daemon and wait for startup
-                        let new_client = spawn_daemon_and_wait(daemon_config.clone(), &fingerprint).await?;
+                        spawn_daemon_and_wait(daemon_config.clone(), &fingerprint).await?;
                         // Connect to newly spawned daemon
                         connect_to_daemon(daemon_config, &socket_path).await
                     }
@@ -172,13 +72,16 @@ pub async fn ensure_daemon(daemon_config: Arc<Config>) -> Result<Box<dyn Protoco
                 Ok(other_response) => {
                     tracing::warn!("Unexpected response from daemon: {:?}", other_response);
                     // Treat as stale, spawn new daemon
-                    let new_client = spawn_daemon_and_wait(daemon_config.clone(), &fingerprint).await?;
+                    spawn_daemon_and_wait(daemon_config.clone(), &fingerprint).await?;
                     connect_to_daemon(daemon_config, &socket_path).await
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to get fingerprint from daemon: {}, spawning new daemon", e);
+                    tracing::warn!(
+                        "Failed to get fingerprint from daemon: {}, spawning new daemon",
+                        e
+                    );
                     // Treat as stale, spawn new daemon
-                    let new_client = spawn_daemon_and_wait(daemon_config.clone(), &fingerprint).await?;
+                    spawn_daemon_and_wait(daemon_config.clone(), &fingerprint).await?;
                     connect_to_daemon(daemon_config, &socket_path).await
                 }
             }
@@ -186,7 +89,7 @@ pub async fn ensure_daemon(daemon_config: Arc<Config>) -> Result<Box<dyn Protoco
         Err(_) => {
             tracing::info!("Daemon not running, spawning new daemon...");
             // Spawn new daemon and wait for startup
-            let new_client = spawn_daemon_and_wait(daemon_config.clone(), &fingerprint).await?;
+            spawn_daemon_and_wait(daemon_config.clone(), &fingerprint).await?;
             // Connect to newly spawned daemon
             connect_to_daemon(daemon_config, &socket_path).await
         }
@@ -197,7 +100,7 @@ pub async fn ensure_daemon(daemon_config: Arc<Config>) -> Result<Box<dyn Protoco
 ///
 /// Finds the daemon binary and spawns it with the current config path.
 /// Waits up to 5 seconds for the daemon to start accepting connections.
-async fn spawn_daemon_and_wait(daemon_config: Arc<Config>, fingerprint: &str) -> Result<()> {
+async fn spawn_daemon_and_wait(daemon_config: Arc<Config>, _fingerprint: &str) -> Result<()> {
     // Get current executable path and daemon binary path
     let current_exe = std::env::current_exe()?;
     let daemonexe_path = if cfg!(windows) {
@@ -251,7 +154,10 @@ async fn spawn_daemon_and_wait(daemon_config: Arc<Config>, fingerprint: &str) ->
 ///
 /// Attempts to connect to the daemon at the socket path.
 /// Returns an IPC client wrapper connected to the daemon.
-async fn connect_to_daemon(config: Arc<Config>, _socket_path: &Path) -> Result<Box<dyn ProtocolClient>> {
+async fn connect_to_daemon(
+    config: Arc<Config>,
+    _socket_path: &Path,
+) -> Result<Box<dyn ProtocolClient>> {
     let client = crate::ipc::create_ipc_client(config)?;
     Ok(client)
 }
@@ -259,7 +165,11 @@ async fn connect_to_daemon(config: Arc<Config>, _socket_path: &Path) -> Result<B
 /// Wait for daemon to start accepting connections.
 ///
 /// Retries connection with exponential backoff until timeout.
-async fn wait_for_daemon_startup(config: Arc<Config>, socket_path: &Path, timeout: Duration) -> Result<Box<dyn ProtocolClient>> {
+async fn wait_for_daemon_startup(
+    config: Arc<Config>,
+    socket_path: &Path,
+    timeout: Duration,
+) -> Result<Box<dyn ProtocolClient>> {
     let start = std::time::Instant::now();
     let mut retry_delay = Duration::from_millis(100);
 
@@ -308,7 +218,10 @@ pub async fn shutdown_daemon(daemon_config: Arc<Config>) -> Result<()> {
         }
         Err(e) => {
             // If daemon is already dead or connection fails, that's okay
-            tracing::warn!("Failed to send shutdown request (daemon may already be gone): {}", e);
+            tracing::warn!(
+                "Failed to send shutdown request (daemon may already be gone): {}",
+                e
+            );
             Ok(())
         }
     }

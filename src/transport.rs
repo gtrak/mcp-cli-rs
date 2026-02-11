@@ -56,10 +56,7 @@ pub trait TransportFactory: Send + Sync {
     ///
     /// This method is implemented for ServerTransport enum to create stdio or
     /// HTTP transport instances based on the configuration.
-    fn create_transport(
-        &self,
-        server_name: &str,
-    ) -> Box<dyn Transport + Send + Sync>;
+    fn create_transport(&self, server_name: &str) -> Box<dyn Transport + Send + Sync>;
 
     /// Check if transport requires tool filtering support (Phase 4).
     fn supports_filtering(&self) -> bool {
@@ -74,8 +71,6 @@ pub type BoxedTransport = Box<dyn Transport + Send + Sync>;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_transport_type() {
         // This is a placeholder test - actual transport implementations will be in stdio.rs and http.rs

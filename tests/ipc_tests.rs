@@ -5,11 +5,11 @@
 
 #[cfg(test)]
 mod ipc_tests {
+    use mcp_cli_rs::daemon::protocol::{DaemonRequest, DaemonResponse};
+    use mcp_cli_rs::ipc;
     use std::path::PathBuf;
     use std::time::Duration;
-    use mcp_cli_rs::daemon::protocol::{DaemonRequest, DaemonResponse};
-    use tokio::time::{timeout, sleep};
-    use tokio::task::JoinError;
+    use tokio::time::timeout;
 
     /// Get a temporary socket/pipe path for testing
     fn get_test_socket_path() -> PathBuf {
@@ -33,17 +33,14 @@ mod ipc_tests {
         let socket_path = get_test_socket_path();
 
         // Create IPC server
-        let mut server = mcp_cli_rs::ipc::create_ipc_server(&socket_path)
-            .expect("Failed to create IPC server");
+        let server = ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
 
         // Spawn server task
         let server_handle = tokio::spawn(async move {
-            let (mut stream, _addr) = match timeout(Duration::from_secs(5), server.accept()).await {
-                Ok(result) => {
-                    match result {
-                        Ok(stream) => stream,
-                        Err(e) => panic!("Server accept failed: {}", e),
-                    }
+            let (stream, _addr) = match timeout(Duration::from_secs(5), server.accept()).await {
+                Ok(result) => match result {
+                    Ok(stream) => stream,
+                    Err(e) => panic!("Server accept failed: {}", e),
                 },
                 Err(e) => panic!("Server accept timed out: {}", e),
             };
@@ -71,7 +68,8 @@ mod ipc_tests {
 
         // Send request and get response
         let request = DaemonRequest::Ping;
-        let response = client.send_request(&request)
+        let response = client
+            .send_request(&request)
             .await
             .expect("Failed to send request");
 
@@ -94,18 +92,15 @@ mod ipc_tests {
         let socket_path = get_test_socket_path();
 
         // Create IPC server
-        let mut server = mcp_cli_rs::ipc::create_ipc_server(&socket_path)
-            .expect("Failed to create IPC server");
+        let server = ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
 
         // Spawn server task to handle multiple connections
         let server_handle = tokio::spawn(async move {
             for _ in 0..3 {
-                let (mut stream, _addr) = match timeout(Duration::from_secs(5), server.accept()).await {
-                    Ok(result) => {
-                        match result {
-                            Ok(stream) => stream,
-                            Err(e) => panic!("Server accept failed: {}", e),
-                        }
+                let (stream, _addr) = match timeout(Duration::from_secs(5), server.accept()).await {
+                    Ok(result) => match result {
+                        Ok(stream) => stream,
+                        Err(e) => panic!("Server accept failed: {}", e),
                     },
                     Err(e) => panic!("Server accept timed out: {}", e),
                 };
@@ -143,8 +138,8 @@ mod ipc_tests {
         let socket_path = get_test_socket_path();
 
         // Create IPC server
-        let mut server = mcp_cli_rs::ipc::create_ipc_server(&socket_path)
-            .expect("Failed to create IPC server");
+        let server =
+            mcp_cli_rs::ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
 
         // Create large JSON object (simulating tool response with big content)
         let large_content = serde_json::json!({
@@ -155,12 +150,10 @@ mod ipc_tests {
 
         // Spawn server task
         let server_handle = tokio::spawn(async move {
-            let (mut stream, _addr) = match timeout(Duration::from_secs(10), server.accept()).await {
-                Ok(result) => {
-                    match result {
-                        Ok(stream) => stream,
-                        Err(e) => panic!("Server accept failed: {}", e),
-                    }
+            let (stream, _addr) = match timeout(Duration::from_secs(10), server.accept()).await {
+                Ok(result) => match result {
+                    Ok(stream) => stream,
+                    Err(e) => panic!("Server accept failed: {}", e),
                 },
                 Err(e) => panic!("Server accept timed out: {}", e),
             };
@@ -185,7 +178,8 @@ mod ipc_tests {
 
         // Send ping request
         let request = DaemonRequest::Ping;
-        let response = client.send_request(&request)
+        let response = client
+            .send_request(&request)
             .await
             .expect("Failed to send request");
 

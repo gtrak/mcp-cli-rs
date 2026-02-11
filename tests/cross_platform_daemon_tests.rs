@@ -5,28 +5,9 @@
 //!
 //! XP-04: Validates daemon works on Linux, macOS, Windows
 
-use std::fs;
-use std::path::PathBuf;
-use std::time::Duration;
 use mcp_cli_rs::daemon::protocol::{DaemonRequest, DaemonResponse};
-use mcp_cli_rs::ipc::IpcClient; // Import IpcClient trait
-use tokio::time::{timeout, sleep};
-
-/// Get a temporary socket/pipe path for testing
-fn get_test_socket_path() -> PathBuf {
-    #[cfg(unix)]
-    {
-        let mut path = std::env::temp_dir();
-        path.push(format!("mcp-test-{}.sock", std::process::id()));
-        path
-    }
-    #[cfg(windows)]
-    {
-        let mut path = std::env::temp_dir();
-        path.push(format!("\\\\.\\pipe\\mcp-test-{}", std::process::id()));
-        path
-    }
-}
+use mcp_cli_rs::ipc::IpcClient;
+use std::path::PathBuf; // Import IpcClient trait
 
 /// Get a temporary Unix socket path specifically for testing
 #[cfg(unix)]
@@ -49,8 +30,10 @@ async fn test_unix_socket_creation() {
     let socket_path = get_unix_test_socket_path();
 
     // Verify socket path format
-    assert!(socket_path.to_string_lossy().contains(".sock"),
-             "Unix socket path should end with .sock");
+    assert!(
+        socket_path.to_string_lossy().contains(".sock"),
+        "Unix socket path should end with .sock"
+    );
 
     // Verify parent directory can be created
     let mut path = socket_path.clone();
@@ -59,8 +42,10 @@ async fn test_unix_socket_creation() {
     }
 
     // Verify socket file doesn't exist yet
-    assert!(!socket_path.exists(),
-             "Socket file should not exist before creation");
+    assert!(
+        !socket_path.exists(),
+        "Socket file should not exist before creation"
+    );
 
     // Clean up
     let _ = std::fs::remove_file(&socket_path);
@@ -73,17 +58,25 @@ async fn test_windows_named_pipe_creation() {
     let pipe_name = get_windows_test_pipe_name();
 
     // Verify pipe name format (should start with \\.\\pipe\\)
-    assert!(pipe_name.starts_with(r"\\.\pipe\"),
-             "Named pipe name should start with \\.\\pipe\\");
+    assert!(
+        pipe_name.starts_with(r"\\.\pipe\"),
+        "Named pipe name should start with \\.\\pipe\\"
+    );
 
     // Verify pipe name is unique (includes PID)
     let pid = std::process::id().to_string();
-    assert!(pipe_name.contains(&pid),
-             "Named pipe name should include process ID");
+    assert!(
+        pipe_name.contains(&pid),
+        "Named pipe name should include process ID"
+    );
 
     // Verify pipe name contains only valid characters
-    assert!(pipe_name.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '\\' || c == '-'),
-             "Named pipe name should contain only valid characters");
+    assert!(
+        pipe_name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '.' || c == '\\' || c == '-'),
+        "Named pipe name should contain only valid characters"
+    );
 }
 
 /// Test Unix socket client-server roundtrip (Linux/macOS)
@@ -93,17 +86,15 @@ async fn test_unix_socket_client_server_roundtrip() {
     let socket_path = get_unix_test_socket_path();
 
     // Create IPC server
-    let mut server = mcp_cli_rs::ipc::create_ipc_server(&socket_path)
-        .expect("Failed to create IPC server");
+    let mut server =
+        mcp_cli_rs::ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
 
     // Spawn server task
     let server_handle = tokio::spawn(async move {
         let (mut stream, _addr) = match timeout(Duration::from_secs(5), server.accept()).await {
-            Ok(result) => {
-                match result {
-                    Ok(stream) => stream,
-                    Err(e) => panic!("Server accept failed: {}", e),
-                }
+            Ok(result) => match result {
+                Ok(stream) => stream,
+                Err(e) => panic!("Server accept failed: {}", e),
             },
             Err(e) => panic!("Server accept timed out: {}", e),
         };
@@ -115,8 +106,11 @@ async fn test_unix_socket_client_server_roundtrip() {
             .expect("Failed to receive request");
 
         // Verify we got a Ping request
-        assert!(matches!(request, DaemonRequest::Ping),
-                 "Expected Ping request, got {:?}", request);
+        assert!(
+            matches!(request, DaemonRequest::Ping),
+            "Expected Ping request, got {:?}",
+            request
+        );
 
         // Send response
         let response = DaemonResponse::Pong;
@@ -132,13 +126,17 @@ async fn test_unix_socket_client_server_roundtrip() {
 
     // Send request and get response
     let request = DaemonRequest::Ping;
-    let response = client.send_request(&request)
+    let response = client
+        .send_request(&request)
         .await
         .expect("Failed to send request");
 
     // Verify response
-    assert!(matches!(response, DaemonResponse::Pong),
-             "Expected Pong response, got {:?}", response);
+    assert!(
+        matches!(response, DaemonResponse::Pong),
+        "Expected Pong response, got {:?}",
+        response
+    );
 
     // Wait for server to complete
     server_handle.await.expect("Server task failed to join");
@@ -154,18 +152,16 @@ async fn test_unix_socket_multiple_concurrent_connections() {
     let socket_path = get_unix_test_socket_path();
 
     // Create IPC server
-    let mut server = mcp_cli_rs::ipc::create_ipc_server(&socket_path)
-        .expect("Failed to create IPC server");
+    let mut server =
+        mcp_cli_rs::ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
 
     // Spawn server task handling 3 concurrent connections
     let server_handle = tokio::spawn(async move {
         for _ in 0..3 {
             let (mut stream, _addr) = match timeout(Duration::from_secs(5), server.accept()).await {
-                Ok(result) => {
-                    match result {
-                        Ok(stream) => stream,
-                        Err(e) => panic!("Server accept failed: {}", e),
-                    }
+                Ok(result) => match result {
+                    Ok(stream) => stream,
+                    Err(e) => panic!("Server accept failed: {}", e),
                 },
                 Err(e) => panic!("Server accept timed out: {}", e),
             };
@@ -177,8 +173,11 @@ async fn test_unix_socket_multiple_concurrent_connections() {
                 .expect("Failed to receive request");
 
             // Verify Ping request
-            assert!(matches!(request, DaemonRequest::Ping),
-                     "Expected Ping request, got {:?}", request);
+            assert!(
+                matches!(request, DaemonRequest::Ping),
+                "Expected Ping request, got {:?}",
+                request
+            );
 
             // Send response
             let response = DaemonResponse::Pong;
@@ -189,15 +188,19 @@ async fn test_unix_socket_multiple_concurrent_connections() {
     });
 
     // Create IPC client and send 3 concurrent requests
-            let config = mcp_cli_rs::config::Config::default();
-        let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
-            .expect("Failed to create IPC client");
-        let request = DaemonRequest::Ping;
-        let response = client.send_request(&request)
-            .await
-            .expect("Failed to send request");
-        assert!(matches!(response, DaemonResponse::Pong),
-                 "Expected Pong response for client {}", i);
+    let config = mcp_cli_rs::config::Config::default();
+    let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
+        .expect("Failed to create IPC client");
+    let request = DaemonRequest::Ping;
+    let response = client
+        .send_request(&request)
+        .await
+        .expect("Failed to send request");
+    assert!(
+        matches!(response, DaemonResponse::Pong),
+        "Expected Pong response for client {}",
+        i
+    );
 
     // Clean up socket file (Unix only)
     #[cfg(unix)]
@@ -208,7 +211,6 @@ async fn test_unix_socket_multiple_concurrent_connections() {
     }
 }
 
-
 /// Test Unix socket large message transfer (Linux/macOS)
 #[cfg(unix)]
 #[tokio::test]
@@ -216,8 +218,8 @@ async fn test_unix_socket_large_message_transfer() {
     let socket_path = get_unix_test_socket_path();
 
     // Create IPC server
-    let mut server = mcp_cli_rs::ipc::create_ipc_server(&socket_path)
-        .expect("Failed to create IPC server");
+    let mut server =
+        mcp_cli_rs::ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
 
     // Create large JSON object (100KB text as in plan)
     let large_content = serde_json::json!({
@@ -229,11 +231,9 @@ async fn test_unix_socket_large_message_transfer() {
     // Spawn server task
     let server_handle = tokio::spawn(async move {
         let (mut stream, _addr) = match timeout(Duration::from_secs(10), server.accept()).await {
-            Ok(result) => {
-                match result {
-                    Ok(stream) => stream,
-                    Err(e) => panic!("Server accept failed: {}", e),
-                }
+            Ok(result) => match result {
+                Ok(stream) => stream,
+                Err(e) => panic!("Server accept failed: {}", e),
             },
             Err(e) => panic!("Server accept timed out: {}", e),
         };
@@ -258,7 +258,8 @@ async fn test_unix_socket_large_message_transfer() {
 
     // Send ping request
     let request = DaemonRequest::Ping;
-    let response = client.send_request(&request)
+    let response = client
+        .send_request(&request)
         .await
         .expect("Failed to send request");
 
@@ -282,22 +283,23 @@ async fn test_unix_socket_cleanup_on_removal() {
     let socket_path = get_unix_test_socket_path();
 
     // Create IPC server
-    let server = mcp_cli_rs::ipc::create_ipc_server(&socket_path)
-        .expect("Failed to create IPC server");
+    let server =
+        mcp_cli_rs::ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
 
     // Remove socket path manually
     std::fs::remove_file(&socket_path).expect("Failed to remove socket file");
 
     // Verify socket is gone
-    assert!(!socket_path.exists(),
-             "Socket file should be removed");
+    assert!(!socket_path.exists(), "Socket file should be removed");
 
     // Create server again at same path - should handle stale file gracefully
     let server2 = mcp_cli_rs::ipc::create_ipc_server(&socket_path)
         .expect("Failed to create server after cleanup");
 
-    assert!(server2.listener.local_addr().is_ok(),
-             "Server should be able to bind to cleaned path");
+    assert!(
+        server2.listener.local_addr().is_ok(),
+        "Server should be able to bind to cleaned path"
+    );
 
     // Clean up
     let _ = std::fs::remove_file(&socket_path);
@@ -310,21 +312,22 @@ async fn test_unix_socket_stale_error_handling() {
     let socket_path = get_unix_test_socket_path();
 
     // Create IPC server
-    let mut server = mcp_cli_rs::ipc::create_ipc_server(&socket_path)
-        .expect("Failed to create IPC server");
+    let mut server =
+        mcp_cli_rs::ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
 
     // Spawn server task
     let server_handle = tokio::spawn(async move {
         // Try to accept connection - should handle errors
         let result = server.accept().await;
         // Connection should fail (stale socket)
-        assert!(result.is_err(),
-                 "Accept should fail on stale socket");
+        assert!(result.is_err(), "Accept should fail on stale socket");
 
         if let Err(e) = result {
             // Should be an IpcError type
-            assert!(matches!(e, mcp_cli_rs::error::McpError::IpcError(_)),
-                     "Should be IpcError type");
+            assert!(
+                matches!(e, mcp_cli_rs::error::McpError::IpcError(_)),
+                "Should be IpcError type"
+            );
         }
     });
 
@@ -342,14 +345,8 @@ async fn test_windows_named_pipe_server_creation() {
     let pipe_name = get_windows_test_pipe_name();
 
     // Create IPC server
-    let mut server = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
+    let _server = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
         .expect("Failed to create IPC server");
-
-    // Verify server was created
-    assert!(true, "IPC server created successfully");
-
-    // Clean up pipe by creating it with reject_remote_clients
-    // (pipe will be cleaned up when server drops)
 }
 
 /// Test Windows named pipe client-server roundtrip
@@ -361,8 +358,8 @@ async fn test_windows_named_pipe_client_server_roundtrip() {
     let pipe_name = pipe_path.to_string_lossy().to_string();
 
     // Create IPC server
-    let mut server = mcp_cli_rs::ipc::create_ipc_server(&pipe_path)
-        .expect("Failed to create IPC server");
+    let _server =
+        mcp_cli_rs::ipc::create_ipc_server(&pipe_path).expect("Failed to create IPC server");
 
     // Spawn server task
     let server_handle = tokio::spawn(async move {
@@ -373,7 +370,9 @@ async fn test_windows_named_pipe_client_server_roundtrip() {
             .expect("Failed to create named pipe");
 
         // Wait for client connection
-        server_instance.connect().await
+        server_instance
+            .connect()
+            .await
             .expect("Failed to connect named pipe");
 
         // Server now has the pipe stream
@@ -385,8 +384,11 @@ async fn test_windows_named_pipe_client_server_roundtrip() {
             .expect("Failed to receive request");
 
         // Verify we got a Ping request
-        assert!(matches!(request, DaemonRequest::Ping),
-                 "Expected Ping request, got {:?}", request);
+        assert!(
+            matches!(request, DaemonRequest::Ping),
+            "Expected Ping request, got {:?}",
+            request
+        );
 
         // Send response
         let response = DaemonResponse::Pong;
@@ -402,13 +404,17 @@ async fn test_windows_named_pipe_client_server_roundtrip() {
 
     // Send request and get response
     let request = DaemonRequest::Ping;
-    let response = client.send_request(&request)
+    let response = client
+        .send_request(&request)
         .await
         .expect("Failed to send request");
 
     // Verify response
-    assert!(matches!(response, DaemonResponse::Pong),
-             "Expected Pong response, got {:?}", response);
+    assert!(
+        matches!(response, DaemonResponse::Pong),
+        "Expected Pong response, got {:?}",
+        response
+    );
 
     // Wait for server to complete
     server_handle.await.expect("Server task failed to join");
@@ -423,8 +429,8 @@ async fn test_windows_named_pipe_multiple_concurrent_connections() {
     let pipe_name = pipe_path.to_string_lossy().to_string();
 
     // Create IPC server
-    let mut server = mcp_cli_rs::ipc::create_ipc_server(&pipe_path)
-        .expect("Failed to create IPC server");
+    let _server =
+        mcp_cli_rs::ipc::create_ipc_server(&pipe_path).expect("Failed to create IPC server");
 
     // Spawn server task handling 3 concurrent connections
     let server_handle = tokio::spawn(async move {
@@ -436,7 +442,9 @@ async fn test_windows_named_pipe_multiple_concurrent_connections() {
                 .expect("Failed to create named pipe");
 
             // Wait for client connection
-            server_instance.connect().await
+            server_instance
+                .connect()
+                .await
                 .expect("Failed to connect named pipe");
 
             // Read request - wrap in BufReader for AsyncBufRead requirement
@@ -446,8 +454,11 @@ async fn test_windows_named_pipe_multiple_concurrent_connections() {
                 .expect("Failed to receive request");
 
             // Verify Ping request
-            assert!(matches!(request, DaemonRequest::Ping),
-                     "Expected Ping request, got {:?}", request);
+            assert!(
+                matches!(request, DaemonRequest::Ping),
+                "Expected Ping request, got {:?}",
+                request
+            );
 
             // Send response
             let response = DaemonResponse::Pong;
@@ -458,16 +469,20 @@ async fn test_windows_named_pipe_multiple_concurrent_connections() {
     });
 
     // Create IPC client and send 3 concurrent requests
-        for i in 0..3 {
-            let config = mcp_cli_rs::config::Config::default();
-            let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
-                .expect("Failed to create IPC client");
+    for i in 0..3 {
+        let config = mcp_cli_rs::config::Config::default();
+        let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
+            .expect("Failed to create IPC client");
         let request = DaemonRequest::Ping;
-        let response = client.send_request(&request)
+        let response = client
+            .send_request(&request)
             .await
             .expect("Failed to send request");
-        assert!(matches!(response, DaemonResponse::Pong),
-                 "Expected Pong response for client {}", i);
+        assert!(
+            matches!(response, DaemonResponse::Pong),
+            "Expected Pong response for client {}",
+            i
+        );
     }
 
     // Wait for server to complete
@@ -483,8 +498,8 @@ async fn test_windows_named_pipe_large_message_transfer() {
     let pipe_name = pipe_path.to_string_lossy().to_string();
 
     // Create IPC server
-    let mut server = mcp_cli_rs::ipc::create_ipc_server(&pipe_path)
-        .expect("Failed to create IPC server");
+    let _server =
+        mcp_cli_rs::ipc::create_ipc_server(&pipe_path).expect("Failed to create IPC server");
 
     // Create large JSON object (100KB text as in plan)
     let large_content = serde_json::json!({
@@ -502,7 +517,9 @@ async fn test_windows_named_pipe_large_message_transfer() {
             .expect("Failed to create named pipe");
 
         // Wait for client connection
-        server_instance.connect().await
+        server_instance
+            .connect()
+            .await
             .expect("Failed to connect named pipe");
 
         // Read request - wrap in BufReader for AsyncBufRead requirement
@@ -525,7 +542,8 @@ async fn test_windows_named_pipe_large_message_transfer() {
 
     // Send ping request
     let request = DaemonRequest::Ping;
-    let response = client.send_request(&request)
+    let response = client
+        .send_request(&request)
         .await
         .expect("Failed to send request");
 
@@ -546,7 +564,7 @@ async fn test_windows_named_pipe_security_flags() {
     let pipe_name = get_windows_test_pipe_name();
 
     // Create IPC server
-    let mut server = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
+    let _server = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
         .expect("Failed to create IPC server");
 
     // Spawn server task that checks connection properties
@@ -558,8 +576,10 @@ async fn test_windows_named_pipe_security_flags() {
             .expect("Failed to create named pipe");
 
         // Verify connection was made (this means local connection was accepted)
-        assert!(server_instance.connect().await.is_ok(),
-                 "Should accept local connections");
+        assert!(
+            server_instance.connect().await.is_ok(),
+            "Should accept local connections"
+        );
 
         // Try to disconnect and recreate to verify flags persist
         // (Flags are applied per-connection, but server implementation should respect them)
@@ -573,7 +593,8 @@ async fn test_windows_named_pipe_security_flags() {
 
     // Send request
     let request = DaemonRequest::Ping;
-    let _response = client.send_request(&request)
+    let _response = client
+        .send_request(&request)
         .await
         .expect("Failed to send request");
 
@@ -589,7 +610,7 @@ async fn test_windows_named_pipe_cleanup_on_shutdown() {
     let pipe_name_clone = pipe_name.clone();
 
     // Create IPC server
-    let mut server = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
+    let _server = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
         .expect("Failed to create IPC server");
 
     // Spawn server task that creates pipe and immediately drops it
@@ -609,9 +630,8 @@ async fn test_windows_named_pipe_cleanup_on_shutdown() {
     server_handle.await.expect("Server task failed to join");
 
     // Create IPC server again at same pipe name - should succeed
-    let server2 = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
+    let _server2 = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
         .expect("Failed to create server after cleanup");
-    assert!(true, "Server created successfully");
 }
 
 /// Test IpcServer trait methods work identically across platforms
@@ -626,8 +646,10 @@ async fn test_ipc_server_trait_consistency() {
             .expect("Failed to create UnixIpcServer");
 
         // Verify trait methods are implemented
-        assert!(server.listener.local_addr().is_ok(),
-                 "UnixIpcServer should have local_addr method");
+        assert!(
+            server.listener.local_addr().is_ok(),
+            "UnixIpcServer should have local_addr method"
+        );
 
         // Clean up
         let _ = std::fs::remove_file(&socket_path);
@@ -638,12 +660,14 @@ async fn test_ipc_server_trait_consistency() {
     {
         let pipe_name = get_windows_test_pipe_name();
 
-        let server = mcp_cli_rs::ipc::windows::NamedPipeIpcServer::new(&PathBuf::from(&pipe_name))
+        let _server = mcp_cli_rs::ipc::windows::NamedPipeIpcServer::new(&PathBuf::from(&pipe_name))
             .expect("Failed to create NamedPipeIpcServer");
 
         // Verify trait methods are implemented
-        assert!(!"temp_pipe_name".is_empty(),
-                 "NamedPipeIpcServer should have pipe_name method");
+        assert!(
+            !pipe_name.is_empty(),
+            "NamedPipeIpcServer should have pipe_name method"
+        );
     }
 }
 
@@ -659,21 +683,25 @@ async fn test_ipc_client_trait_consistency() {
         let client = mcp_cli_rs::ipc::UnixIpcClient::new(std::sync::Arc::new(config));
 
         // Verify trait methods are implemented
-        assert!(client.config().is_empty(),
-                 "UnixIpcClient should have config method");
+        assert!(
+            client.config().is_empty(),
+            "UnixIpcClient should have config method"
+        );
     }
 
     // Test on Windows
     #[cfg(windows)]
     {
-        let pipe_name = get_windows_test_pipe_name();
         let config = mcp_cli_rs::config::Config::default();
 
-        let client = mcp_cli_rs::ipc::windows::NamedPipeIpcClient::with_config(std::sync::Arc::new(config));
+        let client =
+            mcp_cli_rs::ipc::windows::NamedPipeIpcClient::with_config(std::sync::Arc::new(config));
 
         // Verify trait methods are implemented
-        assert!(client.config().is_empty(),
-                 "NamedPipeIpcClient should have config method");
+        assert!(
+            client.config().is_empty(),
+            "NamedPipeIpcClient should have config method"
+        );
     }
 }
 
@@ -688,31 +716,38 @@ async fn test_ndjson_protocol_consistency() {
 
         // Serialize to NDJSON (one-line JSON)
         let serialized = serde_json::to_string(&request).unwrap();
-        assert!(!serialized.contains("\n"),
-                 "Serialized request should be single line");
+        assert!(
+            !serialized.contains("\n"),
+            "Serialized request should be single line"
+        );
 
         // Deserialize back
         let deserialized: DaemonRequest = serde_json::from_str(&serialized).unwrap();
-        assert!(matches!(deserialized, DaemonRequest::ListServers),
-                 "Expected ListServers request, got {:?}", deserialized);
+        assert!(
+            matches!(deserialized, DaemonRequest::ListServers),
+            "Expected ListServers request, got {:?}",
+            deserialized
+        );
     }
 
     // Test on Windows
     #[cfg(windows)]
     {
-        let pipe_name = get_windows_test_pipe_name();
         let request = DaemonRequest::ListServers;
 
         // Serialize to NDJSON (one-line JSON)
         let serialized = serde_json::to_string(&request).unwrap();
-        assert!(!serialized.contains("\n"),
-                 "Serialized request should be single line");
+        assert!(
+            !serialized.contains("\n"),
+            "Serialized request should be single line"
+        );
 
         // Deserialize back
         let deserialized: DaemonRequest = serde_json::from_str(&serialized).unwrap();
-        assert!(matches!(deserialized, DaemonRequest::ListServers),
-                 "Expected ListServers request, got {:?}", deserialized);
+        assert!(
+            matches!(deserialized, DaemonRequest::ListServers),
+            "Expected ListServers request, got {:?}",
+            deserialized
+        );
     }
 }
-
-

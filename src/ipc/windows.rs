@@ -100,7 +100,7 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
         tracing::debug!("IPC: Connecting to pipe at {:?}", pipe_path);
 
         // Connect to daemon
-        let mut stream = self.connect(&pipe_path).await?;
+        let stream = self.connect(&pipe_path).await?;
         tracing::debug!("IPC: Connected to pipe");
 
         // Split stream for reading and writing

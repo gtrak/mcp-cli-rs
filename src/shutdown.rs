@@ -3,8 +3,8 @@
 //! Provides cross-platform signal handling for SIGINT/SIGTERM (Unix)
 //! and Ctrl+C (Windows). Implements CLI-04.
 
-use tokio::sync::broadcast;
 use tokio::signal;
+use tokio::sync::broadcast;
 
 /// Graceful shutdown handler for signals.
 ///
@@ -34,7 +34,7 @@ impl GracefulShutdown {
     /// Listens for SIGINT/SIGTERM on Unix and Ctrl+C on Windows.
     /// Sends shutdown signal when received.
     pub fn spawn_signal_listener(&self) {
-        let mut shutdown_tx = self.shutdown_tx.clone();
+        let shutdown_tx = self.shutdown_tx.clone();
 
         tokio::spawn(async move {
             #[cfg(unix)]
@@ -42,10 +42,10 @@ impl GracefulShutdown {
                 use tokio::signal::unix::{self, SignalKind};
 
                 // Setup signal handlers for POSIX systems
-                let mut sigint = unix::signal(SignalKind::interrupt())
-                    .expect("Failed to setup SIGINT handler");
-                let mut sigterm = unix::signal(SignalKind::terminate())
-                    .expect("Failed to setup SIGTERM handler");
+                let mut sigint =
+                    unix::signal(SignalKind::interrupt()).expect("Failed to setup SIGINT handler");
+                let mut sigterm =
+                    unix::signal(SignalKind::terminate()).expect("Failed to setup SIGTERM handler");
 
                 tokio::select! {
                     _ = sigint.recv() => {
@@ -81,10 +81,7 @@ impl GracefulShutdown {
     ///
     /// Returns true if shutdown signal was sent.
     pub fn is_shutdown_requested(&mut self) -> bool {
-        match self.shutdown_rx.try_recv() {
-            Ok(value) => value,
-            Err(_) => false,
-        }
+        self.shutdown_rx.try_recv().unwrap_or_default()
     }
 }
 
@@ -117,7 +114,10 @@ impl Default for GracefulShutdown {
 ///     shutdown.subscribe(),
 /// ).await?;
 /// ```
-pub async fn run_with_graceful_shutdown<F, T, Fut>(op: F, mut shutdown_rx: broadcast::Receiver<bool>) -> crate::error::Result<T>
+pub async fn run_with_graceful_shutdown<F, T, Fut>(
+    op: F,
+    mut shutdown_rx: broadcast::Receiver<bool>,
+) -> crate::error::Result<T>
 where
     F: Fn() -> Fut,
     Fut: std::future::Future<Output = crate::error::Result<T>>,

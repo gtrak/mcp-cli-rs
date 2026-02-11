@@ -5,13 +5,15 @@
 //!
 //! XP-04: Validates daemon lifecycle works consistently on Linux, macOS, Windows
 
-use mcp_cli_rs::config::loader::{find_and_load, load_config};
-use mcp_cli_rs::ipc::IpcClient;
+use std::sync::Arc;
+
 use mcp_cli_rs::config::Config;
+use mcp_cli_rs::config::loader::load_config;
 use mcp_cli_rs::daemon::fingerprint::calculate_fingerprint;
 use mcp_cli_rs::daemon::orphan::{cleanup_orphaned_daemon, read_daemon_pid, write_daemon_pid};
+use mcp_cli_rs::ipc::IpcClient;
 use tempfile::TempDir;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 /// Create a config from content.
 fn create_config_from_content(content: &str) -> Config {
@@ -41,11 +43,12 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
     let socket_path = mcp_cli_rs::ipc::get_socket_path();
 
     // Clean up orphaned daemon
-    let _ = cleanup_orphaned_daemon(&config, &socket_path);
+    cleanup_orphaned_daemon(&config, &socket_path)
+        .await
+        .expect("Orphan cleanup failed");
 
     // Start daemon (this would spawn mcp-daemon binary)
     // In tests, we verify the IPC mechanism works for daemon startup
-    let config_arc = std::sync::Arc::new(config.clone());
 
     // Simulate daemon startup by checking socket path exists and is ready
     // (In production, this would use ensure_daemon)
@@ -58,26 +61,36 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
         false
     };
 
-    assert!(socket_exists || cfg!(target_os = "linux") || cfg!(target_os = "macos") || cfg!(target_os = "windows"),
-             "Socket/pipe path should be valid");
+    assert!(
+        socket_exists
+            || cfg!(target_os = "linux")
+            || cfg!(target_os = "macos")
+            || cfg!(target_os = "windows"),
+        "Socket/pipe path should be valid"
+    );
 
     // Create IPC client to verify connection
     let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config.clone()))
         .expect("Failed to create IPC client");
 
     // Send Ping request
-    let response = client.send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
+    let response = client
+        .send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
         .await
         .expect("Failed to send request");
 
     // Verify Pong response
-    assert!(matches!(response, mcp_cli_rs::daemon::protocol::DaemonResponse::Pong),
-             "Expected Pong response on daemon startup");
+    assert!(
+        matches!(response, mcp_cli_rs::daemon::protocol::DaemonResponse::Pong),
+        "Expected Pong response on daemon startup"
+    );
 
     // Verify config is accessible
     let config_fingerprint = calculate_fingerprint(&config);
-    assert!(!config_fingerprint.is_empty(),
-             "Config fingerprint should be generated");
+    assert!(
+        !config_fingerprint.is_empty(),
+        "Config fingerprint should be generated"
+    );
 }
 
 /// Test daemon idle timeout (60-second default) - shortened to 2 seconds for tests
@@ -95,7 +108,9 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
     let socket_path = mcp_cli_rs::ipc::get_socket_path();
 
     // Clean up orphaned daemon
-    let _ = cleanup_orphaned_daemon(&std::sync::Arc::new(config.clone()), &socket_path);
+    cleanup_orphaned_daemon(&std::sync::Arc::new(config.clone()), &socket_path)
+        .await
+        .expect("Orphan cleanup failed");
 
     // Create IPC client
     let config_arc = std::sync::Arc::new(config.clone());
@@ -103,12 +118,15 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
         .expect("Failed to create IPC client");
 
     // Send Ping request (active connection)
-    let response = client.send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
+    let response = client
+        .send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
         .await
         .expect("Failed to send request");
 
-    assert!(matches!(response, mcp_cli_rs::daemon::protocol::DaemonResponse::Pong),
-             "Should respond to Ping when actively connected");
+    assert!(
+        matches!(response, mcp_cli_rs::daemon::protocol::DaemonResponse::Pong),
+        "Should respond to Ping when actively connected"
+    );
 
     // Simulate idle state by waiting
     // Note: Real daemon idle timeout is 60 seconds, tests verify mechanism exists
@@ -118,16 +136,19 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
     // In real daemon, after 60 seconds of no activity, daemon should terminate
 
     // Verify that we can connect again (simulating daemon restart after timeout)
-    let mut new_client = mcp_cli_rs::ipc::create_ipc_client(config_arc)
-        .expect("Failed to create IPC client");
+    let mut new_client =
+        mcp_cli_rs::ipc::create_ipc_client(config_arc).expect("Failed to create IPC client");
 
     // Send request
-    let response = new_client.send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
+    let response = new_client
+        .send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
         .await
         .expect("Failed to send request");
 
-    assert!(matches!(response, mcp_cli_rs::daemon::protocol::DaemonResponse::Pong),
-             "Daemon should respond after idle timeout");
+    assert!(
+        matches!(response, mcp_cli_rs::daemon::protocol::DaemonResponse::Pong),
+        "Daemon should respond after idle timeout"
+    );
 }
 
 /// Test orphaned daemon cleanup on startup
@@ -158,25 +179,24 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
 
     // Write fake PID
     let fake_pid = std::process::id() - 12345; // Older PID
-    write_daemon_pid(&pid_file, fake_pid)
-        .expect("Failed to write stale PID file");
+    write_daemon_pid(&pid_file, fake_pid).expect("Failed to write stale PID file");
 
     // Verify stale PID exists
     let stale_pid = read_daemon_pid(&pid_file).expect("Failed to read PID file");
-    assert_eq!(stale_pid, fake_pid,
-             "Stale PID file should be readable");
+    assert_eq!(stale_pid, fake_pid, "Stale PID file should be readable");
 
     // Clean up orphaned daemon
     let cleanup_result = cleanup_orphaned_daemon(&config, &pid_file).await;
 
     // Cleanup should handle the stale PID gracefully
-    assert!(cleanup_result.is_ok() || cleanup_result.is_err(),
-             "Cleanup should not crash");
+    assert!(
+        cleanup_result.is_ok() || cleanup_result.is_err(),
+        "Cleanup should not crash"
+    );
 
     // Verify stale PID is gone
     let result = read_daemon_pid(&pid_file);
-    assert!(result.is_err(),
-             "Stale PID file should be cleaned up");
+    assert!(result.is_err(), "Stale PID file should be cleaned up");
 
     // Clean up test files
     if cfg!(unix) {
@@ -208,24 +228,30 @@ transport = { type = "stdio", command = "cat" }
     let fp2 = calculate_fingerprint(&config2);
 
     // Verify fingerprints are different
-    assert_ne!(fp1, fp2,
-             "Different configs should have different fingerprints");
+    assert_ne!(
+        fp1, fp2,
+        "Different configs should have different fingerprints"
+    );
 
     // Verify same config has same fingerprint
     let fp1_again = calculate_fingerprint(&config1);
-    assert_eq!(fp1, fp1_again,
-             "Same config should have same fingerprint");
+    assert_eq!(fp1, fp1_again, "Same config should have same fingerprint");
 
     // Simulate config change detection
     // In production, ensure_daemon compares fingerprints and restarts if different
 
     // When config changes, daemon should restart with new config
-    assert!(!fp1.is_empty() && !fp2.is_empty(),
-             "Fingerprints should be generated");
+    assert!(
+        !fp1.is_empty() && !fp2.is_empty(),
+        "Fingerprints should be generated"
+    );
 
     // Verify fingerprint format (SHA256 hex string)
-    assert_eq!(fp1.len(), 64,
-             "Fingerprint should be 64 hex characters (SHA256)");
+    assert_eq!(
+        fp1.len(),
+        64,
+        "Fingerprint should be 64 hex characters (SHA256)"
+    );
 }
 
 /// Test daemon graceful shutdown
@@ -243,7 +269,9 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
     let socket_path = mcp_cli_rs::ipc::get_socket_path();
 
     // Clean up orphaned daemon
-    let _ = cleanup_orphaned_daemon(&config, &socket_path);
+    cleanup_orphaned_daemon(&config, &socket_path)
+        .await
+        .expect("Orphan cleanup failed");
 
     // Create IPC client
     let config_arc = std::sync::Arc::new(config.clone());
@@ -251,36 +279,30 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
         .expect("Failed to create IPC client");
 
     // Send Ping request (active connection)
-    let response = client.send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
+    let response = client
+        .send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
         .await
         .expect("Failed to send request");
 
-    assert!(matches!(response, mcp_cli_rs::daemon::protocol::DaemonResponse::Pong),
-             "Daemon should respond when actively connected");
+    assert!(
+        matches!(response, mcp_cli_rs::daemon::protocol::DaemonResponse::Pong),
+        "Daemon should respond when actively connected"
+    );
 
     // Send shutdown request
-    let shutdown_response = client.send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Shutdown)
+    let shutdown_response = client
+        .send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Shutdown)
         .await
         .expect("Failed to send shutdown request");
 
     // Verify shutdown acknowledgment
-    assert!(matches!(shutdown_response, mcp_cli_rs::daemon::protocol::DaemonResponse::ShutdownAck),
-             "Daemon should acknowledge shutdown");
-
-    // Verify socket/pipe is cleaned up after shutdown
-    let socket_exists = if cfg!(unix) {
-        std::path::Path::new(&socket_path).exists()
-    } else if cfg!(windows) {
-        true // Windows named pipe persists until explicitly cleaned
-    } else {
-        false
-    };
-
-    // Socket should be cleaned up (or will be cleaned by next daemon start)
-    // In production, cleanup_orphaned_daemon handles this
-
-    // Verify config cleanup - should not leak stale config files
-    assert!(true, "Graceful shutdown should complete without errors");
+    assert!(
+        matches!(
+            shutdown_response,
+            mcp_cli_rs::daemon::protocol::DaemonResponse::ShutdownAck
+        ),
+        "Daemon should acknowledge shutdown"
+    );
 }
 
 /// Test multiple config versions fingerprint detection
@@ -288,25 +310,35 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
 async fn test_config_fingerprint_detection() {
     // Test multiple config variations to verify fingerprint detects changes
     let configs: Vec<(&str, &str)> = vec![
-        ("empty", r#""),
+        (
+            "empty",
+            r#""),
         ("single_server", r#"
 [servers.server]
 transport = { type = "stdio", command = "echo" }
-"#),
-        ("two_servers", r#"
+"#,
+        ),
+        (
+            "two_servers",
+            r#"
 [servers.server1]
 transport = { type = "stdio", command = "echo1" }
 
 [servers.server2]
 transport = { type = "stdio", command = "echo2" }
-"#),
-        ("server_with_args", r#"
+"#,
+        ),
+        (
+            "server_with_args",
+            r#"
 [servers.server]
 transport = { type = "stdio", command = "echo", args = ["arg1", "arg2"] }
-"#),
+"#,
+        ),
     ];
 
-    let fingerprints: Vec<String> = configs.iter()
+    let fingerprints: Vec<String> = configs
+        .iter()
         .map(|(_, config_content)| {
             let cfg = create_config_from_content(config_content);
             calculate_fingerprint(&cfg)
@@ -315,22 +347,29 @@ transport = { type = "stdio", command = "echo", args = ["arg1", "arg2"] }
 
     // All fingerprints should be valid (64-char hex strings)
     for fp in &fingerprints {
-        assert_eq!(fp.len(), 64,
-                 "Fingerprint should be 64 hex characters");
-        assert!(fp.chars().all(|c| c.is_ascii_hexdigit()),
-                 "Fingerprint should be valid hex");
+        assert_eq!(fp.len(), 64, "Fingerprint should be 64 hex characters");
+        assert!(
+            fp.chars().all(|c| c.is_ascii_hexdigit()),
+            "Fingerprint should be valid hex"
+        );
     }
 
     // Some fingerprints should be different
-    let unique_count = fingerprints.iter()
+    let unique_count = fingerprints
+        .iter()
         .collect::<std::collections::HashSet<_>>()
         .len();
 
-    assert!(unique_count > 1,
-             "Different configs should produce different fingerprints");
+    assert!(
+        unique_count > 1,
+        "Different configs should produce different fingerprints"
+    );
 
-    println!("✓ Config fingerprint detection test passed - {} unique fingerprints from {} configs",
-             unique_count, configs.len());
+    println!(
+        "✓ Config fingerprint detection test passed - {} unique fingerprints from {} configs",
+        unique_count,
+        configs.len()
+    );
 }
 
 /// Test daemon config versioning and switching
@@ -357,20 +396,29 @@ transport = { type = "stdio", command = "cat" }
     let fp_b = calculate_fingerprint(&config_b);
 
     // Verify fingerprints differ
-    assert_ne!(fp_a, fp_b,
-             "Config versions should have different fingerprints");
+    assert_ne!(
+        fp_a, fp_b,
+        "Config versions should have different fingerprints"
+    );
 
     // Verify config fingerprints can be stored and compared
-    assert!(!fp_a.is_empty() && !fp_b.is_empty(),
-             "Fingerprints should be generated");
+    assert!(
+        !fp_a.is_empty() && !fp_b.is_empty(),
+        "Fingerprints should be generated"
+    );
 
     // Test config comparison logic
-    assert!(fp_a != fp_b,
-             "Different configs should have different fingerprints");
+    assert!(
+        fp_a != fp_b,
+        "Different configs should have different fingerprints"
+    );
 
     // Test same config produces same fingerprint
-    assert_eq!(fp_a, calculate_fingerprint(&config_a),
-             "Same config should produce same fingerprint");
+    assert_eq!(
+        fp_a,
+        calculate_fingerprint(&config_a),
+        "Same config should produce same fingerprint"
+    );
 }
 
 /// Test cross-platform consistency: Startup time variance
@@ -383,12 +431,13 @@ async fn test_cross_platform_startup_consistency() {
         let socket_path = mcp_cli_rs::ipc::get_socket_path();
 
         // Verify socket path is valid
-        assert!(socket_path.is_absolute(),
-                 "Socket path should be absolute");
+        assert!(socket_path.is_absolute(), "Socket path should be absolute");
 
         let duration = start.elapsed();
-        assert!(duration.as_secs() < 1,
-                 "Startup validation should be fast (< 1s)");
+        assert!(
+            duration.as_secs() < 1,
+            "Startup validation should be fast (< 1s)"
+        );
     }
 
     // Test on Windows
@@ -398,12 +447,16 @@ async fn test_cross_platform_startup_consistency() {
         let pipe_path = mcp_cli_rs::ipc::get_socket_path();
 
         // Verify pipe path format
-        assert!(pipe_path.starts_with(r"\\.\pipe\"),
-                 "Pipe path should start with \\.\\pipe\\");
+        assert!(
+            pipe_path.starts_with(r"\\.\pipe\"),
+            "Pipe path should start with \\.\\pipe\\"
+        );
 
         let duration = start.elapsed();
-        assert!(duration.as_secs() < 1,
-                 "Startup validation should be fast (< 1s)");
+        assert!(
+            duration.as_secs() < 1,
+            "Startup validation should be fast (< 1s)"
+        );
     }
 }
 
@@ -414,11 +467,10 @@ async fn test_cross_platform_idle_timeout_consistency() {
     let timeout_duration = Duration::from_secs(60); // Standard idle timeout
 
     // Verify timeout is reasonable
-    assert!(timeout_duration.as_secs() > 0 && timeout_duration.as_secs() <= 120,
-             "Idle timeout should be between 0 and 120 seconds");
-
-    // Test that timeout can be configured (in production, config file)
-    assert!(true, "Idle timeout should be configurable");
+    assert!(
+        timeout_duration.as_secs() > 0 && timeout_duration.as_secs() <= 120,
+        "Idle timeout should be between 0 and 120 seconds"
+    );
 
     // Verify consistent behavior: same timeout duration on all platforms
     #[cfg(unix)]
@@ -449,44 +501,54 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
     #[cfg(unix)]
     {
         let config_arc = std::sync::Arc::new(config.clone());
-        let mut client = mcp_cli_rs::ipc::create_ipc_client(config_arc)
-            .expect("Failed to create IPC client");
+        let mut client =
+            mcp_cli_rs::ipc::create_ipc_client(config_arc).expect("Failed to create IPC client");
 
         let start = std::time::Instant::now();
-        let response = client.send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
+        let response = client
+            .send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
             .await
             .expect("Failed to send request");
 
         let latency = start.elapsed().as_millis();
 
-        assert!(response == mcp_cli_rs::daemon::protocol::DaemonResponse::Pong,
-                 "Response should be Pong");
+        assert!(
+            response == mcp_cli_rs::daemon::protocol::DaemonResponse::Pong,
+            "Response should be Pong"
+        );
 
         // Latency should be reasonable (< 1 second for local IPC)
-        assert!(latency < 1000,
-                 "Local IPC latency should be reasonable (< 1s)");
+        assert!(
+            latency < 1000,
+            "Local IPC latency should be reasonable (< 1s)"
+        );
     }
 
     // Test on Windows
     #[cfg(windows)]
     {
         let config_arc = std::sync::Arc::new(config.clone());
-        let mut client = mcp_cli_rs::ipc::create_ipc_client(config_arc)
-            .expect("Failed to create IPC client");
+        let mut client =
+            mcp_cli_rs::ipc::create_ipc_client(config_arc).expect("Failed to create IPC client");
 
         let start = std::time::Instant::now();
-        let response = client.send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
+        let response = client
+            .send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
             .await
             .expect("Failed to send request");
 
         let latency = start.elapsed().as_millis();
 
-        assert!(response == mcp_cli_rs::daemon::protocol::DaemonResponse::Pong,
-                 "Response should be Pong");
+        assert!(
+            response == mcp_cli_rs::daemon::protocol::DaemonResponse::Pong,
+            "Response should be Pong"
+        );
 
         // Latency should be reasonable (< 1 second for local IPC)
-        assert!(latency < 1000,
-                 "Local IPC latency should be reasonable (< 1s)");
+        assert!(
+            latency < 1000,
+            "Local IPC latency should be reasonable (< 1s)"
+        );
     }
 }
 
@@ -495,29 +557,36 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
 async fn test_config_file_cleanup() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let config_path = temp_dir.path().join("config.toml");
-    std::fs::write(&config_path,
+    std::fs::write(
+        &config_path,
         r#"
 [servers.test]
 description = "Test server"
 transport = { type = "stdio", command = "echo" }
-"#)
-        .expect("Failed to write config");
+"#,
+    )
+    .expect("Failed to write config");
 
     // Load config
-    let config = load_config(&config_path).await.expect("Failed to load config");
+    let config = load_config(&config_path)
+        .await
+        .expect("Failed to load config");
 
     // Verify config is loaded
-    assert!(!config.servers.is_empty(),
-             "Config should have servers");
+    assert!(!config.servers.is_empty(), "Config should have servers");
 
     // Calculate fingerprint
     let fp = calculate_fingerprint(&config);
-    assert!(!fp.is_empty() && fp.len() == 64,
-             "Fingerprint should be valid SHA256 hex");
+    assert!(
+        !fp.is_empty() && fp.len() == 64,
+        "Fingerprint should be valid SHA256 hex"
+    );
 
     // Verify temp directory exists before cleanup
-    assert!(temp_dir.path().exists(),
-             "Temp directory should exist before cleanup");
+    assert!(
+        temp_dir.path().exists(),
+        "Temp directory should exist before cleanup"
+    );
 
     // Clean up temp directory
     let _ = temp_dir.close();
@@ -534,8 +603,7 @@ async fn test_orphaned_pid_cleanup_platforms() {
     {
         // Write stale PID
         let stale_pid = std::process::id() - 12345;
-        write_daemon_pid(&pid_file, stale_pid)
-            .expect("Failed to write PID file");
+        write_daemon_pid(&pid_file, stale_pid).expect("Failed to write PID file");
 
         // Read back
         let read_pid = read_daemon_pid(&pid_file).expect("Failed to read PID file");
@@ -545,22 +613,23 @@ async fn test_orphaned_pid_cleanup_platforms() {
         let _ = cleanup_orphaned_daemon(&Config::default(), &pid_file).await;
 
         // Verify cleanup
-        assert!(read_daemon_pid(&pid_file).is_err(),
-                 "Stale PID should be cleaned up");
+        assert!(
+            read_daemon_pid(&pid_file).is_err(),
+            "Stale PID should be cleaned up"
+        );
     }
 
-        // Test Windows - PID files may be handled differently
-        #[cfg(windows)]
-        {
-            // On Windows, PID file cleanup may use different mechanism
-            // This test verifies the cleanup function exists and works
-            let stale_pid = std::process::id() - 12345;
-            write_daemon_pid(&pid_file, stale_pid)
-                .expect("Failed to write PID file");
+    // Test Windows - PID files may be handled differently
+    #[cfg(windows)]
+    {
+        // On Windows, PID file cleanup may use different mechanism
+        // This test verifies the cleanup function exists and works
+        let stale_pid = std::process::id() - 12345;
+        write_daemon_pid(&pid_file, stale_pid).expect("Failed to write PID file");
 
-            // Cleanup should handle gracefully
-            let _ = cleanup_orphaned_daemon(&Config::default(), &pid_file).await;
-        }
+        // Cleanup should handle gracefully
+        let _ = cleanup_orphaned_daemon(&Config::default(), &pid_file).await;
+    }
 
     // Clean up temp directory
     let _ = temp_dir.close();
@@ -568,13 +637,14 @@ async fn test_orphaned_pid_cleanup_platforms() {
     // Verify temp directory is gone
     #[cfg(unix)]
     {
-        assert!(!std::path::Path::new(pid_file).exists(),
-                 "Temp PID file should be cleaned up");
+        assert!(
+            !std::path::Path::new(pid_file).exists(),
+            "Temp PID file should be cleaned up"
+        );
     }
     #[cfg(windows)]
     {
-        assert!(!pid_file.exists(),
-                 "Temp PID file should be cleaned up");
+        assert!(!pid_file.exists(), "Temp PID file should be cleaned up");
     }
 }
 
@@ -593,29 +663,35 @@ transport = { type = "stdio", command = "echo", args = ["test"] }
     let socket_path = mcp_cli_rs::ipc::get_socket_path();
 
     // Clean up orphaned daemon
-    let _ = cleanup_orphaned_daemon(&std::sync::Arc::new(config.clone()), &socket_path);
+    cleanup_orphaned_daemon(&Arc::new(config.clone()), &socket_path)
+        .await
+        .expect("Orphan cleanup failed");
 
     // Create IPC client
-    let config_arc = std::sync::Arc::new(config.clone());
+    let config_arc = Arc::new(config.clone());
     let mut client = mcp_cli_rs::ipc::create_ipc_client(config_arc.clone())
         .expect("Failed to create IPC client");
 
     // Send Ping request (active connection)
-    let _response = client.send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
+    let _response = client
+        .send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Ping)
         .await
         .expect("Failed to send request");
 
     // Send shutdown request
-    let shutdown_response = client.send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Shutdown)
+    let shutdown_response = client
+        .send_request(&mcp_cli_rs::daemon::protocol::DaemonRequest::Shutdown)
         .await
         .expect("Failed to send shutdown request");
 
     // Verify shutdown acknowledgment
-    assert!(matches!(shutdown_response, mcp_cli_rs::daemon::protocol::DaemonResponse::ShutdownAck),
-             "Daemon should acknowledge shutdown even with active connection");
-
-    // Connection should be closed after shutdown
-    assert!(true, "Graceful shutdown should complete");
+    assert!(
+        matches!(
+            shutdown_response,
+            mcp_cli_rs::daemon::protocol::DaemonResponse::ShutdownAck
+        ),
+        "Daemon should acknowledge shutdown even with active connection"
+    );
 }
 
 /// Test daemon protocol consistency across platforms
@@ -624,7 +700,8 @@ async fn test_daemon_protocol_consistency() {
     // Test on Unix
     #[cfg(unix)]
     {
-        let socket_path = std::env::temp_dir().join(format!("mcp-protocol-test-{}.sock", std::process::id()));
+        let socket_path =
+            std::env::temp_dir().join(format!("mcp-protocol-test-{}.sock", std::process::id()));
         let config = mcp_cli_rs::config::Config::default();
         let client = mcp_cli_rs::ipc::UnixIpcClient::new(std::sync::Arc::new(config));
 
@@ -637,29 +714,32 @@ async fn test_daemon_protocol_consistency() {
         for req in test_requests {
             let result = client.send_request(&req).await;
             // Should not crash, response may vary
-            assert!(result.is_ok() || result.is_err(),
-                     "Protocol request should not crash");
+            assert!(
+                result.is_ok() || result.is_err(),
+                "Protocol request should not crash"
+            );
         }
     }
 
     // Test on Windows
     #[cfg(windows)]
     {
-        let pipe_name = format!("\\\\.\\pipe\\mcp-protocol-test-{}", std::process::id());
+        use mcp_cli_rs::{daemon::protocol::DaemonRequest, ipc::NamedPipeIpcClient};
+
         let config = mcp_cli_rs::config::Config::default();
-        let mut client = mcp_cli_rs::ipc::windows::NamedPipeIpcClient::with_config(std::sync::Arc::new(config));
+        let mut client = NamedPipeIpcClient::with_config(std::sync::Arc::new(config));
 
         // Test all protocol requests
-        let test_requests: Vec<mcp_cli_rs::daemon::protocol::DaemonRequest> = vec![
-            mcp_cli_rs::daemon::protocol::DaemonRequest::Ping,
-            mcp_cli_rs::daemon::protocol::DaemonRequest::ListServers,
-        ];
+        let test_requests: Vec<DaemonRequest> =
+            vec![DaemonRequest::Ping, DaemonRequest::ListServers];
 
         for req in test_requests {
             let result = client.send_request(&req).await;
             // Should not crash, response may vary
-            assert!(result.is_ok() || result.is_err(),
-                     "Protocol request should not crash");
+            assert!(
+                result.is_ok() || result.is_err(),
+                "Protocol request should not crash"
+            );
         }
     }
 }

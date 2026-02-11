@@ -96,7 +96,10 @@ pub fn validate_server_config(server: &ServerConfig, config_path: &str) -> Resul
                     field: "command",
                 });
             }
-            debug!("Server '{}' stdio config validated (command: {})", server.name, command);
+            debug!(
+                "Server '{}' stdio config validated (command: {})",
+                server.name, command
+            );
         }
         ServerTransport::Http { url, .. } => {
             if url.is_empty() {
@@ -120,14 +123,23 @@ pub fn validate_server_config(server: &ServerConfig, config_path: &str) -> Resul
                 });
             }
 
-            debug!("Server '{}' HTTP config validated (url: {})", server.name, url);
+            debug!(
+                "Server '{}' HTTP config validated (url: {})",
+                server.name, url
+            );
         }
     }
 
     // Phase 4: Validate tool filtering configuration
     // Ensure at least one of allowed_tools or disabled_tools is provided
-    let has_allowed = server.allowed_tools.as_ref().map_or(false, |tools| !tools.is_empty());
-    let has_disabled = server.disabled_tools.as_ref().map_or(false, |tools| !tools.is_empty());
+    let has_allowed = server
+        .allowed_tools
+        .as_ref()
+        .is_some_and(|tools| !tools.is_empty());
+    let has_disabled = server
+        .disabled_tools
+        .as_ref()
+        .is_some_and(|tools| !tools.is_empty());
 
     if !has_allowed && !has_disabled {
         debug!(
@@ -151,11 +163,12 @@ pub fn validate_server_config(server: &ServerConfig, config_path: &str) -> Resul
 /// * `Err(McpError)` if any validation fails
 pub fn validate_config(config: &Config, config_path: &str) -> Result<(), McpError> {
     for server in &config.servers {
-        if let Err(e) = validate_server_config(server, config_path) {
-            return Err(e);
-        }
+        validate_server_config(server, config_path)?
     }
-    debug!("All server configurations in {} validated successfully", config_path);
+    debug!(
+        "All server configurations in {} validated successfully",
+        config_path
+    );
     Ok(())
 }
 
@@ -201,7 +214,10 @@ pub async fn load_config(path: &std::path::Path) -> Result<Config, McpError> {
 
     // CONFIG-05: Display warning if no servers configured
     if config.is_empty() {
-        tracing::warn!("Config file '{}' contains no server definitions", path.display());
+        tracing::warn!(
+            "Config file '{}' contains no server definitions",
+            path.display()
+        );
     } else {
         debug!(
             "Config file '{}' parsed successfully with {} server(s)",

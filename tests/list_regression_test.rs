@@ -8,7 +8,7 @@ use std::time::Duration;
 
 /// Ensure binary is built
 fn ensure_binary_built() {
-    let _ = Command::new("cargo").args(&["build"]).output();
+    let _ = Command::new("cargo").args(["build"]).output();
 }
 
 /// Helper function to shutdown daemon via IPC
@@ -16,7 +16,7 @@ fn ensure_binary_built() {
 fn shutdown_daemon_gracefully() -> Result<(), Box<dyn std::error::Error>> {
     // Send shutdown request to daemon
     let output = Command::new("./target/debug/mcp-cli-rs.exe")
-        .args(&["shutdown"])
+        .args(["shutdown"])
         .env("RUST_LOG", "")
         .env("SERENA_LOG_LEVEL", "error")
         .output()?;
@@ -62,12 +62,12 @@ impl Drop for DaemonHandle {
         let _ = shutdown_daemon_gracefully();
 
         // Force kill if still running
-        if let Some(mut child) = self.child.take() {
-            if child.try_wait().is_ok() {
-                // Process still running, kill it
-                let _ = child.kill();
-                let _ = child.wait();
-            }
+        if let Some(mut child) = self.child.take()
+            && child.try_wait().is_ok()
+        {
+            // Process still running, kill it
+            let _ = child.kill();
+            let _ = child.wait();
         }
     }
 }
@@ -81,7 +81,7 @@ fn test_list_no_daemon() {
     println!("Testing: list command with --no-daemon");
 
     let output = Command::new("./target/debug/mcp-cli-rs.exe")
-        .args(&["list", "--no-daemon"])
+        .args(["list", "--no-daemon"])
         .env("RUST_LOG", "")
         .env("SERENA_LOG_LEVEL", "error")
         .output();
@@ -120,7 +120,7 @@ fn test_manual_daemon_spawn() {
     ensure_binary_built();
 
     let daemon = Command::new("./target/debug/mcp-cli-rs.exe")
-        .args(&["daemon", "--ttl", "10"])
+        .args(["daemon", "--ttl", "10"])
         .env("RUST_LOG", "")
         .env("SERENA_LOG_LEVEL", "error")
         .spawn()
@@ -132,7 +132,7 @@ fn test_manual_daemon_spawn() {
     std::thread::sleep(Duration::from_secs(2));
 
     let output = Command::new("./target/debug/mcp-cli-rs.exe")
-        .args(&["list", "--require-daemon"])
+        .args(["list", "--require-daemon"])
         .env("RUST_LOG", "")
         .env("SERENA_LOG_LEVEL", "error")
         .output()

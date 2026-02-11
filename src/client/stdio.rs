@@ -6,42 +6,14 @@
 
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::io::BufRead;
 use std::time::Duration;
 
 use crate::client::http::HttpTransport;
 use crate::config::ServerTransport;
 use crate::error::{McpError, Result};
 use crate::transport::{Transport, TransportFactory};
-use tokio::io::{BufReader, AsyncBufReadExt, AsyncRead};
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
-
-/// Mock reader for testing that wraps Vec<u8> with AsyncRead
-struct MockAsyncReader {
-    data: Vec<u8>,
-}
-
-impl MockAsyncReader {
-    fn new(data: Vec<u8>) -> Self {
-        Self { data }
-    }
-}
-
-impl AsyncRead for MockAsyncReader {
-    fn poll_read(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &mut tokio::io::ReadBuf,
-    ) -> std::task::Poll<std::result::Result<(), std::io::Error>> {
-        if self.data.is_empty() {
-            return std::task::Poll::Ready(Ok(()));
-        }
-        let bytes = &self.data[..];
-        let len = buf.remaining().min(bytes.len());
-        buf.put_slice(&bytes[..len]);
-        std::task::Poll::Ready(Ok(()))
-    }
-}
 
 /// Stdio transport for local process communication.
 ///
@@ -49,7 +21,7 @@ impl AsyncRead for MockAsyncReader {
 /// stdin/stdout using JSON-RPC over newline-delimited JSON.
 pub struct StdioTransport {
     /// Child process handle.
-    child: tokio::process::Child,
+    _child: tokio::process::Child,
 
     /// Process stdin handle for sending requests.
     stdin: tokio::process::ChildStdin,
@@ -79,8 +51,7 @@ impl StdioTransport {
     ) -> Result<Self> {
         // Set stdin/stdout before environment variables
         let mut cmd = Command::new(command);
-        cmd.args(args)
-            .kill_on_drop(true); // Prevents Windows zombie processes
+        cmd.args(args).kill_on_drop(true); // Prevents Windows zombie processes
 
         cmd.stdin(std::process::Stdio::piped());
         cmd.stdout(std::process::Stdio::piped());
@@ -96,26 +67,28 @@ impl StdioTransport {
         }
 
         // Spawn the process
-        let mut child = cmd.spawn().map_err(|e| {
-            McpError::connection_error(command, e)
-        })?;
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| McpError::connection_error(command, e))?;
 
         // Extract stdin and stdout handles
-        let stdin = child.stdin.take().ok_or_else(|| {
-            McpError::InvalidProtocol {
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| McpError::InvalidProtocol {
                 message: "Failed to get stdin handle".to_string(),
-            }
-        })?;
+            })?;
 
-        let stdout = child.stdout.take().ok_or_else(|| {
-            McpError::InvalidProtocol {
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| McpError::InvalidProtocol {
                 message: "Failed to get stdout handle".to_string(),
-            }
-        })?;
+            })?;
 
         // Return StdioTransport
         Ok(StdioTransport {
-            child,
+            _child: child,
             stdin,
             stdout: BufReader::new(stdout),
         })
@@ -125,34 +98,33 @@ impl StdioTransport {
 #[async_trait]
 impl Transport for StdioTransport {
     async fn receive_notification(&mut self) -> Result<serde_json::Value> {
-        use tokio::time::timeout;
         use std::time::Duration;
-        
+        use tokio::time::timeout;
+
         let mut line = String::new();
         let notification = timeout(Duration::from_secs(10), async move {
-            let _ = self.stdout.read_line(&mut line).await.map_err(|e| {
-                McpError::connection_error("stdio", e)
-            })?;
+            let _ = self
+                .stdout
+                .read_line(&mut line)
+                .await
+                .map_err(|e| McpError::connection_error("stdio", e))?;
             if line.trim().is_empty() {
                 return Err(McpError::InvalidProtocol {
                     message: "Empty notification line".to_string(),
                 });
             }
-            let notification: serde_json::Value = serde_json::from_str(&line)
-                .map_err(|e| {
-                    McpError::InvalidProtocol {
-                        message: format!("Invalid JSON notification: {}", e),
-                    }
+            let notification: serde_json::Value =
+                serde_json::from_str(&line).map_err(|e| McpError::InvalidProtocol {
+                    message: format!("Invalid JSON notification: {}", e),
                 })?;
             Ok(notification)
-        }).await;
-        
+        })
+        .await;
+
         match notification {
             Ok(Ok(n)) => Ok(n),
             Ok(Err(e)) => Err(e),
-            Err(_) => Err(McpError::Timeout {
-                timeout: 10,
-            })
+            Err(_) => Err(McpError::Timeout { timeout: 10 }),
         }
     }
 
@@ -163,54 +135,41 @@ impl Transport for StdioTransport {
         self.stdin
             .write_all(request_str.as_bytes())
             .await
-            .map_err(|e| {
-                McpError::connection_error("stdio", e)
-            })?;
+            .map_err(|e| McpError::connection_error("stdio", e))?;
         self.stdin
             .write_all(b"\n")
             .await
-            .map_err(|e| {
-                McpError::connection_error("stdio", e)
-            })?;
+            .map_err(|e| McpError::connection_error("stdio", e))?;
 
         // Flush stdin to ensure message is sent
         self.stdin
             .flush()
             .await
-            .map_err(|e| {
-                McpError::connection_error("stdio", e)
-            })?;
+            .map_err(|e| McpError::connection_error("stdio", e))?;
 
         // Read response (newline-delimited JSON)
-        let response_str = tokio::time::timeout(
-            Duration::from_secs(30),
-            async move {
-                let mut line = String::new();
-                let _ = self.stdout.read_line(&mut line).await.map_err(|e| {
-                    McpError::connection_error("stdio", e)
-                })?;
-                if line.trim().is_empty() {
-                    return Err(McpError::InvalidProtocol {
-                        message: "Empty response line".to_string(),
-                    });
-                }
-                Ok(line)
+        let response_str = tokio::time::timeout(Duration::from_secs(30), async move {
+            let mut line = String::new();
+            let _ = self
+                .stdout
+                .read_line(&mut line)
+                .await
+                .map_err(|e| McpError::connection_error("stdio", e))?;
+            if line.trim().is_empty() {
+                return Err(McpError::InvalidProtocol {
+                    message: "Empty response line".to_string(),
+                });
             }
-        )
+            Ok(line)
+        })
         .await
-        .map_err(|_| {
-            McpError::Timeout {
-                timeout: 30,
-            }
-        })?;
+        .map_err(|_| McpError::Timeout { timeout: 30 })?;
 
         // Parse response JSON
         let response_str = response_str?;
-        let response: serde_json::Value = serde_json::from_str(&response_str)
-            .map_err(|e| {
-                McpError::InvalidProtocol {
-                    message: format!("Invalid JSON response: {}", e),
-                }
+        let response: serde_json::Value =
+            serde_json::from_str(&response_str).map_err(|e| McpError::InvalidProtocol {
+                message: format!("Invalid JSON response: {}", e),
             })?;
 
         Ok(response)
@@ -223,23 +182,17 @@ impl Transport for StdioTransport {
         self.stdin
             .write_all(notification_str.as_bytes())
             .await
-            .map_err(|e| {
-                McpError::connection_error("stdio", e)
-            })?;
+            .map_err(|e| McpError::connection_error("stdio", e))?;
         self.stdin
             .write_all(b"\n")
             .await
-            .map_err(|e| {
-                McpError::connection_error("stdio", e)
-            })?;
+            .map_err(|e| McpError::connection_error("stdio", e))?;
 
         // Flush stdin to ensure message is sent
         self.stdin
             .flush()
             .await
-            .map_err(|e| {
-                McpError::connection_error("stdio", e)
-            })?;
+            .map_err(|e| McpError::connection_error("stdio", e))?;
 
         Ok(())
     }
@@ -265,14 +218,15 @@ impl Transport for StdioTransport {
     }
 }
 
-
 impl TransportFactory for ServerTransport {
-    fn create_transport(
-        &self,
-        _server_name: &str,
-    ) -> Box<dyn Transport + Send + Sync> {
+    fn create_transport(&self, _server_name: &str) -> Box<dyn Transport + Send + Sync> {
         match self {
-            ServerTransport::Stdio { command, args, env, cwd } => {
+            ServerTransport::Stdio {
+                command,
+                args,
+                env,
+                cwd,
+            } => {
                 let transport = StdioTransport::new(command, args, env, cwd.as_deref())
                     .expect("Failed to create stdio transport");
                 Box::new(transport)
@@ -290,20 +244,4 @@ impl TransportFactory for ServerTransport {
             ServerTransport::Stdio { .. } => false,
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn test_stdio_transport_creation() {
-        // Placeholder test
-        println!("StdioTransport creation works");
-    }
-
-    // NOTE: test_write_json removed due to type compatibility issues
-    // Real ChildStdout is required, cannot use MockAsyncReader for stdout field
-    // Placeholder test_stdio_transport_creation exists for testing purposes
 }

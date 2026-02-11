@@ -3,12 +3,12 @@
 //! This module provides the main client for interacting with MCP servers,
 //! including tool listing, execution, and protocol handling.
 
-pub mod stdio;
 pub mod http;
+pub mod stdio;
 
-use crate::transport::{Transport, TransportFactory};
 use crate::config::Config;
 use crate::error::{McpError, Result};
+use crate::transport::{Transport, TransportFactory};
 use serde_json::Value;
 
 /// Information about a tool available on a MCP server.
@@ -56,18 +56,21 @@ impl McpClient {
     /// Sends initialize request with client capabilities and receives server capabilities.
     /// The server automatically sends notifications/initialized - we don't need to wait for it.
     pub async fn initialize(&mut self) -> Result<()> {
-        let init_request = Self::json_rpc_request("initialize", serde_json::json!({
-            "protocolVersion": "2024-11-05",
-            "capabilities": {
-                "roots": {},
-                "sampling": {},
-                "tools": {}
-            },
-            "clientInfo": {
-                "name": "mcp-cli-rs",
-                "version": env!("CARGO_PKG_VERSION")
-            }
-        }));
+        let init_request = Self::json_rpc_request(
+            "initialize",
+            serde_json::json!({
+                "protocolVersion": "2024-11-05",
+                "capabilities": {
+                    "roots": {},
+                    "sampling": {},
+                    "tools": {}
+                },
+                "clientInfo": {
+                    "name": "mcp-cli-rs",
+                    "version": env!("CARGO_PKG_VERSION")
+                }
+            }),
+        );
 
         let response = self.transport.send(init_request).await?;
 
@@ -89,26 +92,22 @@ impl McpClient {
     /// Returns McpError::InvalidProtocol if response is malformed
     /// Returns McpError::Timeout if server doesn't respond
     pub async fn list_tools(&mut self) -> Result<Vec<ToolInfo>> {
-        let _ = self.initialize().await?;
-        
+        self.initialize().await?;
+
         let request = Self::json_rpc_request("tools/list", serde_json::json!({}));
         let response = self.transport.send(request).await?;
 
         // Parse response
         let result = response["result"]
             .as_object()
-            .ok_or_else(|| {
-                McpError::InvalidProtocol {
-                    message: "Expected result object in response".to_string(),
-                }
+            .ok_or_else(|| McpError::InvalidProtocol {
+                message: "Expected result object in response".to_string(),
             })?;
 
         let tools_array = result["tools"]
             .as_array()
-            .ok_or_else(|| {
-                McpError::InvalidProtocol {
-                    message: "Expected tools array in result".to_string(),
-                }
+            .ok_or_else(|| McpError::InvalidProtocol {
+                message: "Expected tools array in result".to_string(),
             })?;
 
         // Convert tools array to ToolInfo structs
@@ -122,7 +121,7 @@ impl McpClient {
                 Some(ToolInfo {
                     name,
                     description,
-                    input_schema: input_schema,
+                    input_schema,
                 })
             })
             .collect();
@@ -143,10 +142,13 @@ impl McpClient {
     /// Returns McpError::InvalidOperation for now (to be implemented in Plan 04)
     pub async fn call_tool(&mut self, tool_name: &str, arguments: Value) -> Result<Value> {
         // Build JSON-RPC request for "tools/call"
-        let request = Self::json_rpc_request("tools/call", serde_json::json!({
-            "name": tool_name,
-            "arguments": arguments
-        }));
+        let request = Self::json_rpc_request(
+            "tools/call",
+            serde_json::json!({
+                "name": tool_name,
+                "arguments": arguments
+            }),
+        );
 
         // Send request via transport
         let response = self.transport.send(request).await?;
@@ -154,10 +156,8 @@ impl McpClient {
         // Parse response
         let result = response["result"]
             .as_object()
-            .ok_or_else(|| {
-                McpError::InvalidProtocol {
-                    message: "Expected result object in response".to_string(),
-                }
+            .ok_or_else(|| McpError::InvalidProtocol {
+                message: "Expected result object in response".to_string(),
             })?;
 
         Ok(serde_json::Value::Object(result.clone()))
@@ -200,11 +200,9 @@ impl std::fmt::Display for McpClient {
 }
 
 impl TransportFactory for Config {
-    fn create_transport(
-        &self,
-        server_name: &str,
-    ) -> Box<dyn Transport + Send + Sync> {
-        let server = self.get_server(server_name)
+    fn create_transport(&self, server_name: &str) -> Box<dyn Transport + Send + Sync> {
+        let server = self
+            .get_server(server_name)
             .expect("Server not found in config");
 
         server.transport.create_transport(server_name)
@@ -218,9 +216,6 @@ impl TransportFactory for Config {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::stdio::StdioTransport;
-    use std::collections::HashMap;
-
     #[test]
     fn test_tool_info_struct() {
         let schema = serde_json::json!({

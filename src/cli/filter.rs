@@ -4,7 +4,6 @@
 // https://github.com/garyt/opencode/issues/XXXX
 
 use glob::Pattern;
-use std::str::FromStr;
 
 /// Validates that a tool name matches a glob pattern
 ///

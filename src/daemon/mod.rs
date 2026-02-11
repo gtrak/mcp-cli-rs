@@ -1,21 +1,19 @@
 use anyhow::Result;
 use std::io::ErrorKind;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::time::Duration;
 
 use crate::config::Config;
-use crate::daemon::protocol::{DaemonRequest, DaemonResponse};
-use crate::ipc::{create_ipc_server, IpcServer};
 use crate::daemon::lifecycle::DaemonLifecycle;
 use crate::daemon::pool::ConnectionPool;
+use crate::ipc::{IpcServer, create_ipc_server};
 
-pub mod protocol;
-pub mod lifecycle;
-pub mod pool;
 pub mod fingerprint;
+pub mod lifecycle;
 pub mod orphan;
+pub mod pool;
+pub mod protocol;
 
 /// Configuration fingerprint hash
 pub type ConfigFingerprint = String;
@@ -63,7 +61,11 @@ impl DaemonState {
 /// 3. Spawns idle timeout monitor
 /// 4. Main loop accepts connections and handles requests
 /// 5. Removes socket file on exit
-pub async fn run_daemon(config: Config, socket_path: PathBuf, lifecycle: DaemonLifecycle) -> Result<()> {
+pub async fn run_daemon(
+    config: Config,
+    socket_path: PathBuf,
+    lifecycle: DaemonLifecycle,
+) -> Result<()> {
     tracing::info!("Starting daemon with socket: {:?}", socket_path);
 
     // Create IPC server
@@ -84,7 +86,7 @@ pub async fn run_daemon(config: Config, socket_path: PathBuf, lifecycle: DaemonL
 
     // Spawn idle timeout monitor
     let lifecycle_clone = lifecycle.clone();
-    let lifecycle_task = tokio::spawn(async move {
+    let _lifecycle_task = tokio::spawn(async move {
         crate::daemon::lifecycle::run_idle_timer(&lifecycle_clone).await;
     });
 
@@ -151,62 +153,62 @@ pub async fn run_daemon(config: Config, socket_path: PathBuf, lifecycle: DaemonL
     Ok(())
 }
 
-    /// Handle client requests
-    pub async fn handle_client(
-        stream: impl crate::ipc::IpcStream + Unpin,
-        state: DaemonState,
-    ) {
-        use tokio::io::BufReader;
-        tracing::debug!("Daemon: New client connected");
+/// Handle client requests
+pub async fn handle_client(stream: impl crate::ipc::IpcStream, state: DaemonState) {
+    use tokio::io::BufReader;
+    tracing::debug!("Daemon: New client connected");
 
-        // Update activity timestamp
-        state.update_activity();
+    // Update activity timestamp
+    state.update_activity();
 
-        // Wrap stream for buffered reading
-        let (reader, mut writer) = tokio::io::split(stream);
-        let mut buf_reader = BufReader::new(reader);
+    // Wrap stream for buffered reading
+    let (reader, mut writer) = tokio::io::split(stream);
+    let mut buf_reader = BufReader::new(reader);
 
-        // Read request from stream
-        tracing::debug!("Daemon: Reading request...");
-        let request = match crate::daemon::protocol::receive_request(&mut buf_reader).await {
-            Ok(req) => {
-                tracing::debug!("Daemon: Got request: {:?}", req);
-                req
-            },
-            Err(e) => {
-                tracing::debug!("Daemon: Error reading request: {}", e);
-                return;
-            }
-        };
-
-        // Handle request
-        tracing::debug!("Daemon: Handling request...");
-        let response = handle_request(request, &state).await;
-        tracing::debug!("Daemon: Generated response: {:?}", response);
-
-        // Send response
-        tracing::debug!("Daemon: Sending response...");
-        if let Err(e) = crate::daemon::protocol::send_response(&mut writer, &response).await {
-            tracing::debug!("Daemon: Error sending response: {}", e);
+    // Read request from stream
+    tracing::debug!("Daemon: Reading request...");
+    let request = match crate::daemon::protocol::receive_request(&mut buf_reader).await {
+        Ok(req) => {
+            tracing::debug!("Daemon: Got request: {:?}", req);
+            req
+        }
+        Err(e) => {
+            tracing::debug!("Daemon: Error reading request: {}", e);
             return;
         }
-        tracing::debug!("Daemon: Response sent");
+    };
 
-        // Update activity timestamp
-        state.update_activity();
+    // Handle request
+    tracing::debug!("Daemon: Handling request...");
+    let response = handle_request(request, &state).await;
+    tracing::debug!("Daemon: Generated response: {:?}", response);
+
+    // Send response
+    tracing::debug!("Daemon: Sending response...");
+    if let Err(e) = crate::daemon::protocol::send_response(&mut writer, &response).await {
+        tracing::debug!("Daemon: Error sending response: {}", e);
+        return;
     }
+    tracing::debug!("Daemon: Response sent");
+
+    // Update activity timestamp
+    state.update_activity();
+}
 
 /// Handle daemon request and return response
-pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, state: &DaemonState)
-    -> crate::daemon::protocol::DaemonResponse
-{
+pub async fn handle_request(
+    request: crate::daemon::protocol::DaemonRequest,
+    state: &DaemonState,
+) -> crate::daemon::protocol::DaemonResponse {
     match request {
         crate::daemon::protocol::DaemonRequest::Ping => {
             crate::daemon::protocol::DaemonResponse::Pong
         }
 
         crate::daemon::protocol::DaemonRequest::GetConfigFingerprint => {
-            crate::daemon::protocol::DaemonResponse::ConfigFingerprint(state.config_fingerprint.clone())
+            crate::daemon::protocol::DaemonResponse::ConfigFingerprint(
+                state.config_fingerprint.clone(),
+            )
         }
 
         crate::daemon::protocol::DaemonRequest::Shutdown => {
@@ -216,11 +218,19 @@ pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, sta
             crate::daemon::protocol::DaemonResponse::ShutdownAck
         }
 
-        crate::daemon::protocol::DaemonRequest::ExecuteTool { server_name, tool_name, arguments } => {
+        crate::daemon::protocol::DaemonRequest::ExecuteTool {
+            server_name,
+            tool_name,
+            arguments,
+        } => {
             tracing::info!("ExecuteTool: server={}, tool={}", server_name, tool_name);
 
             // Execute tool using connection pool's execute method
-            match state.connection_pool.execute(&server_name, &tool_name, arguments).await {
+            match state
+                .connection_pool
+                .execute(&server_name, &tool_name, arguments)
+                .await
+            {
                 Ok(result) => crate::daemon::protocol::DaemonResponse::ToolResult(result),
                 Err(e) => {
                     tracing::error!("Tool execution failed: {}", e);
@@ -252,7 +262,10 @@ pub async fn handle_request(request: crate::daemon::protocol::DaemonRequest, sta
             tracing::info!("ListServers requested");
 
             // Get list of configured server names from config
-            let servers: Vec<String> = state.config.servers.iter()
+            let servers: Vec<String> = state
+                .config
+                .servers
+                .iter()
                 .map(|s| s.name.clone())
                 .collect();
 
@@ -294,8 +307,32 @@ pub async fn cleanup_socket(socket_path: PathBuf) -> Result<()> {
     Ok(())
 }
 
+/// Remove PID file
+pub fn remove_pid_file(socket_path: &Path) -> Result<()> {
+    let pid_file = crate::daemon::orphan::get_pid_file_path(socket_path);
+    if pid_file.exists()
+        && let Err(e) = std::fs::remove_file(&pid_file)
+    {
+        tracing::warn!("Failed to remove PID file: {}", e);
+    }
+    Ok(())
+}
+
+/// Remove fingerprint file
+pub fn remove_fingerprint_file(socket_path: &Path) -> Result<()> {
+    let fp_file = crate::daemon::orphan::get_fingerprint_file_path(socket_path);
+    if fp_file.exists()
+        && let Err(e) = std::fs::remove_file(&fp_file)
+    {
+        tracing::warn!("Failed to remove fingerprint file: {}", e);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::daemon::protocol::{DaemonRequest, DaemonResponse};
+
     use super::*;
 
     #[test]
@@ -313,7 +350,9 @@ mod tests {
             config: Arc::new(config),
             config_fingerprint: String::new(),
             lifecycle,
-            connection_pool: Arc::new(crate::daemon::pool::ConnectionPool::new(Arc::new(Config::default()))),
+            connection_pool: Arc::new(crate::daemon::pool::ConnectionPool::new(Arc::new(
+                Config::default(),
+            ))),
         };
 
         let response = handle_request(DaemonRequest::Ping, &state).await;
@@ -328,33 +367,13 @@ mod tests {
             config: Arc::new(config),
             config_fingerprint: String::new(),
             lifecycle: lifecycle.clone(),
-            connection_pool: Arc::new(crate::daemon::pool::ConnectionPool::new(Arc::new(Config::default()))),
+            connection_pool: Arc::new(crate::daemon::pool::ConnectionPool::new(Arc::new(
+                Config::default(),
+            ))),
         };
 
         let response = handle_request(DaemonRequest::Shutdown, &state).await;
         assert!(matches!(response, DaemonResponse::ShutdownAck));
         assert!(!lifecycle.is_running());
     }
-}
-
-/// Remove PID file
-pub fn remove_pid_file(socket_path: &PathBuf) -> Result<()> {
-    let pid_file = crate::daemon::orphan::get_pid_file_path(socket_path);
-    if pid_file.exists() {
-        if let Err(e) = std::fs::remove_file(&pid_file) {
-            tracing::warn!("Failed to remove PID file: {}", e);
-        }
-    }
-    Ok(())
-}
-
-/// Remove fingerprint file
-pub fn remove_fingerprint_file(socket_path: &PathBuf) -> Result<()> {
-    let fp_file = crate::daemon::orphan::get_fingerprint_file_path(socket_path);
-    if fp_file.exists() {
-        if let Err(e) = std::fs::remove_file(&fp_file) {
-            tracing::warn!("Failed to remove fingerprint file: {}", e);
-        }
-    }
-    Ok(())
 }
