@@ -262,7 +262,7 @@ async fn execute_command(
             } else {
                 mcp_cli_rs::cli::DetailLevel::Summary
             };
-            cmd_list_servers(client, detail_level).await
+            cmd_list_servers(client, detail_level, output_mode).await
         }
         Some(Commands::Info { name }) => cmd_server_info(client, &name).await,
         Some(Commands::Tool {
@@ -294,7 +294,7 @@ async fn execute_command(
             };
             cmd_search_tools(client, &pattern, detail_level).await
         }
-        None => cmd_list_servers(client, mcp_cli_rs::cli::DetailLevel::Summary).await,
+        None => cmd_list_servers(client, mcp_cli_rs::cli::DetailLevel::Summary, output_mode).await,
     }
 }
 

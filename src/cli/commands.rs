@@ -3,10 +3,11 @@
 use crate::cli::DetailLevel;
 use crate::client::ToolInfo;
 use crate::config::{ServerConfig, ServerTransport};
+use crate::daemon::protocol::{ListOutput, ParameterDetail, SearchOutput, SearchMatch, ServerInfo, ToolDetailOutput};
 use crate::error::{McpError, Result};
-use crate::format::{extract_params_from_schema, format_param_list};
+use crate::format::{extract_params_from_schema, format_param_list, OutputMode};
 use crate::ipc::ProtocolClient;
-use crate::output::{print_error, print_info, print_warning};
+use crate::output::{print_error, print_info, print_json, print_warning};
 use crate::parallel::{ParallelExecutor, list_tools_parallel};
 use crate::retry::{RetryConfig, retry_with_backoff};
 use crate::transport::Transport;
@@ -23,17 +24,24 @@ use tokio::sync::Mutex;
 /// Implements DISC-05: parallel server discovery with configurable concurrency.
 /// Implements ERR-07: partial failure warnings.
 /// Implements OUTP-01, OUTP-03, OUTP-04, OUTP-11, OUTP-12, OUTP-13, OUTP-15, OUTP-18
+/// Implements OUTP-07, OUTP-08: JSON output mode
 ///
 /// # Arguments
 /// * `daemon` - Daemon IPC client
-/// * `detail_level` - Level of detail for tool listings
+/// * `detail_level` - Level of detail for tool listings (ignored in JSON mode)
+/// * `output_mode` - Output format (human or JSON)
 ///
 /// # Errors
 /// Returns McpError::ConfigParseError if config file is invalid
 pub async fn cmd_list_servers(
     mut daemon: Box<dyn ProtocolClient>,
     detail_level: DetailLevel,
+    output_mode: OutputMode,
 ) -> Result<()> {
+    // Handle JSON mode separately
+    if output_mode == OutputMode::Json {
+        return cmd_list_servers_json(daemon).await;
+    }
     let config = daemon.config();
 
     // Empty state handling (OUTP-15)
@@ -330,6 +338,129 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
         println!();
     }
 
+    Ok(())
+}
+
+/// Execute the list servers command in JSON mode.
+///
+/// Outputs all servers and tools as structured JSON for programmatic use.
+/// Implements OUTP-07: --json flag support
+/// Implements OUTP-08: consistent JSON schema with complete tool metadata
+async fn cmd_list_servers_json(mut daemon: Box<dyn ProtocolClient>) -> Result<()> {
+    let config = daemon.config();
+
+    // Handle empty config
+    if config.is_empty() {
+        let output = ListOutput {
+            servers: vec![],
+            total_servers: 0,
+            connected_servers: 0,
+            failed_servers: 0,
+            total_tools: 0,
+        };
+        print_json(&output);
+        return Ok(());
+    }
+
+    // Get server names from daemon
+    let server_names = daemon.list_servers().await.map_err(|e| {
+        print_error(&format!("Failed to get servers list: {}", e));
+        e
+    })?;
+
+    // Create parallel executor with concurrency limit from config
+    let executor = ParallelExecutor::new(config.concurrency_limit);
+
+    // Create daemon client for parallel execution
+    let daemon_arc = Arc::new(Mutex::new(daemon));
+
+    // List tools from all servers in parallel
+    let (successes, failures): (Vec<(String, Vec<ToolInfo>)>, Vec<String>) = {
+        list_tools_parallel(
+            server_names,
+            |server| {
+                let daemon_arc = daemon_arc.clone();
+                async move {
+                    let mut daemon_guard = daemon_arc.lock().await;
+                    daemon_guard
+                        .list_tools(&server)
+                        .await
+                        .map_err(|e| {
+                            tracing::warn!("Failed to list tools for {}: {}", server, e);
+                            e
+                        })
+                        .map(|protocol_tools| {
+                            protocol_tools
+                                .into_iter()
+                                .map(|protocol_tool| crate::client::ToolInfo {
+                                    name: protocol_tool.name,
+                                    description: Some(protocol_tool.description),
+                                    input_schema: protocol_tool.input_schema,
+                                })
+                                .collect()
+                        })
+                }
+            },
+            &executor,
+            config.as_ref(),
+        )
+        .await?
+    };
+
+    // Build JSON output
+    let mut servers = Vec::new();
+    let mut total_tools = 0;
+
+    // Process successful servers
+    for (server_name, tools) in successes {
+        let server_config = {
+            let daemon_guard = daemon_arc.lock().await;
+            daemon_guard.config().get_server(&server_name).cloned()
+        };
+
+        // Convert client ToolInfo to protocol ToolInfo for serialization
+        let protocol_tools: Vec<crate::daemon::protocol::ToolInfo> = tools
+            .into_iter()
+            .map(|t| crate::daemon::protocol::ToolInfo {
+                name: t.name,
+                description: t.description.unwrap_or_default(),
+                input_schema: t.input_schema,
+            })
+            .collect();
+
+        let server_info = ServerInfo {
+            name: server_name.clone(),
+            status: "connected".to_string(),
+            tool_count: protocol_tools.len(),
+            tools: protocol_tools,
+            error: None,
+        };
+
+        total_tools += server_info.tool_count;
+        servers.push(server_info);
+    }
+
+    // Process failed servers
+    for server_name in failures {
+        let server_info = ServerInfo {
+            name: server_name,
+            status: "failed".to_string(),
+            tool_count: 0,
+            tools: vec![],
+            error: Some("Connection failed".to_string()),
+        };
+        servers.push(server_info);
+    }
+
+    let output = ListOutput {
+        total_servers: servers.len(),
+        connected_servers: servers.iter().filter(|s| s.status == "connected").count(),
+        failed_servers: servers.iter().filter(|s| s.status == "failed").count(),
+        total_tools,
+        servers,
+    };
+
+    print_json(&output);
     Ok(())
 }
 
