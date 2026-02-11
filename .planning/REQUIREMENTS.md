@@ -73,7 +73,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Cross-Platform Support
 
-- [ ] **XP-01**: Test stdio process spawning on Windows and ensure no zombie processes remain
+- [x] **XP-01**: Test stdio process spawning on Windows and ensure no zombie processes remain
 - [ ] **XP-02**: Implement Windows named pipe security flags (security_qos_flags) to prevent privilege escalation
 - [ ] **XP-03**: Ensure MCP protocol compliance for stdio transport (newline-delimited messages, no embedded newlines)
 - [ ] **XP-04**: Validate connection daemon functionality on Linux, macOS, and Windows
@@ -152,7 +152,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLI-03 | Phase 1 | Pending |
 | CLI-04 | Phase 3 | Complete |
 | CLI-05 | Phase 4 | Pending |
-| XP-01 | Phase 4 | Pending |
+| XP-01 | Phase 8 | Complete |
 | XP-02 | Phase 4 | Pending |
 | XP-03 | Phase 1 | Pending |
 | XP-04 | Phase 4 | Pending |
