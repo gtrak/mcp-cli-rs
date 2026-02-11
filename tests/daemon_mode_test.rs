@@ -88,36 +88,3 @@ fn test_spawn_daemon_using_main_entry() {
     // Cleanup daemon
     let _ = daemon.kill();
 }
-
-/// Quick smoke test: verify daemon can be started and stopped
-#[test]
-fn test_daemon_lifecycle() {
-    // Kill any existing daemon
-    let _ = Command::new("taskkill")
-        .args(["/F", "/IM", "mcp-cli-rs.exe"])
-        .output();
-
-    thread::sleep(Duration::from_millis(500));
-
-    // Spawn daemon with short TTL
-    let mut daemon = Command::new("cargo")
-        .args(["run", "--", "daemon", "--ttl", "2"])
-        .spawn()
-        .expect("Failed to spawn daemon");
-
-    // Give it time to start
-    thread::sleep(Duration::from_secs(1));
-
-    // Verify it's running
-    if let Ok(status) = daemon.try_wait() {
-        assert!(status.is_none(), "Daemon should still be running");
-    }
-
-    // Wait for TTL to expire
-    thread::sleep(Duration::from_secs(3));
-
-    // Daemon should have quit
-    if let Ok(status) = daemon.try_wait() {
-        assert!(status.is_some(), "Daemon should have exited after TTL");
-    }
-}

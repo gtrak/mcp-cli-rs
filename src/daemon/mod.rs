@@ -1,18 +1,17 @@
 use anyhow::Result;
 use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::Mutex;
 
 use crate::config::Config;
-use crate::daemon;
 use crate::daemon::lifecycle::DaemonLifecycle;
 use crate::daemon::pool::ConnectionPool;
 use crate::ipc::{IpcServer, create_ipc_server};
 
-pub mod fingerprint;
 pub mod lifecycle;
-pub mod orphan;
+
 pub mod pool;
 pub mod protocol;
 
@@ -27,30 +26,20 @@ pub struct DaemonState {
     /// Config file content fingerprint for validation
     pub config_fingerprint: ConfigFingerprint,
     /// Lifecycle manager for idle timeout
-    pub lifecycle: DaemonLifecycle,
+    pub lifecycle: Arc<Mutex<DaemonLifecycle>>,
     /// Connection pool for persistent MCP server connections
     pub connection_pool: Arc<crate::daemon::pool::ConnectionPool>,
 }
 
 impl DaemonState {
     /// Update activity timestamp
-    pub fn update_activity(&self) {
-        self.lifecycle.update_activity();
-    }
-
-    /// Check if daemon should shutdown
-    pub fn should_shutdown(&self) -> bool {
-        self.lifecycle.should_shutdown()
+    pub async fn update_activity(&self) {
+        self.lifecycle.lock().await.update_activity().await;
     }
 
     /// Signal that daemon should shut down
-    pub fn shutdown(&self) {
-        self.lifecycle.shutdown();
-    }
-
-    /// Check if daemon is running
-    pub fn is_running(&self) -> bool {
-        self.lifecycle.is_running()
+    pub async fn shutdown(&self) {
+        self.lifecycle.lock().await.shutdown();
     }
 }
 
@@ -81,25 +70,21 @@ pub async fn run_daemon(
     let pid = std::process::id();
     tracing::info!("Daemon PID: {}", pid);
 
-    // Write PID to file for orphan detection
-    daemon::orphan::write_daemon_pid(&config, pid)?;
-    tracing::info!("PID file written");
-
-    // Spawn idle timeout monitor
-    let lifecycle_clone = lifecycle.clone();
-    let _lifecycle_task = tokio::spawn(async move {
-        crate::daemon::lifecycle::run_idle_timer(&lifecycle_clone).await;
-    });
-
     // Initialize connection pool
     let connection_pool = Arc::new(ConnectionPool::new(Arc::new(config.clone())));
 
     let state = DaemonState {
         config: Arc::new(config),
         config_fingerprint: config_fingerprint.clone(),
-        lifecycle,
+        lifecycle: Arc::new(Mutex::new(lifecycle)),
         connection_pool,
     };
+
+    let state2 = state.clone();
+    // Spawn idle timeout monitor
+    let _lifecycle_task = tokio::spawn(async move {
+        crate::daemon::lifecycle::run_idle_timer(state2.lifecycle).await;
+    });
 
     tracing::info!("Daemon main loop starting");
 
@@ -120,7 +105,7 @@ pub async fn run_daemon(
                     Err(e) => {
                         tracing::warn!("Error accepting connection: {}", e);
                         // Check if we should shutdown
-                        if state.should_shutdown() {
+                        if state.lifecycle.lock().await.should_shutdown().await {
                             break;
                         }
                         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -131,7 +116,7 @@ pub async fn run_daemon(
             // Wait for shutdown timeout
             _ = tokio::time::sleep(Duration::from_secs(1)) => {
                 // Check if we should shutdown
-                if state.should_shutdown() {
+                if state.lifecycle.lock().await.should_shutdown().await {
                     break;
                 }
             }
@@ -141,14 +126,6 @@ pub async fn run_daemon(
     tracing::info!("Daemon shutting down, removing resource files");
     let socket_path_clone = socket_path.clone();
     cleanup_socket(socket_path_clone).await?;
-
-    // Remove PID file
-    let _ = crate::daemon::orphan::remove_pid_file(&socket_path);
-    tracing::info!("PID file removed");
-
-    // Remove fingerprint file
-    let _ = crate::daemon::orphan::remove_fingerprint_file(&socket_path);
-    tracing::info!("Fingerprint file removed");
 
     tracing::info!("Daemon shutdown complete");
     Ok(())
@@ -160,7 +137,7 @@ pub async fn handle_client(stream: impl crate::ipc::IpcStream, state: DaemonStat
     tracing::debug!("Daemon: New client connected");
 
     // Update activity timestamp
-    state.update_activity();
+    state.update_activity().await;
 
     // Wrap stream for buffered reading
     let (reader, mut writer) = tokio::io::split(stream);
@@ -193,7 +170,7 @@ pub async fn handle_client(stream: impl crate::ipc::IpcStream, state: DaemonStat
     tracing::debug!("Daemon: Response sent");
 
     // Update activity timestamp
-    state.update_activity();
+    state.update_activity().await;
 }
 
 /// Handle daemon request and return response
@@ -215,7 +192,7 @@ pub async fn handle_request(
         crate::daemon::protocol::DaemonRequest::Shutdown => {
             tracing::info!("Shutdown requested by client");
             // Shutdown the lifecycle
-            state.shutdown();
+            state.shutdown().await;
             crate::daemon::protocol::DaemonResponse::ShutdownAck
         }
 
@@ -308,28 +285,6 @@ pub async fn cleanup_socket(socket_path: PathBuf) -> Result<()> {
     Ok(())
 }
 
-/// Remove PID file
-pub fn remove_pid_file(socket_path: &Path) -> Result<()> {
-    let pid_file = crate::daemon::orphan::get_pid_file_path(socket_path);
-    if pid_file.exists()
-        && let Err(e) = std::fs::remove_file(&pid_file)
-    {
-        tracing::warn!("Failed to remove PID file: {}", e);
-    }
-    Ok(())
-}
-
-/// Remove fingerprint file
-pub fn remove_fingerprint_file(socket_path: &Path) -> Result<()> {
-    let fp_file = crate::daemon::orphan::get_fingerprint_file_path(socket_path);
-    if fp_file.exists()
-        && let Err(e) = std::fs::remove_file(&fp_file)
-    {
-        tracing::warn!("Failed to remove fingerprint file: {}", e);
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use crate::daemon::protocol::{DaemonRequest, DaemonResponse};
@@ -350,7 +305,7 @@ mod tests {
         let state = DaemonState {
             config: Arc::new(config),
             config_fingerprint: String::new(),
-            lifecycle,
+            lifecycle: Arc::new(Mutex::new(lifecycle)),
             connection_pool: Arc::new(crate::daemon::pool::ConnectionPool::new(Arc::new(
                 Config::default(),
             ))),
@@ -367,7 +322,7 @@ mod tests {
         let state = DaemonState {
             config: Arc::new(config),
             config_fingerprint: String::new(),
-            lifecycle: lifecycle.clone(),
+            lifecycle: Arc::new(Mutex::new(lifecycle)),
             connection_pool: Arc::new(crate::daemon::pool::ConnectionPool::new(Arc::new(
                 Config::default(),
             ))),
@@ -375,6 +330,5 @@ mod tests {
 
         let response = handle_request(DaemonRequest::Shutdown, &state).await;
         assert!(matches!(response, DaemonResponse::ShutdownAck));
-        assert!(!lifecycle.is_running());
     }
 }

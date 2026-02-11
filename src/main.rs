@@ -4,6 +4,7 @@ use mcp_cli_rs::config::loader::{find_and_load, load_config};
 use mcp_cli_rs::error::{Result, exit_code};
 use mcp_cli_rs::ipc::create_ipc_client;
 use mcp_cli_rs::shutdown::{GracefulShutdown, run_with_graceful_shutdown};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -322,7 +323,7 @@ async fn shutdown_daemon() -> Result<()> {
 /// Run in standalone daemon mode - starts persistent daemon with specified TTL
 async fn run_standalone_daemon(
     cli_ttl: Option<u64>,
-    cli_socket_path: Option<std::path::PathBuf>,
+    cli_socket_path: Option<PathBuf>,
 ) -> mcp_cli_rs::error::Result<()> {
     use mcp_cli_rs::config::loader::find_and_load;
     use mcp_cli_rs::daemon::run_daemon;
@@ -331,7 +332,10 @@ async fn run_standalone_daemon(
     let mut config = match find_and_load(None).await {
         Ok(cfg) => cfg,
         Err(e) => {
-            tracing::warn!("No config file found, starting daemon with empty config: {}", e);
+            tracing::warn!(
+                "No config file found, starting daemon with empty config: {}",
+                e
+            );
             Config::default()
         }
     };
@@ -401,7 +405,10 @@ pub async fn run_auto_daemon_mode(cli: &Cli, config: &Config) -> mcp_cli_rs::err
             // Set minimum TTL of 5 seconds for auto-daemon mode to prevent race conditions
             let mut ttl = config.daemon_ttl;
             if ttl < 5 {
-                tracing::warn!("Auto-daemon TTL too short ({}s), setting minimum of 5s to prevent race conditions", ttl);
+                tracing::warn!(
+                    "Auto-daemon TTL too short ({}s), setting minimum of 5s to prevent race conditions",
+                    ttl
+                );
                 ttl = 5;
             }
 

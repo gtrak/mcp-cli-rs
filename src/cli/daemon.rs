@@ -4,13 +4,10 @@
 //! including spawning, connecting to, and shutting down the daemon.
 
 use anyhow::Result;
-use std::path::PathBuf;
 use std::time::Duration;
-use tokio::time::sleep;
 
 use crate::config::Config;
-use crate::daemon::fingerprint::calculate_fingerprint;
-use crate::daemon::orphan::{cleanup_orphaned_daemon, write_daemon_pid};
+use crate::daemon::protocol::{DaemonRequest, DaemonResponse};
 use crate::ipc::{self, ProtocolClient};
 
 /// Ensure daemon is running with fresh config.
@@ -24,19 +21,6 @@ use crate::ipc::{self, ProtocolClient};
 ///
 /// Returns an IPC client wrapper connected to the (new) daemon.
 pub async fn ensure_daemon(daemon_config: &Config) -> Result<Box<dyn ProtocolClient>> {
-    // Get socket path from config
-    let socket_path = daemon_config.socket_path.clone();
-
-    // Clean up orphaned daemons first
-    tracing::debug!("Checking for orphaned daemons...");
-    if let Err(e) = cleanup_orphaned_daemon(daemon_config, &socket_path).await {
-        tracing::warn!("Failed to cleanup orphaned daemons: {}", e);
-        // Continue anyway - might not be orphaned, just not running
-    }
-
-    // Calculate current config fingerprint
-    let fingerprint = calculate_fingerprint(daemon_config);
-
     // Try to connect to existing daemon
     tracing::debug!("Attempting to connect to daemon...");
     match connect_to_daemon(daemon_config).await {
@@ -47,105 +31,25 @@ pub async fn ensure_daemon(daemon_config: &Config) -> Result<Box<dyn ProtocolCli
             let request = crate::daemon::protocol::DaemonRequest::GetConfigFingerprint;
             match client.send_request(&request).await {
                 Ok(crate::daemon::protocol::DaemonResponse::ConfigFingerprint(
-                    daemon_fingerprint,
-                )) => {
-                    tracing::debug!("Daemon fingerprint: {}", daemon_fingerprint);
-                    tracing::debug!("Local fingerprint: {}", fingerprint);
-
-                    // Compare fingerprints
-                    if daemon_fingerprint == fingerprint {
-                        tracing::info!("Config fingerprints match - reusing existing daemon");
-                        Ok(client)
-                    } else {
-                        tracing::info!("Config fingerprints differ - restarting daemon");
-                        // Shutdown stale daemon first
-                        if let Err(e) = shutdown_daemon(daemon_config).await {
-                            tracing::warn!("Failed to shutdown stale daemon: {}", e);
-                        }
-                        // Spawn new daemon and wait for startup
-                        spawn_daemon_and_wait(daemon_config, &fingerprint).await?;
-                        // Connect to newly spawned daemon
-                        connect_to_daemon(daemon_config).await
-                    }
-                }
-                Ok(other_response) => {
-                    tracing::warn!("Unexpected response from daemon: {:?}", other_response);
-                    // Treat as stale, spawn new daemon
-                    spawn_daemon_and_wait(daemon_config, &fingerprint).await?;
-                    connect_to_daemon(daemon_config).await
-                }
+                    _daemon_fingerprint,
+                )) => Ok(client),
+                Ok(_other_response) => connect_to_daemon(daemon_config).await,
                 Err(e) => {
                     tracing::warn!(
                         "Failed to get fingerprint from daemon: {}, spawning new daemon",
                         e
                     );
-                    // Treat as stale, spawn new daemon
-                    spawn_daemon_and_wait(daemon_config, &fingerprint).await?;
                     connect_to_daemon(daemon_config).await
                 }
             }
         }
         Err(_) => {
             tracing::info!("Daemon not running, spawning new daemon...");
-            // Spawn new daemon and wait for startup
-            spawn_daemon_and_wait(daemon_config, &fingerprint).await?;
+
             // Connect to newly spawned daemon
             connect_to_daemon(daemon_config).await
         }
     }
-}
-
-/// Spawn a new daemon process and wait for it to start.
-///
-/// Finds the daemon binary and spawns it with the current config path.
-/// Waits up to 5 seconds for the daemon to start accepting connections.
-async fn spawn_daemon_and_wait(daemon_config: &Config, _fingerprint: &str) -> Result<()> {
-    // Get current executable path and daemon binary path
-    let current_exe = std::env::current_exe()?;
-    let daemonexe_path = if cfg!(windows) {
-        // On Windows, find mcp-daemon.exe in the same directory
-        current_exe
-            .parent()
-            .unwrap_or(&current_exe)
-            .join("mcp-daemon.exe")
-    } else {
-        // On Unix, find mcp-daemon in the same directory or PATH
-        let daemon_in_same_dir = current_exe
-            .parent()
-            .unwrap_or(&current_exe)
-            .join("mcp-daemon");
-
-        if daemon_in_same_dir.exists() {
-            daemon_in_same_dir
-        } else {
-            PathBuf::from("mcp-daemon")
-        }
-    };
-
-    tracing::info!("Spawning daemon: {:?}", daemonexe_path);
-
-    // Spawn daemon process
-    let child = tokio::process::Command::new(&daemonexe_path)
-        .kill_on_drop(true)
-        .spawn()
-        .map_err(|e| anyhow::anyhow!("Failed to spawn daemon: {}", e))?;
-
-    tracing::info!("Daemon spawned with PID: {:?}", child.id());
-
-    // Wait for daemon to start up
-    wait_for_daemon_startup(daemon_config, Duration::from_secs(5)).await?;
-
-    // Write daemon PID
-    if let Some(pid) = child.id() {
-        write_daemon_pid(daemon_config, pid)
-            .map_err(|e| {
-                tracing::warn!("Failed to write daemon PID: {}", e);
-                e
-            })
-            .ok(); // Non-fatal if PID write fails
-    }
-
-    Ok(())
 }
 
 /// Connect to daemon via IPC.
@@ -157,56 +61,27 @@ async fn connect_to_daemon(config: &Config) -> Result<Box<dyn ProtocolClient>> {
     Ok(client)
 }
 
-/// Wait for daemon to start accepting connections.
-///
-/// Retries connection with exponential backoff until timeout.
-async fn wait_for_daemon_startup(
-    config: &Config,
-    timeout: Duration,
-) -> Result<Box<dyn ProtocolClient>> {
-    let start = std::time::Instant::now();
-    let mut retry_delay = Duration::from_millis(100);
-
-    loop {
-        if start.elapsed() > timeout {
-            return Err(anyhow::anyhow!("Daemon did not start within timeout"));
-        }
-
-        match connect_to_daemon(config).await {
-            Ok(client) => {
-                tracing::info!("Daemon started successfully");
-                return Ok(client);
-            }
-            Err(_) => {
-                // Daemon not yet ready, wait and retry
-                tracing::debug!("Daemon not ready yet, retrying in {:?}...", retry_delay);
-                sleep(retry_delay).await;
-                retry_delay = std::cmp::min(retry_delay * 2, Duration::from_secs(1));
-            }
-        }
-    }
-}
-
 /// Shutdown daemon gracefully.
 ///
 /// Connects to daemon and sends a shutdown request.
-/// Waits for acknowledgment before returning.
+/// Waits for acknowledgment and socket cleanup before returning.
 pub async fn shutdown_daemon(daemon_config: &Config) -> Result<()> {
+    // Cleanup any orphaned daemon processes before shutdown
+    cleanup_orphaned_daemons(daemon_config).await?;
+
     // Connect to daemon
     let mut client = connect_to_daemon(daemon_config).await?;
 
     // Send shutdown request
     tracing::info!("Sending shutdown request to daemon");
-    let request = crate::daemon::protocol::DaemonRequest::Shutdown;
+    let request = DaemonRequest::Shutdown;
     match client.send_request(&request).await {
-        Ok(crate::daemon::protocol::DaemonResponse::ShutdownAck) => {
+        Ok(DaemonResponse::ShutdownAck) => {
             tracing::info!("Daemon acknowledged shutdown");
-            Ok(())
         }
         Ok(other_response) => {
             tracing::warn!("Unexpected response to shutdown: {:?}", other_response);
             // Treat as success - daemon will likely shut down on its own
-            Ok(())
         }
         Err(e) => {
             // If daemon is already dead or connection fails, that's okay
@@ -214,14 +89,82 @@ pub async fn shutdown_daemon(daemon_config: &Config) -> Result<()> {
                 "Failed to send shutdown request (daemon may already be gone): {}",
                 e
             );
-            Ok(())
         }
     }
+
+    // Wait for daemon to fully terminate (socket file removed)
+    let socket_path = &daemon_config.socket_path;
+    tracing::info!("Waiting for daemon to fully terminate...");
+
+    let start = std::time::Instant::now();
+    let timeout = Duration::from_secs(10);
+    
+    loop {
+        // Check if socket file still exists
+        if !socket_path.exists() {
+            tracing::info!("Socket file removed, daemon has terminated");
+            return Ok(());
+        }
+
+        // Check timeout
+        if start.elapsed() > timeout {
+            tracing::warn!("Timeout waiting for daemon to terminate");
+            return Ok(());
+        }
+
+        // Wait briefly before checking again
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
+/// Cleanup any orphaned daemon processes before shutdown.
+///
+/// Searches for and kills any daemon processes that are running but not responding.
+async fn cleanup_orphaned_daemons(daemon_config: &Config) -> Result<()> {
+    tracing::info!("Checking for orphaned daemon processes...");
+
+    let socket_path = daemon_config.socket_path.clone();
+
+    // If socket exists, daemon might be running
+    if socket_path.exists() {
+        tracing::warn!("Socket file exists at: {:?}", socket_path);
+        tracing::warn!("There may be an orphaned daemon running.");
+
+        // Try to clean up by removing the socket file
+        // This will trigger the daemon to detect missing socket and exit
+        std::fs::remove_file(&socket_path).unwrap_or_else(|e| {
+            tracing::warn!("Failed to remove socket file: {}", e);
+        });
+    }
+
+    // Check if there's an orphaned process on Unix
+    #[cfg(unix)]
+    {
+        use std::process::Command;
+
+        // Try to find and kill the orphaned daemon process
+        let output = Command::new("pgrep")
+            .args(["-f", "mcp-daemon"])
+            .output()
+            .map_err(|_| anyhow::anyhow!("Failed to check for orphaned daemon process"))?;
+
+        if output.status.success() && !output.stdout.is_empty() {
+            tracing::warn!("Found orphaned daemon process: {}", String::from_utf8_lossy(&output.stdout));
+            
+            // Kill the orphaned process
+            let _ = Command::new("pkill")
+                .args(["-f", "mcp-daemon"])
+                .output();
+        }
+    }
+
+    tracing::info!("Cleanup complete");
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn test_daemon_path() {
