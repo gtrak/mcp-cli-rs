@@ -413,7 +413,7 @@ async fn cmd_list_servers_json(mut daemon: Box<dyn ProtocolClient>) -> Result<()
 
     // Process successful servers
     for (server_name, tools) in successes {
-        let server_config = {
+        let _server_config = {
             let daemon_guard = daemon_arc.lock().await;
             daemon_guard.config().get_server(&server_name).cloned()
         };
@@ -531,11 +531,13 @@ pub async fn cmd_server_info(daemon: Box<dyn ProtocolClient>, server_name: &str)
 /// Displays detailed information about a specific tool including its JSON Schema.
 /// Implements DISC-03: inspection of tool details.
 /// Implements OUTP-05, OUTP-11, OUTP-14: consistent formatting and descriptions
+/// Implements OUTP-07, OUTP-08: JSON output mode
 ///
 /// # Arguments
 /// * `daemon` - Daemon IPC client
 /// * `tool_id` - Tool identifier in format "server/tool" or "server tool"
-/// * `detail_level` - Level of detail for display
+/// * `detail_level` - Level of detail for display (ignored in JSON mode)
+/// * `output_mode` - Output format (human or JSON)
 ///
 /// # Errors
 /// Returns McpError::ToolNotFound if tool doesn't exist (ERR-02)
@@ -544,7 +546,12 @@ pub async fn cmd_tool_info(
     mut daemon: Box<dyn ProtocolClient>,
     tool_id: &str,
     detail_level: DetailLevel,
+    output_mode: OutputMode,
 ) -> Result<()> {
+    // Handle JSON mode separately
+    if output_mode == OutputMode::Json {
+        return cmd_tool_info_json(daemon, tool_id).await;
+    }
     let (server_name, tool_name) = parse_tool_id(tool_id)?;
 
     let _server = daemon.config().get_server(&server_name).ok_or_else(|| {
@@ -721,6 +728,63 @@ pub async fn cmd_tool_info(
     Ok(())
 }
 
+/// Execute the tool info command in JSON mode.
+///
+/// Outputs complete tool information including schema as structured JSON.
+/// Implements OUTP-07: --json flag support
+/// Implements OUTP-08: consistent JSON schema with complete tool metadata
+async fn cmd_tool_info_json(mut daemon: Box<dyn ProtocolClient>, tool_id: &str) -> Result<()> {
+    let (server_name, tool_name) = parse_tool_id(tool_id)?;
+
+    let _server = daemon.config().get_server(&server_name).ok_or_else(|| {
+        McpError::ToolNotFound {
+            tool: tool_name.clone(),
+            server: server_name.clone(),
+        }
+    })?;
+
+    // Send ListTools request to daemon
+    let tools = daemon.list_tools(&server_name).await?;
+
+    let tool = tools.iter().find(|t| t.name == tool_name).ok_or_else(|| {
+        McpError::ToolNotFound {
+            tool: tool_name.clone(),
+            server: server_name.clone(),
+        }
+    })?;
+
+    // Get server config for transport info
+    let config = daemon.config();
+    let server_config = config.get_server(&server_name);
+    let transport_name = server_config
+        .map(|s| s.transport.type_name())
+        .unwrap_or("unknown");
+
+    // Extract parameters from schema
+    let params = extract_params_from_schema(&tool.input_schema);
+    let parameters: Vec<ParameterDetail> = params
+        .into_iter()
+        .map(|param| ParameterDetail {
+            name: param.name,
+            param_type: param.param_type,
+            required: param.required,
+            description: param.description,
+        })
+        .collect();
+
+    let output = ToolDetailOutput {
+        name: tool_name.clone(),
+        description: tool.description.clone(),
+        server: server_name.clone(),
+        transport: transport_name.to_string(),
+        parameters,
+        input_schema: tool.input_schema.clone(),
+    };
+
+    print_json(&output);
+    Ok(())
+}
+
 /// Execute tool call command.
 ///
 /// Executes a tool with JSON arguments, retrying on transient failures.
@@ -891,11 +955,13 @@ pub async fn cmd_call_tool(
 /// Implements DISC-04: search of tools using glob patterns.
 /// Implements OUTP-14: context-rich search results
 /// Implements OUTP-05: consistent formatting
+/// Implements OUTP-07, OUTP-08: JSON output mode
 ///
 /// # Arguments
 /// * `daemon` - Daemon IPC client
 /// * `pattern` - Glob pattern to search for (e.g., "*", "search*", "tool-*")
-/// * `detail_level` - Level of detail for display
+/// * `detail_level` - Level of detail for display (ignored in JSON mode)
+/// * `output_mode` - Output format (human or JSON)
 ///
 /// # Errors
 /// Returns empty result if no tools match
@@ -903,7 +969,12 @@ pub async fn cmd_search_tools(
     mut daemon: Box<dyn ProtocolClient>,
     pattern: &str,
     detail_level: DetailLevel,
+    output_mode: OutputMode,
 ) -> Result<()> {
+    // Handle JSON mode separately
+    if output_mode == OutputMode::Json {
+        return cmd_search_tools_json(daemon, pattern).await;
+    }
     let config = daemon.config();
 
     // Empty pattern handling
@@ -1182,6 +1253,105 @@ pub async fn cmd_search_tools(
     Ok(())
 }
 
+/// Execute the search tools command in JSON mode.
+///
+/// Outputs search results as structured JSON for programmatic use.
+/// Implements OUTP-07: --json flag support
+/// Implements OUTP-08: consistent JSON schema with complete tool metadata
+async fn cmd_search_tools_json(mut daemon: Box<dyn ProtocolClient>, pattern: &str) -> Result<()> {
+    let config = daemon.config();
+
+    // Handle empty pattern or config
+    if pattern.trim().is_empty() || config.is_empty() {
+        let output = SearchOutput {
+            pattern: pattern.to_string(),
+            total_matches: 0,
+            match_count: 0,
+            matches: vec![],
+            failed_servers: vec![],
+        };
+        print_json(&output);
+        return Ok(());
+    }
+
+    let executor = ParallelExecutor::new(config.concurrency_limit);
+
+    // Get server names from daemon
+    let server_names = daemon.list_servers().await.map_err(|e| {
+        print_error(&format!("Failed to get servers list: {}", e));
+        e
+    })?;
+
+    // Create daemon client for parallel execution
+    let daemon_arc = Arc::new(Mutex::new(daemon));
+
+    // List tools from all servers in parallel
+    let (successes, failures): (Vec<(String, Vec<ToolInfo>)>, Vec<String>) = {
+        list_tools_parallel(
+            server_names,
+            |server| {
+                let daemon_arc = daemon_arc.clone();
+                async move {
+                    let mut daemon_guard = daemon_arc.lock().await;
+                    daemon_guard
+                        .list_tools(&server)
+                        .await
+                        .map_err(|e| {
+                            tracing::warn!("Failed to list tools for {}: {}", server, e);
+                            e
+                        })
+                        .map(|protocol_tools| {
+                            protocol_tools
+                                .into_iter()
+                                .map(|protocol_tool| crate::client::ToolInfo {
+                                    name: protocol_tool.name,
+                                    description: Some(protocol_tool.description),
+                                    input_schema: protocol_tool.input_schema,
+                                })
+                                .collect()
+                        })
+                }
+            },
+            &executor,
+            config.as_ref(),
+        )
+        .await?
+    };
+
+    // Parse glob pattern
+    let pattern_obj = match glob::Pattern::new(pattern) {
+        Ok(p) => p,
+        Err(_) => {
+            glob::Pattern::new("*").unwrap()
+        }
+    };
+
+    // Search for matching tools across all servers
+    let mut matches = Vec::new();
+    for (server_name, tools) in successes {
+        for tool in tools {
+            if pattern_obj.matches(&tool.name) {
+                matches.push(SearchMatch {
+                    server: server_name.clone(),
+                    name: tool.name,
+                    description: tool.description.unwrap_or_default(),
+                });
+            }
+        }
+    }
+
+    let output = SearchOutput {
+        pattern: pattern.to_string(),
+        total_matches: matches.len(),
+        match_count: matches.len(),
+        matches,
+        failed_servers: failures,
+    };
+
+    print_json(&output);
+    Ok(())
+}
+ 
 /// Parse a tool identifier from a string.
 ///
 /// Supports both "server/tool" and "server tool" formats (CLI-05).
