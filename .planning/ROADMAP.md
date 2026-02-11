@@ -444,13 +444,13 @@ Plans:
 | 5 | Unified Daemon Architecture | Complete | 100% |
 | 6 | Output Formatting & Visual Hierarchy | Complete | 100% |
 | 7 | JSON Output & Machine-Readable Modes | Complete | 100% |
-| 8 | Fix Phase 4 Windows Tests (XP-01) | Planned | ready (1 plan in 1 wave) |
+| 8 | Fix Phase 4 Windows Tests (XP-01) | Complete | 100% |
 | 9 | Cross-Platform Verification (XP-02, XP-04) | Pending | 0% |
 | 10 | Phase 6 Verification Documentation | Pending | 0% |
 | 11 | Code Quality Cleanup | Pending | 0% |
 
-**v1.2 Tech Debt Coverage:** 4/4 items pending
+**v1.2 Tech Debt Coverage:** 3/4 items pending
 
 ---
 
-**Last updated:** 2026-02-11 (Phase 8 planned - 1 plan in 1 wave)
+**Last updated:** 2026-02-11 (Phase 8 complete - Windows integration tests created)
