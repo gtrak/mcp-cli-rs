@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::config::Config;
+use crate::daemon;
 use crate::daemon::lifecycle::DaemonLifecycle;
 use crate::daemon::pool::ConnectionPool;
 use crate::ipc::{IpcServer, create_ipc_server};
@@ -81,7 +82,7 @@ pub async fn run_daemon(
     tracing::info!("Daemon PID: {}", pid);
 
     // Write PID to file for orphan detection
-    let _ = crate::daemon::orphan::write_daemon_pid(&socket_path, pid);
+    daemon::orphan::write_daemon_pid(&config, pid)?;
     tracing::info!("PID file written");
 
     // Spawn idle timeout monitor

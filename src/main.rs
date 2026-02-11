@@ -1,7 +1,8 @@
 use clap::{Parser, Subcommand};
+use mcp_cli_rs::config::Config;
 use mcp_cli_rs::config::loader::{find_and_load, load_config};
 use mcp_cli_rs::error::{Result, exit_code};
-use mcp_cli_rs::ipc::{create_ipc_client, get_socket_path};
+use mcp_cli_rs::ipc::create_ipc_client;
 use mcp_cli_rs::shutdown::{GracefulShutdown, run_with_graceful_shutdown};
 use std::sync::Arc;
 use std::time::Duration;
@@ -199,17 +200,14 @@ async fn run(cli: Cli) -> Result<()> {
     } else if cli.require_daemon {
         // Require-daemon mode: fail if daemon not running
         run_with_graceful_shutdown(
-            || run_require_daemon_mode(&cli, Arc::clone(&daemon_config)),
+            || run_require_daemon_mode(&cli, &daemon_config),
             shutdown_rx,
         )
         .await?
     } else {
         // Auto-daemon mode (default): spawn if needed, use TTL
-        run_with_graceful_shutdown(
-            || run_auto_daemon_mode(&cli, Arc::clone(&daemon_config)),
-            shutdown_rx,
-        )
-        .await?
+        run_with_graceful_shutdown(|| run_auto_daemon_mode(&cli, &daemon_config), shutdown_rx)
+            .await?
     };
 
     Ok(())
@@ -295,10 +293,8 @@ async fn shutdown_daemon() -> Result<()> {
         mcp_cli_rs::error::McpError::usage_error(format!("Failed to load configuration: {}", e))
     })?;
 
-    let config_arc = Arc::new(config);
-
     // Create IPC client to connect to daemon
-    let mut client = create_ipc_client(config_arc).map_err(|e| {
+    let mut client = create_ipc_client(&config).map_err(|e| {
         mcp_cli_rs::error::McpError::io_error(std::io::Error::new(
             std::io::ErrorKind::ConnectionRefused,
             e,
@@ -336,8 +332,8 @@ async fn run_standalone_daemon(cli_ttl: Option<u64>) -> mcp_cli_rs::error::Resul
 
     tracing::info!("Starting standalone daemon with TTL: {}s", ttl);
 
-    // Get socket path
-    let socket_path = get_socket_path();
+    // Use the config's socket path (already set by Config::default())
+    let socket_path = config.socket_path.clone();
     tracing::info!("Using socket path: {:?}", socket_path);
 
     // Remove existing socket file if present
@@ -367,15 +363,10 @@ async fn run_standalone_daemon(cli_ttl: Option<u64>) -> mcp_cli_rs::error::Resul
 }
 
 /// Run in auto-daemon mode: spawn if needed, execute command, daemon auto-shutdowns after TTL
-pub async fn run_auto_daemon_mode(
-    cli: &Cli,
-    config: Arc<mcp_cli_rs::config::Config>,
-) -> mcp_cli_rs::error::Result<()> {
+pub async fn run_auto_daemon_mode(cli: &Cli, config: &Config) -> mcp_cli_rs::error::Result<()> {
     tracing::debug!("run_auto_daemon_mode called");
     // Check if daemon is running
-    let socket_path = get_socket_path();
-
-    match try_connect_to_daemon(config.clone(), &socket_path).await {
+    match try_connect_to_daemon(config).await {
         Ok(client) => {
             // Daemon is running, use it
             tracing::info!("Using existing daemon");
@@ -390,10 +381,10 @@ pub async fn run_auto_daemon_mode(
 
             // Spawn daemon as background task
             tracing::debug!("Spawning daemon with TTL={}s...", ttl);
-            let config_clone = Arc::clone(&config);
+
             tokio::spawn(async move {
                 tracing::debug!("Inside tokio::spawn, about to spawn daemon...");
-                match spawn_background_daemon(config_clone, ttl).await {
+                match spawn_background_daemon(ttl).await {
                     Ok(_) => tracing::debug!("spawn_background_daemon returned Ok"),
                     Err(e) => tracing::debug!("spawn_background_daemon failed: {}", e),
                 }
@@ -407,7 +398,7 @@ pub async fn run_auto_daemon_mode(
             loop {
                 tokio::time::sleep(delay).await;
 
-                match try_connect_to_daemon(config.clone(), &socket_path).await {
+                match try_connect_to_daemon(config).await {
                     Ok(client) => {
                         tracing::info!("Connected to daemon after {} attempt(s)", retries + 1);
                         return execute_command(cli, client).await;
@@ -441,13 +432,8 @@ pub async fn run_auto_daemon_mode(
 }
 
 /// Run in require-daemon mode: fail if daemon not running
-pub async fn run_require_daemon_mode(
-    cli: &Cli,
-    config: Arc<mcp_cli_rs::config::Config>,
-) -> mcp_cli_rs::error::Result<()> {
-    let socket_path = get_socket_path();
-
-    match try_connect_to_daemon(config.clone(), &socket_path).await {
+pub async fn run_require_daemon_mode(cli: &Cli, config: &Config) -> mcp_cli_rs::error::Result<()> {
+    match try_connect_to_daemon(config).await {
         Ok(client) => {
             tracing::info!("Using existing daemon");
             execute_command(cli, client).await
@@ -459,10 +445,9 @@ pub async fn run_require_daemon_mode(
 }
 
 async fn try_connect_to_daemon(
-    config: Arc<mcp_cli_rs::config::Config>,
-    _socket_path: &std::path::Path,
+    config: &Config,
 ) -> mcp_cli_rs::error::Result<Box<dyn mcp_cli_rs::ipc::ProtocolClient>> {
-    let client = create_ipc_client(config.clone())?;
+    let client = create_ipc_client(config)?;
 
     // Actually verify the connection works by sending a ping
     let mut test_client = client;
@@ -472,10 +457,7 @@ async fn try_connect_to_daemon(
     }
 }
 
-async fn spawn_background_daemon(
-    _config: Arc<mcp_cli_rs::config::Config>,
-    ttl: u64,
-) -> mcp_cli_rs::error::Result<()> {
+async fn spawn_background_daemon(ttl: u64) -> mcp_cli_rs::error::Result<()> {
     // Spawn the daemon as a separate process using the binary itself
     // This is necessary because the daemon runs an IPC server that needs
     // to be independent of the client process

@@ -72,8 +72,11 @@ impl<T: Clone + IpcClient> IpcClientWrapper<T> {
     }
 
     /// Create wrapper with config (convenience method for wrapped clients)
-    pub fn with_config(client: T, config: Arc<Config>) -> Self {
-        Self { client, config }
+    pub fn with_config(client: T, config: Config) -> Self {
+        Self {
+            client,
+            config: config.into(),
+        }
     }
 
     /// List all configured servers
@@ -253,7 +256,7 @@ impl<T: IpcClient + Send + Sync + Clone> ProtocolClient for IpcClientWrapper<T> 
 ///
 /// Returns Box<dyn ProtocolClient> with platform-specific implementation
 #[cfg(unix)]
-pub fn create_ipc_client(config: Arc<Config>) -> Result<Box<dyn ProtocolClient>, McpError> {
+pub fn create_ipc_client(config: Config) -> Result<Box<dyn ProtocolClient>, McpError> {
     let client = crate::ipc::UnixIpcClient::new(config.clone());
     Ok(Box::new(crate::ipc::IpcClientWrapper::with_config(
         client, config,
@@ -264,10 +267,11 @@ pub fn create_ipc_client(config: Arc<Config>) -> Result<Box<dyn ProtocolClient>,
 ///
 /// Returns Box<dyn ProtocolClient> with platform-specific implementation
 #[cfg(windows)]
-pub fn create_ipc_client(config: Arc<Config>) -> Result<Box<dyn ProtocolClient>, McpError> {
-    let client = crate::ipc::NamedPipeIpcClient::with_config(config.clone());
+pub fn create_ipc_client(config: &Config) -> Result<Box<dyn ProtocolClient>, McpError> {
+    let client = crate::ipc::NamedPipeIpcClient::with_config(config);
     Ok(Box::new(crate::ipc::IpcClientWrapper::with_config(
-        client, config,
+        client,
+        config.clone(),
     )))
 }
 

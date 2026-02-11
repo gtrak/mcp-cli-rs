@@ -63,8 +63,8 @@ mod ipc_tests {
 
         // Create IPC client
         let config = mcp_cli_rs::config::Config::default();
-        let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
-            .expect("Failed to create IPC client");
+        let mut client =
+            mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
 
         // Send request and get response
         let request = DaemonRequest::Ping;
@@ -173,8 +173,8 @@ mod ipc_tests {
 
         // Create IPC client
         let config = mcp_cli_rs::config::Config::default();
-        let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
-            .expect("Failed to create IPC client");
+        let mut client =
+            mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
 
         // Send ping request
         let request = DaemonRequest::Ping;

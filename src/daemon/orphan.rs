@@ -101,8 +101,8 @@ pub fn read_daemon_pid(socket_path: &Path) -> Result<u32> {
 /// Write PID to PID file
 ///
 /// Called by daemon on startup to register itself.
-pub fn write_daemon_pid(socket_path: &Path, pid: u32) -> Result<()> {
-    let pid_file = get_pid_file_path(socket_path);
+pub fn write_daemon_pid(config: &Config, pid: u32) -> Result<()> {
+    let pid_file = get_pid_file_path(&config.socket_path);
     let pid_str = pid.to_string();
 
     fs::write(&pid_file, &pid_str)?;
@@ -210,8 +210,7 @@ pub fn remove_fingerprint_file(socket_path: &Path) -> Result<()> {
 fn try_connect_via_ipc(daemon_config: &Config, _socket_path: &Path) -> Result<()> {
     // Try to create IPC client to check if daemon is running
     // Note: This may fail if daemon is not running, which is expected
-    use std::sync::Arc;
-    let _client = crate::ipc::create_ipc_client(Arc::new(daemon_config.clone()))?;
+    let _client = crate::ipc::create_ipc_client(daemon_config)?;
     Ok(())
 }
 

@@ -20,7 +20,14 @@ fn get_unix_test_socket_path() -> PathBuf {
 /// Get a temporary named pipe path specifically for testing
 #[cfg(windows)]
 fn get_windows_test_pipe_name() -> String {
-    format!("\\\\.\\pipe\\mcp-windows-test-{}", std::process::id())
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    let random_suffix: u64 = rng.r#gen();
+    format!(
+        "\\\\.\\pipe\\mcp-windows-test-{}-{}",
+        std::process::id(),
+        random_suffix
+    )
 }
 
 /// Test Unix socket creation and validation
@@ -402,8 +409,8 @@ async fn test_windows_named_pipe_client_server_roundtrip() {
 
     // Create IPC client with matching socket path
     let config = mcp_cli_rs::config::Config::with_socket_path(pipe_path);
-    let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
-        .expect("Failed to create IPC client");
+    let mut client =
+        mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
 
     // Send request and get response
     let request = DaemonRequest::Ping;
@@ -477,8 +484,8 @@ async fn test_windows_named_pipe_multiple_concurrent_connections() {
     // Create IPC client and send 3 concurrent requests
     for i in 0..3 {
         let config = mcp_cli_rs::config::Config::with_socket_path(pipe_path.clone());
-        let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
-            .expect("Failed to create IPC client");
+        let mut client =
+            mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
         let request = DaemonRequest::Ping;
         let response = client
             .send_request(&request)
@@ -546,8 +553,8 @@ async fn test_windows_named_pipe_large_message_transfer() {
 
     // Create IPC client with matching socket path
     let config = mcp_cli_rs::config::Config::with_socket_path(pipe_path);
-    let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
-        .expect("Failed to create IPC client");
+    let mut client =
+        mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
 
     // Send ping request
     let request = DaemonRequest::Ping;
@@ -579,8 +586,8 @@ async fn test_windows_named_pipe_security_flags() {
     let pipe_path = PathBuf::from(&pipe_name);
 
     // Create IPC server
-    let _server = mcp_cli_rs::ipc::create_ipc_server(&pipe_path)
-        .expect("Failed to create IPC server");
+    let _server =
+        mcp_cli_rs::ipc::create_ipc_server(&pipe_path).expect("Failed to create IPC server");
 
     // Spawn server task that checks connection properties
     let server_handle = tokio::spawn(async move {
@@ -601,7 +608,7 @@ async fn test_windows_named_pipe_security_flags() {
         let _request = mcp_cli_rs::daemon::protocol::receive_request(&mut buf_reader)
             .await
             .expect("Failed to receive request");
-        
+
         // Send response back to client
         let response = DaemonResponse::Pong;
         mcp_cli_rs::daemon::protocol::send_response(&mut buf_reader, &response)
@@ -614,8 +621,8 @@ async fn test_windows_named_pipe_security_flags() {
 
     // Create IPC client with matching socket path
     let config = mcp_cli_rs::config::Config::with_socket_path(pipe_path);
-    let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
-        .expect("Failed to create IPC client");
+    let mut client =
+        mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
 
     // Send request
     let request = DaemonRequest::Ping;
@@ -720,8 +727,7 @@ async fn test_ipc_client_trait_consistency() {
     {
         let config = mcp_cli_rs::config::Config::default();
 
-        let client =
-            mcp_cli_rs::ipc::windows::NamedPipeIpcClient::with_config(std::sync::Arc::new(config));
+        let client = mcp_cli_rs::ipc::windows::NamedPipeIpcClient::with_config(&config);
 
         // Verify trait methods are implemented
         assert!(

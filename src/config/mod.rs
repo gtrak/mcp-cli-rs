@@ -5,8 +5,8 @@
 //!
 //! Requires the `std::sync::LazyLock` crate feature for static HashMaps.
 
-use std::sync::LazyLock;
 use serde::{Deserialize, Serialize};
+use std::sync::LazyLock;
 
 use crate::McpError;
 use std::collections::HashMap;
@@ -166,8 +166,8 @@ pub struct Config {
 
     /// Socket path for IPC communication.
     ///
-    /// Platform-specific path for daemon IPC. Uses default if not specified.
-    #[serde(default)]
+    /// Platform-specific path for daemon IPC.
+    #[serde(skip, default = "crate::ipc::get_socket_path")]
     pub socket_path: std::path::PathBuf,
 }
 
@@ -410,20 +410,18 @@ mod tests {
     #[test]
     fn test_get_server() {
         let config = Config {
-            servers: vec![
-                ServerConfig {
-                    name: "server1".to_string(),
-                    transport: ServerTransport::Stdio {
-                        command: "echo".to_string(),
-                        args: vec![],
-                        env: HashMap::new(),
-                        cwd: None,
-                    },
-                    description: None,
-                    allowed_tools: None,
-                    disabled_tools: None,
+            servers: vec![ServerConfig {
+                name: "server1".to_string(),
+                transport: ServerTransport::Stdio {
+                    command: "echo".to_string(),
+                    args: vec![],
+                    env: HashMap::new(),
+                    cwd: None,
                 },
-            ],
+                description: None,
+                allowed_tools: None,
+                disabled_tools: None,
+            }],
             ..Default::default()
         };
         let server = config.get_server("server1");
@@ -436,64 +434,62 @@ mod tests {
     fn test_config_fingerprint_includes_daemon_ttl() {
         let config1 = Config {
             daemon_ttl: 60,
-            servers: vec![
-                ServerConfig {
-                    name: "test".to_string(),
-                    transport: ServerTransport::Stdio {
-                        command: "echo".to_string(),
-                        args: vec![],
-                        env: HashMap::new(),
-                        cwd: None,
-                    },
-                    description: None,
-                    allowed_tools: None,
-                    disabled_tools: None,
+            servers: vec![ServerConfig {
+                name: "test".to_string(),
+                transport: ServerTransport::Stdio {
+                    command: "echo".to_string(),
+                    args: vec![],
+                    env: HashMap::new(),
+                    cwd: None,
                 },
-            ],
+                description: None,
+                allowed_tools: None,
+                disabled_tools: None,
+            }],
             ..Default::default()
         };
 
         let config2 = Config {
             daemon_ttl: 120,
-            servers: vec![
-                ServerConfig {
-                    name: "test".to_string(),
-                    transport: ServerTransport::Stdio {
-                        command: "echo".to_string(),
-                        args: vec![],
-                        env: HashMap::new(),
-                        cwd: None,
-                    },
-                    description: None,
-                    allowed_tools: None,
-                    disabled_tools: None,
+            servers: vec![ServerConfig {
+                name: "test".to_string(),
+                transport: ServerTransport::Stdio {
+                    command: "echo".to_string(),
+                    args: vec![],
+                    env: HashMap::new(),
+                    cwd: None,
                 },
-            ],
+                description: None,
+                allowed_tools: None,
+                disabled_tools: None,
+            }],
             ..Default::default()
         };
 
         let config3 = Config {
             daemon_ttl: 60,
-            servers: vec![
-                ServerConfig {
-                    name: "test".to_string(),
-                    transport: ServerTransport::Stdio {
-                        command: "echo".to_string(),
-                        args: vec![],
-                        env: HashMap::new(),
-                        cwd: None,
-                    },
-                    description: None,
-                    allowed_tools: None,
-                    disabled_tools: None,
+            servers: vec![ServerConfig {
+                name: "test".to_string(),
+                transport: ServerTransport::Stdio {
+                    command: "echo".to_string(),
+                    args: vec![],
+                    env: HashMap::new(),
+                    cwd: None,
                 },
-            ],
+                description: None,
+                allowed_tools: None,
+                disabled_tools: None,
+            }],
             ..Default::default()
         };
 
-        assert_ne!(crate::daemon::fingerprint::calculate_fingerprint(&config1),
-                   crate::daemon::fingerprint::calculate_fingerprint(&config2));
-        assert_eq!(crate::daemon::fingerprint::calculate_fingerprint(&config1),
-                   crate::daemon::fingerprint::calculate_fingerprint(&config3));
+        assert_ne!(
+            crate::daemon::fingerprint::calculate_fingerprint(&config1),
+            crate::daemon::fingerprint::calculate_fingerprint(&config2)
+        );
+        assert_eq!(
+            crate::daemon::fingerprint::calculate_fingerprint(&config1),
+            crate::daemon::fingerprint::calculate_fingerprint(&config3)
+        );
     }
 }

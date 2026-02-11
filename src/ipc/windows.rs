@@ -5,11 +5,11 @@
 use async_trait::async_trait;
 use std::path::Path;
 use std::sync::Arc;
-use tokio::net::windows::named_pipe::{NamedPipeClient, ClientOptions};
+use tokio::net::windows::named_pipe::{ClientOptions, NamedPipeClient};
 
-use crate::ipc::IpcServer;
-use crate::error::McpError;
 use crate::config::Config;
+use crate::error::McpError;
+use crate::ipc::IpcServer;
 
 /// Windows named pipe implementation of IPC server
 ///
@@ -24,12 +24,12 @@ impl NamedPipeIpcServer {
     /// Creates a named pipe that can accept multiple client connections
     pub fn new(path: &Path) -> Result<Self, McpError> {
         // Extract pipe name from the path (remove any directory components)
-        let pipe_name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .ok_or_else(|| McpError::IpcError {
-                message: format!("Invalid pipe path: {}", path.display()),
-            })?;
+        let pipe_name =
+            path.file_name()
+                .and_then(|n| n.to_str())
+                .ok_or_else(|| McpError::IpcError {
+                    message: format!("Invalid pipe path: {}", path.display()),
+                })?;
 
         let pipe_name_display = format!(r"\\.\pipe\{}", pipe_name);
 
@@ -59,15 +59,15 @@ impl IpcServer for NamedPipeIpcServer {
             })?;
 
         // Wait for a client connection
-        server
-            .connect()
-            .await
-            .map_err(|e| McpError::IpcError {
-                message: format!("Failed to accept named pipe connection: {}", e),
-            })?;
+        server.connect().await.map_err(|e| McpError::IpcError {
+            message: format!("Failed to accept named pipe connection: {}", e),
+        })?;
 
         // The server becomes the connected pipe for communication
-        Ok((Box::new(server) as Box<dyn crate::ipc::IpcStream>, self.pipe_name.clone()))
+        Ok((
+            Box::new(server) as Box<dyn crate::ipc::IpcStream>,
+            self.pipe_name.clone(),
+        ))
     }
 }
 
@@ -81,8 +81,10 @@ pub struct NamedPipeIpcClient {
 
 impl NamedPipeIpcClient {
     /// Create a new NamedPipeIpcClient with a config reference (convenience method)
-    pub fn with_config(config: Arc<Config>) -> Self {
-        Self { config }
+    pub fn with_config(config: &Config) -> Self {
+        Self {
+            config: config.clone().into(),
+        }
     }
 }
 
@@ -94,7 +96,10 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
     }
 
     /// Send a daemon protocol request and receive response
-    async fn send_request(&mut self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
+    async fn send_request(
+        &mut self,
+        request: &crate::daemon::protocol::DaemonRequest,
+    ) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
         // Get daemon named pipe path from config
         let pipe_path = &self.config.socket_path;
         tracing::debug!("IPC: Connecting to pipe at {:?}", pipe_path);
@@ -104,13 +109,14 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
         tracing::debug!("IPC: Connected to pipe");
 
         // Split stream for reading and writing
-        use tokio::io::{BufReader};
+        use tokio::io::BufReader;
         let (reader, mut writer) = tokio::io::split(stream);
         let mut buf_reader = BufReader::new(reader);
 
         // Send request using NDJSON protocol
         tracing::debug!("IPC: Sending request: {:?}", request);
-        crate::daemon::protocol::send_request(&mut writer, request).await
+        crate::daemon::protocol::send_request(&mut writer, request)
+            .await
             .map_err(|e| McpError::IpcError {
                 message: format!("Failed to send IPC request: {}", e),
             })?;
@@ -118,7 +124,8 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
 
         // Receive response using NDJSON protocol
         tracing::debug!("IPC: Waiting for response...");
-        let result = crate::daemon::protocol::receive_response(&mut buf_reader).await
+        let result = crate::daemon::protocol::receive_response(&mut buf_reader)
+            .await
             .map_err(|e| McpError::IpcError {
                 message: format!("Failed to receive IPC response: {}", e),
             });
@@ -130,26 +137,25 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
     ///
     /// Returns a boxed stream for communication
     async fn connect(&self, path: &Path) -> Result<Box<dyn crate::ipc::IpcStream>, McpError> {
-        let pipe_name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .ok_or_else(|| McpError::IpcError {
-                message: format!("Invalid pipe path: {}", path.display()),
-            })?;
+        let pipe_name =
+            path.file_name()
+                .and_then(|n| n.to_str())
+                .ok_or_else(|| McpError::IpcError {
+                    message: format!("Invalid pipe path: {}", path.display()),
+                })?;
 
         let pipe_name_display = format!(r"\\.\pipe\{}", pipe_name);
 
-        let client = ClientOptions::new()
-            .open(&pipe_name_display)
-            .map_err(|e| McpError::ConnectionError {
+        let client = ClientOptions::new().open(&pipe_name_display).map_err(|e| {
+            McpError::ConnectionError {
                 server: pipe_name_display.clone(),
                 source: e,
-            })?;
+            }
+        })?;
 
         Ok(Box::new(client) as Box<dyn crate::ipc::IpcStream>)
     }
 }
-
 
 /// Manual implementation of IpcStream for NamedPipeClient
 impl crate::ipc::IpcStream for NamedPipeClient {}

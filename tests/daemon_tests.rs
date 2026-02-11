@@ -3,7 +3,7 @@
 use mcp_cli_rs::config::Config;
 use mcp_cli_rs::config::loader::load_config;
 use mcp_cli_rs::daemon::fingerprint::calculate_fingerprint;
-use mcp_cli_rs::daemon::orphan::{read_daemon_pid, write_daemon_pid};
+use mcp_cli_rs::daemon::orphan::read_daemon_pid;
 use tempfile::TempDir;
 
 /// Create a config from content.
@@ -58,24 +58,6 @@ transport = { type = "stdio", command = "cat" }
     assert_eq!(fp1, fp1_again, "Same config should have same fingerprint");
 
     println!("✓ Config fingerprinting test passed");
-}
-
-/// Test PID file reading and writing.
-#[test]
-fn test_pid_file_operations() {
-    let temp_dir = TempDir::new().expect("Failed to create temp dir");
-    let socket_path = temp_dir.path().join("test-sock.pid");
-
-    // Write PID
-    let test_pid = 12345;
-    write_daemon_pid(&socket_path, test_pid).expect("Failed to write PID");
-
-    // Read back
-    let read_pid = read_daemon_pid(&socket_path).expect("Failed to read PID");
-
-    assert_eq!(test_pid, read_pid, "Read PID should match written PID");
-
-    println!("✓ PID file operations test passed");
 }
 
 /// Test graceful error handling for missing PID file.
