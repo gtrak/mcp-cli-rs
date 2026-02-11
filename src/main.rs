@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use mcp_cli_rs::config::Config;
 use mcp_cli_rs::config::loader::{find_and_load, load_config};
 use mcp_cli_rs::error::{Result, exit_code};
+use mcp_cli_rs::format::OutputMode;
 use mcp_cli_rs::ipc::create_ipc_client;
 use mcp_cli_rs::shutdown::{GracefulShutdown, run_with_graceful_shutdown};
 use std::path::PathBuf;
@@ -28,6 +29,10 @@ pub struct Cli {
     /// Require daemon to be already running (fail if not running)
     #[arg(long, global = true, conflicts_with_all = ["no_daemon", "auto_daemon"])]
     require_daemon: bool,
+
+    /// Output results as JSON for programmatic use
+    #[arg(long, global = true)]
+    json: bool,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -224,14 +229,18 @@ async fn run_direct_mode(cli: &Cli, config: Arc<mcp_cli_rs::config::Config>) -> 
     let direct_client =
         Box::new(DirectProtocolClient::new(config)) as Box<dyn mcp_cli_rs::ipc::ProtocolClient>;
 
+    // Determine output mode from CLI flags
+    let output_mode = OutputMode::from_flags(cli.json);
+
     // Execute the command
-    execute_command(cli, direct_client).await
+    execute_command(cli, direct_client, output_mode).await
 }
 
 /// Execute the CLI command using the provided client
 async fn execute_command(
     cli: &Cli,
     client: Box<dyn mcp_cli_rs::ipc::ProtocolClient>,
+    output_mode: OutputMode,
 ) -> mcp_cli_rs::error::Result<()> {
     use mcp_cli_rs::cli::commands::*;
 
@@ -390,12 +399,16 @@ async fn run_standalone_daemon(
 /// Run in auto-daemon mode: spawn if needed, execute command, daemon auto-shutdowns after TTL
 pub async fn run_auto_daemon_mode(cli: &Cli, config: &Config) -> mcp_cli_rs::error::Result<()> {
     tracing::debug!("run_auto_daemon_mode called");
+
+    // Determine output mode from CLI flags
+    let output_mode = OutputMode::from_flags(cli.json);
+
     // Check if daemon is running
     match try_connect_to_daemon(config).await {
         Ok(client) => {
             // Daemon is running, use it
             tracing::info!("Using existing daemon");
-            execute_command(cli, client).await
+            execute_command(cli, client, output_mode).await
         }
         Err(_) => {
             // Daemon not running, spawn it
@@ -436,7 +449,7 @@ pub async fn run_auto_daemon_mode(cli: &Cli, config: &Config) -> mcp_cli_rs::err
                 match try_connect_to_daemon(config).await {
                     Ok(client) => {
                         tracing::info!("Connected to daemon after {} attempt(s)", retries + 1);
-                        return execute_command(cli, client).await;
+                        return execute_command(cli, client, output_mode).await;
                     }
                     Err(e) => {
                         retries += 1;
@@ -468,10 +481,13 @@ pub async fn run_auto_daemon_mode(cli: &Cli, config: &Config) -> mcp_cli_rs::err
 
 /// Run in require-daemon mode: fail if daemon not running
 pub async fn run_require_daemon_mode(cli: &Cli, config: &Config) -> mcp_cli_rs::error::Result<()> {
+    // Determine output mode from CLI flags
+    let output_mode = OutputMode::from_flags(cli.json);
+
     match try_connect_to_daemon(config).await {
         Ok(client) => {
             tracing::info!("Using existing daemon");
-            execute_command(cli, client).await
+            execute_command(cli, client, output_mode).await
         }
         Err(_) => Err(mcp_cli_rs::error::McpError::daemon_not_running(
             "Daemon is not running. Start it with 'mcp daemon' or use --auto-daemon",
