@@ -27,9 +27,43 @@
 //! let detailed = format_param_list(&params, DetailLevel::WithDescriptions);
 //! ```
 
-pub mod schema;
 pub mod params;
+pub mod schema;
 
 // Re-export commonly used items
+pub use params::{format_param_help, format_param_list, DetailLevel};
 pub use schema::{extract_params_from_schema, ParameterInfo};
-pub use params::{format_param_list, format_param_help, DetailLevel};
+
+/// Output format mode for CLI commands
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputMode {
+    /// Human-readable output with colors (when TTY)
+    Human,
+    /// Machine-readable JSON output
+    Json,
+}
+
+impl OutputMode {
+    /// Determine output mode from CLI flags and environment
+    ///
+    /// Priority:
+    /// 1. --json flag forces JSON mode
+    /// 2. If not TTY and not explicitly human, could consider JSON (but keep human as default)
+    pub fn from_flags(json_flag: bool) -> Self {
+        if json_flag {
+            OutputMode::Json
+        } else {
+            OutputMode::Human
+        }
+    }
+
+    /// Check if this is JSON mode
+    pub fn is_json(&self) -> bool {
+        matches!(self, OutputMode::Json)
+    }
+
+    /// Check if this is human mode
+    pub fn is_human(&self) -> bool {
+        matches!(self, OutputMode::Human)
+    }
+}
