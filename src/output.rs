@@ -7,7 +7,8 @@
 //! to stderr, controlled via RUST_LOG environment variable.
 
 use colored::*;
-use std::io::{IsTerminal, stdout};
+use serde::Serialize;
+use std::io::{stdout, IsTerminal};
 use tracing;
 
 /// Determines whether colored output should be used based on:
@@ -157,6 +158,40 @@ pub fn print_partial_failures(context: &str, failures: &[(String, String)]) {
         println!("{}", "─".repeat(50));
         for (item, error) in failures {
             println!("  ✗ {}: {}", item, error);
+        }
+    }
+}
+
+/// Print a value as formatted JSON to stdout.
+///
+/// This function serializes any serializable value to pretty-printed JSON
+/// and writes it to stdout. Used for --json output mode.
+///
+/// # Type Parameters
+/// * `T` - Any type implementing Serialize
+///
+/// # Arguments
+/// * `value` - The value to serialize and print
+///
+/// # Errors
+/// Prints error to stderr if serialization fails
+pub fn print_json<T: Serialize>(value: &T) {
+    match serde_json::to_string_pretty(value) {
+        Ok(json) => println!("{}", json),
+        Err(e) => {
+            eprintln!("{{\"error\": \"Failed to serialize output: {}\"}}", e);
+        }
+    }
+}
+
+/// Print a value as compact JSON to stdout.
+///
+/// Used when minimal output size is preferred.
+pub fn print_json_compact<T: Serialize>(value: &T) {
+    match serde_json::to_string(value) {
+        Ok(json) => println!("{}", json),
+        Err(e) => {
+            eprintln!("{{\"error\": \"Failed to serialize output: {}\"}}", e);
         }
     }
 }
