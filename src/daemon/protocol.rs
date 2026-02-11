@@ -78,6 +78,20 @@ pub struct ServerInfo {
     pub error: Option<String>,
 }
 
+/// Server detail output for server info JSON output
+#[derive(Debug, Serialize)]
+pub struct ServerDetailOutput {
+    /// Server name
+    pub name: String,
+    /// Server description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Transport type
+    pub transport_type: String,
+    /// Transport details
+    pub transport: serde_json::Value,
+}
+
 /// Top-level structure for list command JSON output
 #[derive(Debug, Serialize)]
 pub struct ListOutput {
@@ -125,6 +139,45 @@ pub struct SearchOutput {
     pub match_count: usize,
     pub matches: Vec<SearchMatch>,
     pub failed_servers: Vec<String>,
+}
+
+/// Error details for failed tool execution
+#[derive(Debug, Serialize)]
+pub struct ToolError {
+    /// Error message
+    pub message: String,
+    /// Error code if available
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<i64>,
+}
+
+/// Execution metadata for tool calls
+#[derive(Debug, Serialize)]
+pub struct ExecutionMetadata {
+    /// Timestamp of execution (ISO 8601 format)
+    pub timestamp: String,
+    /// Number of retry attempts (if applicable)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retry_count: Option<u32>,
+}
+
+/// Tool execution result for JSON output
+#[derive(Debug, Serialize)]
+pub struct ToolResult {
+    /// Server name
+    pub server: String,
+    /// Tool name
+    pub tool: String,
+    /// Execution status
+    pub status: String, // "success" or "error"
+    /// Execution result (present on success)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<serde_json::Value>,
+    /// Error details (present on error)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<ToolError>,
+    /// Execution metadata
+    pub metadata: ExecutionMetadata,
 }
 
 /// Send a NDJSON-encoded request to daemon
