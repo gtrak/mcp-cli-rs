@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 /// Manages daemon lifecycle with idle timeout
 #[derive(Clone)]
@@ -10,7 +10,7 @@ pub struct DaemonLifecycle {
     pub last_activity: Arc<Mutex<Instant>>,
     /// Time after which daemon should shutdown
     pub idle_timeout: Duration,
-    pub shutting_down: bool,
+    pub shutting_down: Arc<RwLock<bool>>,
 }
 
 impl DaemonLifecycle {
@@ -23,7 +23,7 @@ impl DaemonLifecycle {
         Self {
             last_activity,
             idle_timeout,
-            shutting_down: false,
+            shutting_down: Arc::new(RwLock::new(false)),
         }
     }
 
@@ -37,7 +37,7 @@ impl DaemonLifecycle {
     /// Check if the daemon should shutdown due to idle timeout
     /// Call this periodically (e.g., every 1 second) in a separate task
     pub async fn should_shutdown(&self) -> bool {
-        if self.shutting_down {
+        if *self.shutting_down.read().await {
             return true;
         }
         let last_activity = self.last_activity.lock().await;
@@ -46,8 +46,8 @@ impl DaemonLifecycle {
     }
 
     /// Signal that daemon should shut down
-    pub fn shutdown(&mut self) {
-        self.shutting_down = true;
+    pub async fn shutdown(&self) {
+        *self.shutting_down.write().await = true;
     }
 
     /// Get time until idle timeout (if not yet timed out)
@@ -73,8 +73,8 @@ impl DaemonLifecycle {
     }
 
     /// Check if the daemon is shutting down
-    pub fn is_shutting_down(&self) -> bool {
-        self.shutting_down
+    pub async fn is_shutting_down(&self) -> bool {
+        *self.shutting_down.read().await
     }
 
     /// Get the current config hash
@@ -94,8 +94,8 @@ impl DaemonLifecycle {
     }
 
     /// Check if shutdown has proceeded
-    pub fn shutdown_proceeded(&self) -> bool {
-        self.shutting_down
+    pub async fn shutdown_proceeded(&self) -> bool {
+        *self.shutting_down.read().await
     }
 
     /// Get error state
@@ -118,9 +118,15 @@ pub async fn run_idle_timer(lifecycle: Arc<Mutex<DaemonLifecycle>>) {
         interval.tick().await;
 
         // Check if we should shut down
-        if lifecycle.lock().await.should_shutdown().await {
+        let should_shutdown = {
+            let guard = lifecycle.lock().await;
+            guard.should_shutdown().await
+        };
+
+        if should_shutdown {
             tracing::info!("Idle timeout exceeded, shutting down daemon");
-            lifecycle.blocking_lock().shutdown();
+            let guard = lifecycle.lock().await;
+            guard.shutdown().await;
             break;
         }
     }
