@@ -1,5 +1,5 @@
 ---
-model: "lmstudio/devstral-small-2-24b-instruct-2512"
+# model: "lmstudio/devstral-small-2-24b-instruct-2512"
 description: Executes GSD plans with atomic commits, deviation handling, checkpoint protocols, and state management. Spawned by execute-phase orchestrator or execute-plan command.
 color: "#FFFF00"
 tools:
