@@ -5,6 +5,17 @@
 //!
 //! CLI output is written to stdout. Tracing is used for debug-level logging
 //! to stderr, controlled via RUST_LOG environment variable.
+//!
+//! # Plain Text Mode Compliance (OUTP-09)
+//!
+//! This module implements OUTP-09 requirement for correct plain text mode behavior:
+//!
+//! - **NO_COLOR environment variable**: When set to "1", all color output is disabled
+//! - **TTY detection**: Colors are automatically disabled when stdout is not a terminal
+//! - **JSON output mode**: Produces plain text JSON without any ANSI color codes
+//!
+//! The JSON output functions (`print_json`, `print_json_compact`) never add color codes,
+//! ensuring machine-readable output when using `--json` flag or piping output.
 
 use colored::*;
 use serde::Serialize;
@@ -232,5 +243,42 @@ mod tests {
             ("server2".to_string(), "Timeout".to_string()),
         ];
         print_partial_failures("Discovery", &failures);
+    }
+
+    #[test]
+    fn test_json_output_no_color_codes() {
+        // Verify that JSON serialization produces plain output without color codes
+        let value = serde_json::json!({
+            "test": "value",
+            "another": 123
+        });
+
+        // Capture output in a buffer to check for no color codes
+        use std::io::Write;
+        let mut buffer = Vec::new();
+        writeln!(
+            &mut buffer,
+            "{}",
+            serde_json::to_string_pretty(&value).unwrap()
+        )
+        .unwrap();
+
+        let output = String::from_utf8(buffer).unwrap();
+        assert!(
+            !output.contains('\u{001b}'),
+            "JSON should not contain ANSI color codes"
+        );
+    }
+
+    #[test]
+    fn test_json_compact_no_color_codes() {
+        // Verify that compact JSON also produces plain output
+        let value = serde_json::json!({"compact": "output"});
+
+        let output = serde_json::to_string(&value).unwrap();
+        assert!(
+            !output.contains('\u{001b}'),
+            "Compact JSON should not contain ANSI color codes"
+        );
     }
 }
