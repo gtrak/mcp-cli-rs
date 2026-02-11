@@ -39,6 +39,10 @@ enum Commands {
         /// Daemon idle timeout in seconds (overrides config and env)
         #[arg(short, long)]
         ttl: Option<u64>,
+
+        /// Socket path for IPC communication (used internally when auto-spawning)
+        #[arg(long, hide = true)]
+        socket_path: Option<std::path::PathBuf>,
     },
 
     /// Shutdown the running daemon
@@ -161,8 +165,8 @@ fn init_tracing(is_daemon: bool) {
 
 async fn run(cli: Cli) -> Result<()> {
     // Handle daemon subcommand first (standalone mode)
-    if let Some(Commands::Daemon { ttl }) = &cli.command {
-        return run_standalone_daemon(*ttl).await;
+    if let Some(Commands::Daemon { ttl, socket_path }) = &cli.command {
+        return run_standalone_daemon(*ttl, socket_path.clone()).await;
     }
 
     // Handle shutdown command
@@ -288,10 +292,14 @@ async fn execute_command(
 async fn shutdown_daemon() -> Result<()> {
     use mcp_cli_rs::config::loader::find_and_load;
 
-    // Load configuration (needed for IPC context)
-    let config = find_and_load(None).await.map_err(|e| {
-        mcp_cli_rs::error::McpError::usage_error(format!("Failed to load configuration: {}", e))
-    })?;
+    // Load configuration - use default config if no file found
+    let config = match find_and_load(None).await {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            tracing::warn!("No config file found, using default for IPC: {}", e);
+            mcp_cli_rs::config::Config::default()
+        }
+    };
 
     // Create IPC client to connect to daemon
     let mut client = create_ipc_client(&config).map_err(|e| {
@@ -312,14 +320,21 @@ async fn shutdown_daemon() -> Result<()> {
 }
 
 /// Run in standalone daemon mode - starts persistent daemon with specified TTL
-async fn run_standalone_daemon(cli_ttl: Option<u64>) -> mcp_cli_rs::error::Result<()> {
+async fn run_standalone_daemon(
+    cli_ttl: Option<u64>,
+    cli_socket_path: Option<std::path::PathBuf>,
+) -> mcp_cli_rs::error::Result<()> {
     use mcp_cli_rs::config::loader::find_and_load;
     use mcp_cli_rs::daemon::run_daemon;
 
-    // Load configuration
-    let config = find_and_load(None).await.map_err(|e| {
-        mcp_cli_rs::error::McpError::usage_error(format!("Failed to load configuration: {}", e))
-    })?;
+    // Load configuration - allow daemon to start even without config file
+    let mut config = match find_and_load(None).await {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            tracing::warn!("No config file found, starting daemon with empty config: {}", e);
+            Config::default()
+        }
+    };
 
     // Determine TTL: CLI flag > env var > config > default (60s)
     let ttl = cli_ttl
@@ -332,15 +347,21 @@ async fn run_standalone_daemon(cli_ttl: Option<u64>) -> mcp_cli_rs::error::Resul
 
     tracing::info!("Starting standalone daemon with TTL: {}s", ttl);
 
-    // Use the config's socket path (already set by Config::default())
-    let socket_path = config.socket_path.clone();
+    // Use provided socket path or fall back to config's default
+    let socket_path = cli_socket_path.unwrap_or_else(|| config.socket_path.clone());
     tracing::info!("Using socket path: {:?}", socket_path);
 
-    // Remove existing socket file if present
-    if let Err(e) = std::fs::remove_file(&socket_path)
-        && e.kind() != std::io::ErrorKind::NotFound
+    // Update config with the socket path we're actually using
+    config.socket_path = socket_path.clone();
+
+    // Remove existing socket file if present (only on Unix, Windows named pipes clean up automatically)
+    #[cfg(unix)]
     {
-        tracing::warn!("Could not remove existing socket file: {}", e);
+        if let Err(e) = std::fs::remove_file(&socket_path)
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            tracing::warn!("Could not remove existing socket file: {}", e);
+        }
     }
 
     // Create daemon lifecycle with specified TTL
@@ -377,14 +398,21 @@ pub async fn run_auto_daemon_mode(cli: &Cli, config: &Config) -> mcp_cli_rs::err
             tracing::info!("Daemon not running, spawning...");
 
             // Get TTL from config (includes env var override via config loader)
-            let ttl = config.daemon_ttl;
+            // Set minimum TTL of 5 seconds for auto-daemon mode to prevent race conditions
+            let mut ttl = config.daemon_ttl;
+            if ttl < 5 {
+                tracing::warn!("Auto-daemon TTL too short ({}s), setting minimum of 5s to prevent race conditions", ttl);
+                ttl = 5;
+            }
 
             // Spawn daemon as background task
             tracing::debug!("Spawning daemon with TTL={}s...", ttl);
 
+            // Clone socket_path for the async block
+            let socket_path = config.socket_path.clone();
             tokio::spawn(async move {
                 tracing::debug!("Inside tokio::spawn, about to spawn daemon...");
-                match spawn_background_daemon(ttl).await {
+                match spawn_background_daemon(ttl, &socket_path).await {
                     Ok(_) => tracing::debug!("spawn_background_daemon returned Ok"),
                     Err(e) => tracing::debug!("spawn_background_daemon failed: {}", e),
                 }
@@ -457,7 +485,10 @@ async fn try_connect_to_daemon(
     }
 }
 
-async fn spawn_background_daemon(ttl: u64) -> mcp_cli_rs::error::Result<()> {
+async fn spawn_background_daemon(
+    ttl: u64,
+    socket_path: &std::path::Path,
+) -> mcp_cli_rs::error::Result<()> {
     // Spawn the daemon as a separate process using the binary itself
     // This is necessary because the daemon runs an IPC server that needs
     // to be independent of the client process
@@ -468,14 +499,21 @@ async fn spawn_background_daemon(ttl: u64) -> mcp_cli_rs::error::Result<()> {
             source: std::io::Error::other(format!("Failed to get executable path: {}", e)),
         })?;
 
-    // Build arguments for daemon subcommand
-    let args = vec!["daemon".to_string()];
+    // Build arguments for daemon subcommand - pass socket path explicitly
+    // to ensure daemon uses the same IPC endpoint as the client expects
+    let socket_path_str = socket_path.to_string_lossy().to_string();
+    let args = vec![
+        "daemon".to_string(),
+        "--socket-path".to_string(),
+        socket_path_str,
+    ];
 
     // Spawn the daemon process
     tracing::info!(
-        "Spawning daemon process: {:?} daemon (TTL: {}s)",
+        "Spawning daemon process: {:?} daemon (TTL: {}s, socket: {:?})",
         current_exe,
-        ttl
+        ttl,
+        socket_path
     );
 
     tracing::debug!("Spawning daemon: {:?} with args: {:?}", current_exe, args);
