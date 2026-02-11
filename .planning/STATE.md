@@ -1,14 +1,14 @@
 # State: MCP CLI Rust Rewrite
 
 **Created:** 2025-02-06
-**Last updated:** 2026-02-11 - Phase 7 Plan 01 complete
+**Last updated:** 2026-02-11 - Phase 7 Plan 02 complete
 **Mode:** yolo
 **Depth:** standard
 
-**Last session:** 2026-02-11T14:55:51Z
-**Stopped at:** Completed 07-01-PLAN.md
+**Last session:** 2026-02-11T15:05:23Z
+**Stopped at:** Completed 07-02-PLAN.md
 **Resume file:** None
-**Plans completed:** 01-01 through 01-04 (Phase 1), 02-01 through 02-11 (Phase 2), 03-01 through 03-06 (Phase 3), 04-01 through 04-03 (Phase 4), 05-01 through 05-03 (Phase 5), 07-01 (Phase 7)
+**Plans completed:** 01-01 through 01-04 (Phase 1), 02-01 through 02-11 (Phase 2), 03-01 through 03-06 (Phase 3), 04-01 through 04-03 (Phase 4), 05-01 through 05-03 (Phase 5), 07-01 through 07-02 (Phase 7)
 
 **Phase 1 progress:** 100% (4/4 plans complete)
 **Phase 2 progress:** 100% (11/11 plans complete)
@@ -16,7 +16,7 @@
 **Phase 4 progress:** 100% (3/3 plans complete)
 **Phase 5 progress:** 100% (3/3 plans complete)
 **Phase 6 progress:** 0% (0/5 plans complete)
-**Phase 7 progress:** 25% (1/4 plans complete)
+**Phase 7 progress:** 50% (2/4 plans complete)
 
 **Milestone Status:** v1.1 COMPLETE ✅
 - Requirements: 50/50 verified (100%)
@@ -27,15 +27,17 @@
 ## Current Position
 
 Phase: 7 of 7 (JSON Output & Machine-Readable Modes)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: In progress
-Last activity: 2026-02-11 - Completed 07-01-PLAN.md
+Last activity: 2026-02-11 - Completed 07-02-PLAN.md
 
-Progress: ████████████████░░░░░░░░░░░░░░░░░░░░ 78%
+Progress: ████████████████████░░░░░░░░░░░░░░ 80%
 
 ## Accumulated Context
 
 **Decisions:**
+- [2026-02-11] JSON output structures for list, info, search commands include complete metadata per OUTP-08
+- [2026-02-11] Separate JSON handler functions maintain clean separation between human and JSON code paths
 - [2026-02-11] Added --json global flag with OutputMode enum for machine-readable output
 - [2026-02-11] JSON output helpers (print_json, print_json_compact) use serde_json for serialization
 - [2026-02-10] v1.1 milestone complete - Unified Daemon Architecture shipped
@@ -48,7 +50,8 @@ Progress: ████████████████░░░░░░░�
 - None
 
 **Next Phase Readiness:**
-- JSON output infrastructure in place, ready to implement JSON schemas for individual commands
+- JSON output implemented for discovery commands (list, info, search) per OUTP-08
+- Remaining work in Phase 7: JSON output for remaining commands (call, server-info)
 - Phase 6 (Output Formatting) still pending - can be executed independently
 
 **Planning docs committed:** true
@@ -59,7 +62,10 @@ Progress: ████████████████░░░░░░░�
 
 | Date | Decision |
 |------|----------|
+| 2026-02-11 | JSON output structures for list, info, search commands include complete metadata per OUTP-08 |
+| 2026-02-11 | Separate JSON handler functions maintain clean separation between human and JSON code paths |
 | 2026-02-11 | Added --json global flag with OutputMode enum for machine-readable output |
+| 2026-02-11 | JSON output helpers use serde_json for serialization |
 | 2026-02-11 | JSON output helpers use serde_json for serialization |
 | 2026-02-10 | v1.1 milestone complete - Unified Daemon Architecture shipped |
 | 2026-02-10 | v1.2 focus: Ergonomic CLI Output improvements |
@@ -84,7 +90,7 @@ Progress: ████████████████░░░░░░░�
 | Phase 4: Tool Filtering | ✅ Complete | 100% (3/3 plans) | All requirements satisfied |
 | Phase 5: Unified Daemon Architecture | ✅ Complete | 100% (3/3 plans) | All requirements satisfied |
 | Phase 6: Output Formatting & Visual Hierarchy | ○ Planned | 0% (0/5 plans) | Roadmap defined, ready to plan |
-| Phase 7: JSON Output & Machine-Readable Modes | 🚧 In Progress | 25% (1/4 plans) | JSON infrastructure complete, implementing schemas |
+| Phase 7: JSON Output & Machine-Readable Modes | 🚧 In Progress | 50% (2/4 plans) | Discovery commands JSON output complete, remaining commands pending |
 
 ## Milestone Readiness
 
@@ -94,7 +100,7 @@ Progress: ████████████████░░░░░░░�
 | v1.1 | ✅ COMPLETE | 50/50 (100%) | 5/5 (100%) | PASSED | PASSED |
 | v1.2 | 🚧 In Progress | 18/18 mapped | 2/2 planning complete | — | — |
 
-**Cumulative Progress:** 28/36 plans complete (78%)
+**Cumulative Progress:** 29/36 plans complete (80%)
 
 ---
 
