@@ -353,8 +353,10 @@ Plans:
 
 **Plans:** 1 plan in 1 wave
 
+**Plans:** 1 plan in 1 wave
+
 Plans:
-- [ ] 08-01-PLAN.md — Create Windows process spawning integration tests
+- [x] 08-01-PLAN.md — Create Windows process spawning integration tests
 
 ---
 
@@ -451,4 +453,4 @@ Plans:
 
 ---
 
-**Last updated:** 2026-02-11 (Gap closure phases 8-11 added)
+**Last updated:** 2026-02-11 (Phase 8 planned - 1 plan in 1 wave)
