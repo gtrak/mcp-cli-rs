@@ -95,12 +95,12 @@ impl crate::ipc::IpcClient for NamedPipeIpcClient {
 
     /// Send a daemon protocol request and receive response
     async fn send_request(&mut self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
-        // Get daemon named pipe path
-        let pipe_path = crate::ipc::get_socket_path();
+        // Get daemon named pipe path from config
+        let pipe_path = &self.config.socket_path;
         tracing::debug!("IPC: Connecting to pipe at {:?}", pipe_path);
 
         // Connect to daemon
-        let stream = self.connect(&pipe_path).await?;
+        let stream = self.connect(pipe_path).await?;
         tracing::debug!("IPC: Connected to pipe");
 
         // Split stream for reading and writing

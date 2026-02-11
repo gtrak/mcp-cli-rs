@@ -353,9 +353,9 @@ async fn test_windows_named_pipe_server_creation() {
 #[cfg(windows)]
 #[tokio::test]
 async fn test_windows_named_pipe_client_server_roundtrip() {
-    // Use the default socket path so client and server match
-    let pipe_path = mcp_cli_rs::ipc::get_socket_path();
-    let pipe_name = pipe_path.to_string_lossy().to_string();
+    // Use a unique pipe name for this test
+    let pipe_name = get_windows_test_pipe_name();
+    let pipe_path = PathBuf::from(&pipe_name);
 
     // Create IPC server
     let _server =
@@ -397,8 +397,11 @@ async fn test_windows_named_pipe_client_server_roundtrip() {
             .expect("Failed to send response");
     });
 
-    // Create IPC client
-    let config = mcp_cli_rs::config::Config::default();
+    // Give server time to create the named pipe before client connects
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Create IPC client with matching socket path
+    let config = mcp_cli_rs::config::Config::with_socket_path(pipe_path);
     let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
         .expect("Failed to create IPC client");
 
@@ -424,9 +427,9 @@ async fn test_windows_named_pipe_client_server_roundtrip() {
 #[cfg(windows)]
 #[tokio::test]
 async fn test_windows_named_pipe_multiple_concurrent_connections() {
-    // Use the default socket path so client and server match
-    let pipe_path = mcp_cli_rs::ipc::get_socket_path();
-    let pipe_name = pipe_path.to_string_lossy().to_string();
+    // Use a unique pipe name for this test
+    let pipe_name = get_windows_test_pipe_name();
+    let pipe_path = PathBuf::from(&pipe_name);
 
     // Create IPC server
     let _server =
@@ -468,9 +471,12 @@ async fn test_windows_named_pipe_multiple_concurrent_connections() {
         }
     });
 
+    // Give server time to create the named pipe before client connects
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
     // Create IPC client and send 3 concurrent requests
     for i in 0..3 {
-        let config = mcp_cli_rs::config::Config::default();
+        let config = mcp_cli_rs::config::Config::with_socket_path(pipe_path.clone());
         let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
             .expect("Failed to create IPC client");
         let request = DaemonRequest::Ping;
@@ -493,9 +499,9 @@ async fn test_windows_named_pipe_multiple_concurrent_connections() {
 #[cfg(windows)]
 #[tokio::test]
 async fn test_windows_named_pipe_large_message_transfer() {
-    // Use the default socket path so client and server match
-    let pipe_path = mcp_cli_rs::ipc::get_socket_path();
-    let pipe_name = pipe_path.to_string_lossy().to_string();
+    // Use a unique pipe name for this test
+    let pipe_name = get_windows_test_pipe_name();
+    let pipe_path = PathBuf::from(&pipe_name);
 
     // Create IPC server
     let _server =
@@ -535,8 +541,11 @@ async fn test_windows_named_pipe_large_message_transfer() {
             .expect("Failed to send response");
     });
 
-    // Create IPC client
-    let config = mcp_cli_rs::config::Config::default();
+    // Give server time to create the named pipe before client connects
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Create IPC client with matching socket path
+    let config = mcp_cli_rs::config::Config::with_socket_path(pipe_path);
     let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
         .expect("Failed to create IPC client");
 
@@ -548,7 +557,11 @@ async fn test_windows_named_pipe_large_message_transfer() {
         .expect("Failed to send request");
 
     // Verify large content was transferred correctly
-    assert!(matches!(response, DaemonResponse::ToolResult(_)));
+    assert!(
+        matches!(response, DaemonResponse::ToolResult(_)),
+        "Expected ToolResult response, got {:?}",
+        response
+    );
     if let DaemonResponse::ToolResult(content) = response {
         assert_eq!(content, large_content);
     }
@@ -561,10 +574,12 @@ async fn test_windows_named_pipe_large_message_transfer() {
 #[cfg(windows)]
 #[tokio::test]
 async fn test_windows_named_pipe_security_flags() {
+    // Use a unique pipe name for this test
     let pipe_name = get_windows_test_pipe_name();
+    let pipe_path = PathBuf::from(&pipe_name);
 
     // Create IPC server
-    let _server = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
+    let _server = mcp_cli_rs::ipc::create_ipc_server(&pipe_path)
         .expect("Failed to create IPC server");
 
     // Spawn server task that checks connection properties
@@ -575,19 +590,30 @@ async fn test_windows_named_pipe_security_flags() {
             .create(&pipe_name)
             .expect("Failed to create named pipe");
 
-        // Verify connection was made (this means local connection was accepted)
-        assert!(
-            server_instance.connect().await.is_ok(),
-            "Should accept local connections"
-        );
+        // Wait for client connection
+        server_instance
+            .connect()
+            .await
+            .expect("Failed to connect named pipe");
 
-        // Try to disconnect and recreate to verify flags persist
-        // (Flags are applied per-connection, but server implementation should respect them)
-        let _ = server_instance.disconnect();
+        // Read request and send response (proper protocol handling)
+        let mut buf_reader = tokio::io::BufReader::new(server_instance);
+        let _request = mcp_cli_rs::daemon::protocol::receive_request(&mut buf_reader)
+            .await
+            .expect("Failed to receive request");
+        
+        // Send response back to client
+        let response = DaemonResponse::Pong;
+        mcp_cli_rs::daemon::protocol::send_response(&mut buf_reader, &response)
+            .await
+            .expect("Failed to send response");
     });
 
-    // Create IPC client
-    let config = mcp_cli_rs::config::Config::default();
+    // Give server time to create the named pipe before client connects
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Create IPC client with matching socket path
+    let config = mcp_cli_rs::config::Config::with_socket_path(pipe_path);
     let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
         .expect("Failed to create IPC client");
 

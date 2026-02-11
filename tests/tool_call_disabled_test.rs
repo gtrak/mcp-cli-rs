@@ -26,11 +26,7 @@ mod tests {
                 allowed_tools: None,
                 disabled_tools: Some(vec!["password_*".to_string()]),
             }],
-            concurrency_limit: 5,
-            retry_max: 3,
-            retry_delay_ms: 1000,
-            timeout_secs: 1800,
-            daemon_ttl: 60,
+            ..Config::default()
         };
 
         let server_config = config.get_server("test-server").unwrap();
@@ -65,11 +61,7 @@ mod tests {
                 allowed_tools: Some(vec!["list_*".to_string(), "search_*".to_string()]),
                 disabled_tools: None,
             }],
-            concurrency_limit: 5,
-            retry_max: 3,
-            retry_delay_ms: 1000,
-            timeout_secs: 1800,
-            daemon_ttl: 60,
+            ..Config::default()
         };
 
         let server_config = config.get_server("test-server").unwrap();
@@ -103,11 +95,7 @@ mod tests {
                 allowed_tools: Some(vec!["*".to_string()]), // Allow all tools
                 disabled_tools: Some(vec!["password_*".to_string(), "sudo_*".to_string()]),
             }],
-            concurrency_limit: 5,
-            retry_max: 3,
-            retry_delay_ms: 1000,
-            timeout_secs: 1800,
-            daemon_ttl: 60,
+            ..Config::default()
         };
 
         let server_config = config.get_server("test-server").unwrap();
@@ -161,11 +149,7 @@ mod tests {
                 allowed_tools: None,
                 disabled_tools: Some(vec!["sensitive_*".to_string(), "password_*".to_string()]),
             }],
-            concurrency_limit: 5,
-            retry_max: 3,
-            retry_delay_ms: 1000,
-            timeout_secs: 1800,
-            daemon_ttl: 60,
+            ..Config::default()
         };
 
         let server_config = config.get_server("secure-server").unwrap();

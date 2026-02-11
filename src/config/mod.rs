@@ -163,6 +163,12 @@ pub struct Config {
     /// This implements DAEMON-03, DAEMON-10, and DAEMON-11 requirements.
     #[serde(default = "default_daemon_ttl")]
     pub daemon_ttl: u64,
+
+    /// Socket path for IPC communication.
+    ///
+    /// Platform-specific path for daemon IPC. Uses default if not specified.
+    #[serde(default)]
+    pub socket_path: std::path::PathBuf,
 }
 
 impl Default for Config {
@@ -174,6 +180,22 @@ impl Default for Config {
             retry_delay_ms: default_retry_delay_ms(),
             timeout_secs: default_timeout_secs(),
             daemon_ttl: default_daemon_ttl(),
+            socket_path: crate::ipc::get_socket_path(),
+        }
+    }
+}
+
+impl Config {
+    /// Create a new Config with default values and the default socket path.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create a new Config with a custom socket path.
+    pub fn with_socket_path(socket_path: std::path::PathBuf) -> Self {
+        Self {
+            socket_path,
+            ..Default::default()
         }
     }
 }
