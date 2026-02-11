@@ -309,8 +309,8 @@ Plans:
 Plans:
 - [x] 07-01-PLAN.md — Add --json flag infrastructure and OutputMode enum
 - [x] 07-02-PLAN.md — Implement JSON output for discovery commands (list, info, search)
-- [ ] 07-03-PLAN.md — Implement JSON output for tool execution (call command)
-- [ ] 07-04-PLAN.md — Integration tests and schema documentation
+- [x] 07-03-PLAN.md — Implement JSON output for tool execution (call command)
+- [x] 07-04-PLAN.md — Integration tests and schema documentation
 
 ---
 
@@ -324,10 +324,10 @@ Plans:
 | 4 | Tool Filtering & Cross-Platform Validation | Complete | 100% |
 | 5 | Unified Daemon Architecture | Complete | 100% |
 | 6 | Output Formatting & Visual Hierarchy | Complete | 100% |
-| 7     | JSON Output & Machine-Readable Modes | In Progress | 50% (2/4 plans) |
+| 7 | JSON Output & Machine-Readable Modes | Complete | 100% (4/4 plans) |
 
 **v1.2 Coverage:** 18/18 requirements mapped ✓
 
 ---
 
-**Last updated:** 2026-02-11 (Phase 7 plan 02 complete - Discovery commands JSON output)
+**Last updated:** 2026-02-11 (Phase 7 complete - JSON Output & Machine-Readable Modes)

@@ -183,10 +183,10 @@ Requirements for ergonomic CLI output improvements.
 
 ### Output Modes
 
-- [ ] **OUTP-07**: JSON output mode (`--json` flag) for programmatic use and scripting
-- [ ] **OUTP-08**: JSON output includes complete tool metadata (name, description, parameters, schema)
-- [ ] **OUTP-09**: Plain text mode (`--no-color` or when piped) works correctly for all commands
-- [ ] **OUTP-10**: Machine-readable output follows consistent schema across all commands
+- [x] **OUTP-07**: JSON output mode (`--json` flag) for programmatic use and scripting
+- [x] **OUTP-08**: JSON output includes complete tool metadata (name, description, parameters, schema)
+- [x] **OUTP-09**: Plain text mode (`--no-color` or when piped) works correctly for all commands
+- [x] **OUTP-10**: Machine-readable output follows consistent schema across all commands
 
 ### Tool Discovery UX
 
@@ -206,24 +206,24 @@ Requirements for ergonomic CLI output improvements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| OUTP-01 | Phase 6 | Pending |
-| OUTP-02 | Phase 6 | Pending |
-| OUTP-03 | Phase 6 | Pending |
-| OUTP-04 | Phase 6 | Pending |
-| OUTP-05 | Phase 6 | Pending |
-| OUTP-06 | Phase 6 | Pending |
-| OUTP-07 | Phase 7 | Pending |
-| OUTP-08 | Phase 7 | Pending |
-| OUTP-09 | Phase 7 | Pending |
-| OUTP-10 | Phase 7 | Pending |
-| OUTP-11 | Phase 6 | Pending |
-| OUTP-12 | Phase 6 | Pending |
-| OUTP-13 | Phase 6 | Pending |
-| OUTP-14 | Phase 6 | Pending |
-| OUTP-15 | Phase 6 | Pending |
-| OUTP-16 | Phase 6 | Pending |
-| OUTP-17 | Phase 6 | Pending |
-| OUTP-18 | Phase 6 | Pending |
+| OUTP-01 | Phase 6 | Complete |
+| OUTP-02 | Phase 6 | Complete |
+| OUTP-03 | Phase 6 | Complete |
+| OUTP-04 | Phase 6 | Complete |
+| OUTP-05 | Phase 6 | Complete |
+| OUTP-06 | Phase 6 | Complete |
+| OUTP-07 | Phase 7 | Complete |
+| OUTP-08 | Phase 7 | Complete |
+| OUTP-09 | Phase 7 | Complete |
+| OUTP-10 | Phase 7 | Complete |
+| OUTP-11 | Phase 6 | Complete |
+| OUTP-12 | Phase 6 | Complete |
+| OUTP-13 | Phase 6 | Complete |
+| OUTP-14 | Phase 6 | Complete |
+| OUTP-15 | Phase 6 | Complete |
+| OUTP-16 | Phase 6 | Complete |
+| OUTP-17 | Phase 6 | Complete |
+| OUTP-18 | Phase 6 | Complete |
 
 **v1.2 Coverage:**
 - v1.2 requirements: 18 total
