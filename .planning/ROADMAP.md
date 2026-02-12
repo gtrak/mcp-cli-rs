@@ -325,8 +325,13 @@ Plans:
 | 5 | Unified Daemon Architecture | Complete | 100% |
 | 6 | Output Formatting & Visual Hierarchy | Complete | 100% |
 | 7 | JSON Output & Machine-Readable Modes | Complete | 100% (4/4 plans) |
+| 8 | Fix Phase 4 Windows Tests (XP-01) | Complete | 100% (1/1 plans) |
+| 9 | Cross-Platform Verification (XP-02, XP-04) | Complete | 100% (1/1 plans) |
+| 10 | Phase 6 Verification Documentation | Complete | 100% (1/1 plans) |
+| 11 | Code Quality Cleanup | Complete | 100% (1/1 plans) |
 
 **v1.2 Coverage:** 18/18 requirements mapped ✓
+**v1.2 Tech Debt:** 3/3 complete (XP-01 validated, XP-02/XP-04 verified, code quality cleanup complete)
 
 ---
 
@@ -441,7 +446,7 @@ Plans:
 **Plans:** 1 plan in 1 wave
 
 Plans:
-- [ ] 11-01-PLAN.md — Remove unused imports, commented-out code, run linting checks
+- [x] 11-01-PLAN.md — Remove unused imports, commented-out code, run linting checks
 
 ---
 
@@ -458,11 +463,11 @@ Plans:
 | 7 | JSON Output & Machine-Readable Modes | Complete | 100% (4/4 plans) |
 | 8 | Fix Phase 4 Windows Tests (XP-01) | Complete | 100% |
 | 9 | Cross-Platform Verification (XP-02, XP-04) | Complete | 100% |
- | 10 | Phase 6 Verification Documentation | Complete | 100% (1/1 plans) |
- | 11 | Code Quality Cleanup | Pending | 0% (1/1 plans) |
+  | 10 | Phase 6 Verification Documentation | Complete | 100% (1/1 plans) |
+  | 11 | Code Quality Cleanup | Complete | 100% (1/1 plans) |
 
-**v1.2 Tech Debt Coverage:** 2/3 items pending
+**v1.2 Tech Debt Coverage:** 3/3 complete (XP-01 validated, XP-02, XP-04 verified, code quality cleanup complete)
 
 ---
 
-**Last updated:** 2026-02-12 (Phase 11 planned - Code quality cleanup)
+**Last updated:** 2026-02-12 (Phase 11 complete - Code quality cleanup with clippy/fmt validation)
