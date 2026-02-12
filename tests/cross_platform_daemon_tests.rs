@@ -9,32 +9,14 @@ use mcp_cli_rs::daemon::protocol::{DaemonRequest, DaemonResponse};
 use mcp_cli_rs::ipc::IpcClient;
 use std::path::PathBuf; // Import IpcClient trait
 
-/// Get a temporary Unix socket path specifically for testing
-#[cfg(unix)]
-fn get_unix_test_socket_path() -> PathBuf {
-    let mut path = std::env::temp_dir();
-    path.push(format!("mcp-unix-test-{}.sock", std::process::id()));
-    path
-}
-
-/// Get a temporary named pipe path specifically for testing
-#[cfg(windows)]
-fn get_windows_test_pipe_name() -> String {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    let random_suffix: u64 = rng.r#gen();
-    format!(
-        "\\\\.\\pipe\\mcp-windows-test-{}-{}",
-        std::process::id(),
-        random_suffix
-    )
-}
+#[cfg(test)]
+mod helpers;
 
 /// Test Unix socket creation and validation
 #[cfg(unix)]
 #[tokio::test]
 async fn test_unix_socket_creation() {
-    let socket_path = get_unix_test_socket_path();
+    let socket_path = crate::helpers::get_test_socket_path();
 
     // Verify socket path format
     assert!(
@@ -62,7 +44,8 @@ async fn test_unix_socket_creation() {
 #[cfg(windows)]
 #[tokio::test]
 async fn test_windows_named_pipe_creation() {
-    let pipe_name = get_windows_test_pipe_name();
+    let pipe_path = crate::helpers::get_test_socket_path();
+    let pipe_name = pipe_path.to_string_lossy().to_string();
 
     // Verify pipe name format (should start with \\.\\pipe\\)
     assert!(
@@ -90,7 +73,7 @@ async fn test_windows_named_pipe_creation() {
 #[cfg(unix)]
 #[tokio::test]
 async fn test_unix_socket_client_server_roundtrip() {
-    let socket_path = get_unix_test_socket_path();
+    let socket_path = crate::helpers::get_test_socket_path();
 
     // Create IPC server
     let mut server =
@@ -127,8 +110,8 @@ async fn test_unix_socket_client_server_roundtrip() {
     });
 
     // Create IPC client
-    let config = std::sync::Arc::new(mcp_cli_rs::config::Config::default());
-    let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
+    let config = crate::helpers::create_test_config();
+    let mut client = mcp_cli_rs::ipc::create_ipc_client(config)
         .expect("Failed to create IPC client");
 
     // Send request and get response
@@ -156,7 +139,7 @@ async fn test_unix_socket_client_server_roundtrip() {
 #[cfg(unix)]
 #[tokio::test]
 async fn test_unix_socket_multiple_concurrent_connections() {
-    let socket_path = get_unix_test_socket_path();
+    let socket_path = crate::helpers::get_test_socket_path();
 
     // Create IPC server
     let mut server =
@@ -195,8 +178,8 @@ async fn test_unix_socket_multiple_concurrent_connections() {
     });
 
     // Create IPC client and send 3 concurrent requests
-    let config = std::sync::Arc::new(mcp_cli_rs::config::Config::default());
-    let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
+    let config = crate::helpers::create_test_config();
+    let mut client = mcp_cli_rs::ipc::create_ipc_client(config)
         .expect("Failed to create IPC client");
     let request = DaemonRequest::Ping;
     let response = client
@@ -222,7 +205,7 @@ async fn test_unix_socket_multiple_concurrent_connections() {
 #[cfg(unix)]
 #[tokio::test]
 async fn test_unix_socket_large_message_transfer() {
-    let socket_path = get_unix_test_socket_path();
+    let socket_path = crate::helpers::get_test_socket_path();
 
     // Create IPC server
     let mut server =
@@ -255,12 +238,12 @@ async fn test_unix_socket_large_message_transfer() {
         let response = DaemonResponse::ToolResult(server_content);
         mcp_cli_rs::daemon::protocol::send_response(&mut buf_reader, &response)
             .await
-            .expect("Failed to send response");
+            .        expect("Failed to send response");
     });
 
     // Create IPC client
-    let config = std::sync::Arc::new(mcp_cli_rs::config::Config::default());
-    let mut client = mcp_cli_rs::ipc::create_ipc_client(std::sync::Arc::new(config))
+    let config = crate::helpers::create_test_config();
+    let mut client = mcp_cli_rs::ipc::create_ipc_client(config)
         .expect("Failed to create IPC client");
 
     // Send ping request
@@ -287,7 +270,7 @@ async fn test_unix_socket_large_message_transfer() {
 #[cfg(unix)]
 #[tokio::test]
 async fn test_unix_socket_cleanup_on_removal() {
-    let socket_path = get_unix_test_socket_path();
+    let socket_path = crate::helpers::get_test_socket_path();
 
     // Create IPC server
     let server =
@@ -316,7 +299,7 @@ async fn test_unix_socket_cleanup_on_removal() {
 #[cfg(unix)]
 #[tokio::test]
 async fn test_unix_socket_stale_error_handling() {
-    let socket_path = get_unix_test_socket_path();
+    let socket_path = crate::helpers::get_test_socket_path();
 
     // Create IPC server
     let mut server =
@@ -349,10 +332,10 @@ async fn test_unix_socket_stale_error_handling() {
 #[cfg(windows)]
 #[tokio::test]
 async fn test_windows_named_pipe_server_creation() {
-    let pipe_name = get_windows_test_pipe_name();
+    let pipe_path = crate::helpers::get_test_socket_path();
 
     // Create IPC server
-    let _server = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
+    let _server = mcp_cli_rs::ipc::create_ipc_server(&pipe_path)
         .expect("Failed to create IPC server");
 }
 
@@ -361,8 +344,8 @@ async fn test_windows_named_pipe_server_creation() {
 #[tokio::test]
 async fn test_windows_named_pipe_client_server_roundtrip() {
     // Use a unique pipe name for this test
-    let pipe_name = get_windows_test_pipe_name();
-    let pipe_path = PathBuf::from(&pipe_name);
+    let pipe_path = crate::helpers::get_test_socket_path_with_suffix("roundtrip");
+    let pipe_path_for_server = pipe_path.clone();
 
     // Create IPC server
     let _server =
@@ -371,9 +354,10 @@ async fn test_windows_named_pipe_client_server_roundtrip() {
     // Spawn server task
     let server_handle = tokio::spawn(async move {
         // Create server instance for this connection with reject_remote_clients
+        let pipe_name_str = pipe_path_for_server.to_string_lossy().to_string();
         let server_instance = tokio::net::windows::named_pipe::ServerOptions::new()
             .reject_remote_clients(true)
-            .create(&pipe_name)
+            .create(&pipe_name_str)
             .expect("Failed to create named pipe");
 
         // Wait for client connection
@@ -408,7 +392,7 @@ async fn test_windows_named_pipe_client_server_roundtrip() {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
     // Create IPC client with matching socket path
-    let config = mcp_cli_rs::config::Config::with_socket_path(pipe_path);
+    let config = crate::helpers::create_test_config_with_socket(pipe_path);
     let mut client =
         mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
 
@@ -435,8 +419,8 @@ async fn test_windows_named_pipe_client_server_roundtrip() {
 #[tokio::test]
 async fn test_windows_named_pipe_multiple_concurrent_connections() {
     // Use a unique pipe name for this test
-    let pipe_name = get_windows_test_pipe_name();
-    let pipe_path = PathBuf::from(&pipe_name);
+    let pipe_path = crate::helpers::get_test_socket_path_with_suffix("concurrent");
+    let pipe_path_for_server = pipe_path.clone();
 
     // Create IPC server
     let _server =
@@ -446,9 +430,10 @@ async fn test_windows_named_pipe_multiple_concurrent_connections() {
     let server_handle = tokio::spawn(async move {
         for _ in 0..3 {
             // Create server instance for each connection
+            let pipe_name_str = pipe_path_for_server.to_string_lossy().to_string();
             let server_instance = tokio::net::windows::named_pipe::ServerOptions::new()
                 .reject_remote_clients(true)
-                .create(&pipe_name)
+                .create(&pipe_name_str)
                 .expect("Failed to create named pipe");
 
             // Wait for client connection
@@ -483,7 +468,7 @@ async fn test_windows_named_pipe_multiple_concurrent_connections() {
 
     // Create IPC client and send 3 concurrent requests
     for i in 0..3 {
-        let config = mcp_cli_rs::config::Config::with_socket_path(pipe_path.clone());
+        let config = crate::helpers::create_test_config_with_socket(pipe_path.clone());
         let mut client =
             mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
         let request = DaemonRequest::Ping;
@@ -507,8 +492,8 @@ async fn test_windows_named_pipe_multiple_concurrent_connections() {
 #[tokio::test]
 async fn test_windows_named_pipe_large_message_transfer() {
     // Use a unique pipe name for this test
-    let pipe_name = get_windows_test_pipe_name();
-    let pipe_path = PathBuf::from(&pipe_name);
+    let pipe_path = crate::helpers::get_test_socket_path_with_suffix("large");
+    let pipe_path_for_server = pipe_path.clone();
 
     // Create IPC server
     let _server =
@@ -524,9 +509,10 @@ async fn test_windows_named_pipe_large_message_transfer() {
     // Spawn server task
     let server_handle = tokio::spawn(async move {
         // Create server instance for this connection
+        let pipe_name_str = pipe_path_for_server.to_string_lossy().to_string();
         let server_instance = tokio::net::windows::named_pipe::ServerOptions::new()
             .reject_remote_clients(true)
-            .create(&pipe_name)
+            .create(&pipe_name_str)
             .expect("Failed to create named pipe");
 
         // Wait for client connection
@@ -552,7 +538,7 @@ async fn test_windows_named_pipe_large_message_transfer() {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
     // Create IPC client with matching socket path
-    let config = mcp_cli_rs::config::Config::with_socket_path(pipe_path);
+    let config = crate::helpers::create_test_config_with_socket(pipe_path);
     let mut client =
         mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
 
@@ -582,8 +568,8 @@ async fn test_windows_named_pipe_large_message_transfer() {
 #[tokio::test]
 async fn test_windows_named_pipe_security_flags() {
     // Use a unique pipe name for this test
-    let pipe_name = get_windows_test_pipe_name();
-    let pipe_path = PathBuf::from(&pipe_name);
+    let pipe_path = crate::helpers::get_test_socket_path_with_suffix("security");
+    let pipe_path_for_server = pipe_path.clone();
 
     // Create IPC server
     let _server =
@@ -592,9 +578,10 @@ async fn test_windows_named_pipe_security_flags() {
     // Spawn server task that checks connection properties
     let server_handle = tokio::spawn(async move {
         // Create server instance with security flags
+        let pipe_name_str = pipe_path_for_server.to_string_lossy().to_string();
         let server_instance = tokio::net::windows::named_pipe::ServerOptions::new()
             .reject_remote_clients(true) // This should be applied
-            .create(&pipe_name)
+            .create(&pipe_name_str)
             .expect("Failed to create named pipe");
 
         // Wait for client connection
@@ -620,7 +607,7 @@ async fn test_windows_named_pipe_security_flags() {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
     // Create IPC client with matching socket path
-    let config = mcp_cli_rs::config::Config::with_socket_path(pipe_path);
+    let config = crate::helpers::create_test_config_with_socket(pipe_path);
     let mut client =
         mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
 
@@ -639,19 +626,20 @@ async fn test_windows_named_pipe_security_flags() {
 #[cfg(windows)]
 #[tokio::test]
 async fn test_windows_named_pipe_cleanup_on_shutdown() {
-    let pipe_name = get_windows_test_pipe_name();
-    let pipe_name_clone = pipe_name.clone();
+    let pipe_path = crate::helpers::get_test_socket_path_with_suffix("shutdown");
+    let pipe_path_clone = pipe_path.clone();
 
     // Create IPC server
-    let _server = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
+    let _server = mcp_cli_rs::ipc::create_ipc_server(&pipe_path)
         .expect("Failed to create IPC server");
 
     // Spawn server task that creates pipe and immediately drops it
     let server_handle = tokio::spawn(async move {
         // Create server instance
+        let pipe_name_str = pipe_path_clone.to_string_lossy().to_string();
         let server_instance = tokio::net::windows::named_pipe::ServerOptions::new()
             .reject_remote_clients(true)
-            .create(&pipe_name_clone)
+            .create(&pipe_name_str)
             .expect("Failed to create named pipe");
 
         // Immediately drop server instance (simulating server shutdown)
@@ -663,7 +651,7 @@ async fn test_windows_named_pipe_cleanup_on_shutdown() {
     server_handle.await.expect("Server task failed to join");
 
     // Create IPC server again at same pipe name - should succeed
-    let _server2 = mcp_cli_rs::ipc::create_ipc_server(&PathBuf::from(&pipe_name))
+    let _server2 = mcp_cli_rs::ipc::create_ipc_server(&pipe_path)
         .expect("Failed to create server after cleanup");
 }
 
@@ -673,7 +661,7 @@ async fn test_ipc_server_trait_consistency() {
     // Test on Unix (skip on Windows to avoid platform-specific issues)
     #[cfg(unix)]
     {
-        let socket_path = get_unix_test_socket_path();
+        let socket_path = crate::helpers::get_test_socket_path();
 
         let server = mcp_cli_rs::ipc::UnixIpcServer::new(&socket_path)
             .expect("Failed to create UnixIpcServer");
@@ -691,14 +679,14 @@ async fn test_ipc_server_trait_consistency() {
     // Test on Windows (skip on Unix)
     #[cfg(windows)]
     {
-        let pipe_name = get_windows_test_pipe_name();
+        let pipe_path = crate::helpers::get_test_socket_path();
 
-        let _server = mcp_cli_rs::ipc::windows::NamedPipeIpcServer::new(&PathBuf::from(&pipe_name))
+        let _server = mcp_cli_rs::ipc::windows::NamedPipeIpcServer::new(&pipe_path)
             .expect("Failed to create NamedPipeIpcServer");
 
         // Verify trait methods are implemented
         assert!(
-            !pipe_name.is_empty(),
+            !pipe_path.as_os_str().is_empty(),
             "NamedPipeIpcServer should have pipe_name method"
         );
     }
@@ -710,10 +698,9 @@ async fn test_ipc_client_trait_consistency() {
     // Test on Unix
     #[cfg(unix)]
     {
-        let socket_path = get_unix_test_socket_path();
-        let config = std::sync::Arc::new(mcp_cli_rs::config::Config::default());
+        let config = crate::helpers::create_test_config();
 
-        let client = mcp_cli_rs::ipc::UnixIpcClient::new(std::sync::Arc::new(config));
+        let client = mcp_cli_rs::ipc::UnixIpcClient::new(config);
 
         // Verify trait methods are implemented
         assert!(
@@ -725,7 +712,7 @@ async fn test_ipc_client_trait_consistency() {
     // Test on Windows
     #[cfg(windows)]
     {
-        let config = std::sync::Arc::new(mcp_cli_rs::config::Config::default());
+        let config = crate::helpers::create_test_config();
 
         let client = mcp_cli_rs::ipc::windows::NamedPipeIpcClient::with_config(config);
 
@@ -743,7 +730,7 @@ async fn test_ndjson_protocol_consistency() {
     // Test on Unix
     #[cfg(unix)]
     {
-        let socket_path = get_unix_test_socket_path();
+        let _socket_path = crate::helpers::get_test_socket_path();
         let request = DaemonRequest::ListServers;
 
         // Serialize to NDJSON (one-line JSON)
