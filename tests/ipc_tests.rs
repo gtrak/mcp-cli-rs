@@ -4,44 +4,19 @@
 //! using the unified IpcServer and IpcClient traits.
 
 #[cfg(test)]
+mod helpers;
+
+#[cfg(test)]
 mod ipc_tests {
     use mcp_cli_rs::daemon::protocol::{DaemonRequest, DaemonResponse};
     use mcp_cli_rs::ipc;
-    use std::path::PathBuf;
     use std::time::Duration;
     use tokio::time::timeout;
-
-    /// Get a temporary socket/pipe path for testing
-    #[allow(dead_code)] // Helper function for future test additions
-    fn get_test_socket_path() -> PathBuf {
-        #[cfg(unix)]
-        {
-            let mut path = std::env::temp_dir();
-            path.push(format!("mcp-test-{}.sock", std::process::id()));
-            path
-        }
-        #[cfg(windows)]
-        {
-            let mut path = std::env::temp_dir();
-            path.push(format!("\\\\.\\pipe\\mcp-test-{}", std::process::id()));
-            path
-        }
-    }
 
     /// Test IPC roundtrip request/response
     #[tokio::test]
     async fn test_ipc_roundtrip() {
-        let socket_path = {
-            let mut path = std::env::temp_dir();
-            #[cfg(unix)]
-            path.push(format!("mcp-test-roundtrip-{}.sock", std::process::id()));
-            #[cfg(windows)]
-            path.push(format!(
-                "\\\\.\\pipe\\mcp-test-roundtrip-{}",
-                std::process::id()
-            ));
-            path
-        };
+        let socket_path = crate::helpers::get_test_socket_path_with_suffix("roundtrip");
 
         // Create IPC server
         let server = ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
@@ -76,7 +51,7 @@ mod ipc_tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
         // Create IPC client
-        let config = mcp_cli_rs::config::Config::with_socket_path(socket_path.clone());
+        let config = crate::helpers::create_test_config_with_socket(socket_path.clone());
         let mut client =
             mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
 
@@ -105,17 +80,7 @@ mod ipc_tests {
     /// Test concurrent IPC connections
     #[tokio::test]
     async fn test_concurrent_connections() {
-        let socket_path = {
-            let mut path = std::env::temp_dir();
-            #[cfg(unix)]
-            path.push(format!("mcp-test-concurrent-{}.sock", std::process::id()));
-            #[cfg(windows)]
-            path.push(format!(
-                "\\\\.\\pipe\\mcp-test-concurrent-{}",
-                std::process::id()
-            ));
-            path
-        };
+        let socket_path = crate::helpers::get_test_socket_path_with_suffix("concurrent");
 
         // Create IPC server
         let server = ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
@@ -152,7 +117,7 @@ mod ipc_tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
         // Create 3 sequential clients (Windows named pipes don't support concurrent connections)
-        let config = std::sync::Arc::new(mcp_cli_rs::config::Config::with_socket_path(
+        let config = std::sync::Arc::new(crate::helpers::create_test_config_with_socket(
             socket_path.clone(),
         ));
         for _ in 0..3 {
@@ -181,17 +146,7 @@ mod ipc_tests {
     /// Test large message transfer over IPC
     #[tokio::test]
     async fn test_large_message_transfer() {
-        let socket_path = {
-            let mut path = std::env::temp_dir();
-            #[cfg(unix)]
-            path.push(format!("mcp-test-large-{}.sock", std::process::id()));
-            #[cfg(windows)]
-            path.push(format!(
-                "\\\\.\\pipe\\mcp-test-large-{}",
-                std::process::id()
-            ));
-            path
-        };
+        let socket_path = crate::helpers::get_test_socket_path_with_suffix("large");
 
         // Create IPC server
         let server =
@@ -231,7 +186,7 @@ mod ipc_tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
         // Create IPC client
-        let config = mcp_cli_rs::config::Config::with_socket_path(socket_path.clone());
+        let config = crate::helpers::create_test_config_with_socket(socket_path.clone());
         let mut client =
             mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
 
