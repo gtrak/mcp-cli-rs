@@ -108,7 +108,16 @@ Project follows a solo developer + Claude workflow with no team coordination art
   2. Module structure clearly separates concerns based on functionality area
   3. All module re-exports compile without errors
   4. Full test suite passes after restructuring (verifies no behavior changes)
-**Plans**: TBD
+**Plans**: 7 plans in 4 waves
+
+**Plan Details:**
+- [ ] 13-01-PLAN.md — Split config/mod.rs into types.rs, parser.rs, validator.rs (Wave 1)
+- [ ] 13-02-PLAN.md — Extract config loading from main.rs to config_setup.rs (Wave 1)
+- [ ] 13-03-PLAN.md — Split commands.rs into list.rs, info.rs, call.rs, search.rs (Wave 1)
+- [ ] 13-04-PLAN.md — Extract daemon lifecycle from main.rs to daemon_lifecycle.rs (Wave 2)
+- [ ] 13-05-PLAN.md — Extract command routing from main.rs to command_router.rs (Wave 2)
+- [ ] 13-06-PLAN.md — Extract CLI entry point from main.rs to entry.rs (Wave 3)
+- [ ] 13-07-PLAN.md — Verify module re-exports and run comprehensive tests (Wave 4)
 
 ### Phase 14: Duplication Elimination
 **Goal**: Remove duplicate code across command functions and connection interfaces
