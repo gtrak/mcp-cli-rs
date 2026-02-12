@@ -92,6 +92,8 @@ Project follows a solo developer + Claude workflow with no team coordination art
 - [ ] 12-02-PLAN.md — Refactor ipc_tests.rs and orphan_cleanup_tests.rs to use helpers
 - [ ] 12-03-PLAN.md — Refactor cross_platform_daemon_tests.rs (785 lines) to use helpers
 - [ ] 12-04-PLAN.md — Refactor lifecycle_tests.rs and windows_process_spawn_tests.rs to use helpers
+- [ ] 12-05-PLAN.md — Split cross_platform_daemon_tests.rs into platform modules (unix/, windows/, common/)
+- [ ] 12-04-PLAN.md — Refactor lifecycle_tests.rs and windows_process_spawn_tests.rs to use helpers
 - [ ] 12-05-PLAN.md — Split cross_platform_daemon_tests.rs into tests/unix/*.rs, tests/windows/*.rs, tests/common/*.rs
 
 ### Phase 13: Code Organization
