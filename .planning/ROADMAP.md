@@ -85,7 +85,14 @@ Project follows a solo developer + Claude workflow with no team coordination art
   2. Test suite organized by platform (tests/unix/*.rs, tests/windows/*.rs, tests/common/*.rs)
   3. Running all tests produces identical results before and after refactoring
   4. Test setup code reduced by ~200-300 lines through helper reuse
-**Plans**: TBD
+**Plans**: 5 plans in 5 waves
+
+**Plan Details:**
+- [ ] 12-01-PLAN.md — Create comprehensive test helpers module (TestEnvironment, path generators, IPC helpers, config factories)
+- [ ] 12-02-PLAN.md — Refactor ipc_tests.rs and orphan_cleanup_tests.rs to use helpers
+- [ ] 12-03-PLAN.md — Refactor cross_platform_daemon_tests.rs (785 lines) to use helpers
+- [ ] 12-04-PLAN.md — Refactor lifecycle_tests.rs and windows_process_spawn_tests.rs to use helpers
+- [ ] 12-05-PLAN.md — Split cross_platform_daemon_tests.rs into tests/unix/*.rs, tests/windows/*.rs, tests/common/*.rs
 
 ### Phase 13: Code Organization
 **Goal**: Restructure large files into focused modules with clear separation of concerns
@@ -149,7 +156,7 @@ Phases execute in numeric order: 12 → 13 → 14 → 15 → 16
 | 9 | Cross-Platform Verification (XP-02, XP-04) | Complete | 100% |
 | 10 | Phase 6 Verification Documentation | Complete | 100% |
 | 11 | Code Quality Cleanup | Complete | 100% |
-| 12 | Test Infrastructure | Not started | 0% |
+| 12 | Test Infrastructure | Not started | 0% (5 plans ready) |
 | 13 | Code Organization | Not started | 0% |
 | 14 | Duplication Elimination | Not started | 0% |
 | 15 | Documentation & API | Not started | 0% |
@@ -160,7 +167,7 @@ Phases execute in numeric order: 12 → 13 → 14 → 15 → 16
 - **Total plans:** 39 plans executed (v1.0 + v1.2)
 - **v1 Coverage:** 42/42 requirements satisfied ✅
 - **v1.2 Coverage:** 18/18 requirements satisfied ✅
-- **v1.3 Coverage:** 37/37 requirements mapped (0% delivered)
+- **v1.3 Coverage:** 37/37 requirements mapped (Phase 12: 5 plans ready, 0% delivered)
 - **Total Coverage:** 97/97 requirements (60 delivered, 37 planned)
 
 ---

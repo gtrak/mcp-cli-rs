@@ -1,14 +1,15 @@
 # State: MCP CLI Rust Rewrite
 
 **Created:** 2025-02-06
-**Last updated:** 2026-02-12 - Code Quality Cleanup complete
+**Last updated:** 2026-02-12 - Phase 12: Test Infrastructure planned
 **Mode:** yolo
 **Depth:** standard
 
 **Last session:** 2026-02-12
-**Stopped at:** v1.3 milestone initialization - Tech Debt Cleanup
+**Stopped at:** Phase 12: Test Infrastructure planned (5 plans ready) - Ready to execute
 **Resume file:** None
 **Plans completed:** 01-01 through 01-04 (Phase 1), 02-01 through 02-11 (Phase 2), 03-01 through 03-06 (Phase 3), 04-01 through 04-03 (Phase 4), 05-01 through 05-03 (Phase 5), 06-01 through 06-04 (Phase 6), 07-01 through 07-04 (Phase 7), 08-01 (Phase 8), 09-01 (Phase 9), 10-01 (Phase 10), 11-01 (Phase 11)
+**Plans ready:** 12-01 through 12-05 (Phase 12)
 
 **Phase 1 progress:** 100% (4/4 plans complete)
 **Phase 2 progress:** 100% (11/11 plans complete)
@@ -22,24 +23,33 @@
 **Phase 10 progress:** 100% (1/1 plans complete)
 **Phase 11 progress:** 100% (1/1 plans complete)
 
+**Phase 12 progress:** 0% (0/5 plans - planned)
+**Phase 13 progress:** 0% (0/TBD plans - not started)
+**Phase 14 progress:** 0% (0/TBD plans - not started)
+**Phase 15 progress:** 0% (0/TBD plans - not started)
+**Phase 16 progress:** 0% (0/TBD plans - not started)
+
 **Milestone Status:** v1.3 IN PROGRESS 🧹
 - Focus: Tech debt cleanup, code quality, maintainability
 - Previous milestones: v1.0 (42/42), v1.2 (18/18)
-- Current: Planning phase
+- Current: Phase 12 (Test Infrastructure) - ready to plan
+- v1.3 requirements: 37/37 mapped
 
 ## Current Position
 
-Phase: Not started (defining requirements for v1.3)
-Plan: —
-Status: Defining requirements for tech debt cleanup milestone
-Last activity: 2026-02-12 - v1.3 milestone initialization
+Phase: 12 of 16 (Test Infrastructure)
+Plan: 01 (first of 5 plans ready)
+Status: Ready to execute
+Last activity: 2026-02-12 - Phase 12: Test Infrastructure planned with 5 plans in 5 waves
 
-Progress: Phase planning in progress
+Progress: [████████████░░░░░░░░░░░░░] 50.0% (39/78 plans executed, 39 remaining)
 
 ## Accumulated Context
 
 **Decisions:**
-- [2026-02-12] v1.3 milestone started - Aggressive tech debt cleanup with user decision gates
+- [2026-02-12] Phase 12: Test Infrastructure planned - 5 plans to create helpers, refactor tests, and organize by platform (~200-300 line reduction)
+- [2026-02-12] v1.3 roadmap created - 5 phases (12-16) for tech debt cleanup, 37 requirements mapped
+- [2026-02-12] v1.3 started - Aggressive tech debt cleanup with user decision gates
 - [2026-02-12] Phase 11 complete - Code quality cleanup with zero clippy warnings, proper formatting, fixed shutdown() bug
 - [2026-02-12] Fixed shutdown() bug - added missing .await to properly complete Future in daemon lifecycle
 - [2026-02-12] Changed public API from &PathBuf to &Path for better performance in orphan cleanup functions
@@ -84,6 +94,8 @@ Progress: Phase planning in progress
 
 | Date | Decision |
 |------|----------|
+| 2026-02-12 | Phase 12: Test Infrastructure planned - 5 plans in 5 waves to create helpers, refactor tests, organize by platform (~200-300 line reduction) |
+| 2026-02-12 | v1.3 roadmap created - 5 phases (12-16) for tech debt cleanup, 37 requirements mapped |
 | 2026-02-12 | Phase 11 complete - Code quality cleanup with zero clippy warnings and proper formatting |
 | 2026-02-12 | Fixed shutdown() bug - added missing .await to properly complete Future |
 | 2026-02-12 | Changed public API from &PathBuf to &Path for better performance |
@@ -133,16 +145,22 @@ Progress: Phase planning in progress
 | Phase 9: Cross-Platform Verification | ✅ Complete | 100% (1/1 plans) | XP-02 verified, Windows tests passed |
 | Phase 10: Phase 6 Verification Documentation | ✅ Complete | 100% (1/1 plans) | Phase 6 verification documented, all 14 requirements verified |
 | Phase 11: Code Quality Cleanup | ✅ Complete | 100% (1/1 plans) | Zero clippy warnings, proper formatting, fixed shutdown() bug |
+| Phase 12: Test Infrastructure | 📋 Planned | 0% (0/5 plans ready) | Test helpers module, test organization, ~200-300 lines reduction |
+| Phase 13: Code Organization | 📋 Planned | 0% (0/TBD plans) | Split large files (>600 lines), module restructuring |
+| Phase 14: Duplication Elimination | 📋 Planned | 0% (0/TBD plans) | Consolidate JSON commands, unify connection interfaces |
+| Phase 15: Documentation & API | 📋 Planned | 0% (0/TBD plans) | Fix doc warnings, audit public API, improve module docs |
+| Phase 16: Code Quality Sweep | 📋 Planned | 0% (0/TBD plans) | Replace unwrap(), consistent error handling, final size reduction |
 
 ## Milestone Readiness
 
 | Milestone | Status | Requirements | Phases | Integration | E2E Flows |
 |-----------|--------|--------------|--------|-------------|-----------|
-| v1.0 | ✅ COMPLETE | 42/42 (100%) | 4/4 (100%) | PASSED | PASSED |
-| v1.1 | ✅ COMPLETE | 50/50 (100%) | 5/5 (100%) | PASSED | PASSED |
-| v1.2 | ✅ COMPLETE | 68/68 (100%) | 7/7 (100%) | — | Needs audit |
+| v1.0 | ✅ COMPLETE | 42/42 (100%) | 5/5 (100%) | PASSED | PASSED |
+| v1.1 | ✅ COMPLETE | — | Integrated in v1.0 | — | — |
+| v1.2 | ✅ COMPLETE | 18/18 (100%) | 6/6 (100%) | PASSED | PASSED |
+| v1.3 | 🚧 IN PROGRESS | 37/37 (100% mapped) | 5/5 (0% delivered) | — | — |
 
-**Cumulative Progress:** 39/39 plans complete (100%)
+**Cumulative Progress:** 39/78 plans complete (50.0%)
 
 ---
 
@@ -158,3 +176,27 @@ Progress: Phase planning in progress
 - Focus: --json flag, consistent schema, scripting support
 - Success criteria: JSON output available on all commands, consistent schema, scriptable
 - Progress: ✅ Complete (4/4 plans - infrastructure, discovery, execution, and testing complete)
+
+## v1.3 Roadmap Summary
+
+**Goal:** Reduce codebase by 8-13% (12,408 → 10,800-11,500 lines) through systematic tech debt cleanup
+
+**Phase 12: Test Infrastructure** - 8 requirements (TEST-01 through TEST-08)
+- Focus: Create reusable test helpers, organize tests by platform, eliminate ~200-300 lines of duplication
+- Success criteria: All tests use helpers, organized by platform, identical test results, ~200-300 lines reduced
+
+**Phase 13: Code Organization** - 8 requirements (ORG-01 through ORG-08)
+- Focus: Split large files (commands.rs 1850 lines, main.rs 809 lines), no file >600 lines
+- Success criteria: All files <600 lines, clear module structure, re-exports work, tests pass
+
+**Phase 14: Duplication Elimination** - 6 requirements (DUP-01 through DUP-06)
+- Focus: Consolidate 16 JSON commands to 8, unify connection interfaces, remove duplicate formatting
+- Success criteria: Multi-mode commands, single McpClient trait, no duplicates, tests pass
+
+**Phase 15: Documentation & API** - 6 requirements (DOC-01 through DOC-06)
+- Focus: Fix 9 cargo doc warnings, audit public API, reduce exports by 50-100 lines
+- Success criteria: Zero doc warnings, API reduced, all public items documented, module docs improved
+
+**Phase 16: Code Quality Sweep** - 5 requirements (QUAL-01 through QUAL-05)
+- Focus: Replace 72 unwrap() calls, remove dead_code attributes, consistent error handling
+- Success criteria: No unwrap() in production, no unnecessary attributes, consistent Result<> patterns, 10,800-11,500 lines total
