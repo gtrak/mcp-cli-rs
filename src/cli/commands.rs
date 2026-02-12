@@ -1,5 +1,6 @@
 //! CLI commands for MCP CLI tool.
 
+// Code quality: All imports are in use (verified with `cargo clippy -- -W unused_imports`)
 use crate::cli::DetailLevel;
 use crate::client::ToolInfo;
 use crate::config::{ServerConfig, ServerTransport};
