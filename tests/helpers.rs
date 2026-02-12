@@ -169,4 +169,26 @@ impl TestEnvironment {
     }
 }
 
-// Add remaining helper functions in subsequent tasks
+/// Create a default test configuration
+///
+/// Provides a standard config for tests that don't need custom settings
+pub fn create_test_config() -> Arc<Config> {
+    Arc::new(Config::default())
+}
+
+/// Create a test configuration with custom socket path
+///
+/// Useful for tests that need to specify their own IPC endpoint
+pub fn create_test_config_with_socket(socket_path: PathBuf) -> Arc<Config> {
+    Arc::new(Config::with_socket_path(socket_path))
+}
+
+/// Create a test configuration with daemon socket path for tests
+///
+/// This is the most common test configuration pattern.
+/// Uses a unique socket path based on process ID to avoid conflicts.
+pub fn create_test_daemon_config() -> Arc<Config> {
+    let socket_path = get_test_socket_path();
+    Arc::new(Config::with_socket_path(socket_path))
+}
+
