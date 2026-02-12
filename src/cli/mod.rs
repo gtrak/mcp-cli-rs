@@ -9,10 +9,14 @@ pub mod command_router;
 pub mod config_setup;
 pub mod daemon;
 pub mod daemon_lifecycle;
+pub mod entry;
 pub mod filter;
 pub mod info;
 pub mod list;
 pub mod search;
+
+// Re-export from entry module (CLI entry point)
+pub use entry::{Cli, init_tracing, main as entry_main};
 
 // Re-export from command_router
 pub use command_router::{Commands, dispatch_command, execute_command, get_run_mode, RunMode};
