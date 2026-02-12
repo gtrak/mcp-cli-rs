@@ -8,8 +8,8 @@
 **Last session:** 2026-02-12
 **Stopped at:** Completed 13-01-PLAN.md - config module split into types.rs, parser.rs, validator.rs
 **Resume file:** None
-**Plans completed:** 01-01 through 01-04 (Phase 1), 02-01 through 02-11 (Phase 2), 03-01 through 03-06 (Phase 3), 04-01 through 04-03 (Phase 4), 05-01 through 05-03 (Phase 5), 06-01 through 06-04 (Phase 6), 07-01 through 07-04 (Phase 7), 08-01 (Phase 8), 09-01 (Phase 9), 10-01 (Phase 10), 11-01 (Phase 11), 12-01 through 12-05 (Phase 12), 13-01 through 13-04 (Phase 13)
-**Plans ready:** None (Phase 13 just started)
+**Plans completed:** 01-01 through 01-04 (Phase 1), 02-01 through 02-11 (Phase 2), 03-01 through 03-06 (Phase 3), 04-01 through 04-03 (Phase 4), 05-01 through 05-03 (Phase 5), 06-01 through 06-04 (Phase 6), 07-01 through 07-04 (Phase 7), 08-01 (Phase 8), 09-01 (Phase 9), 10-01 (Phase 10), 11-01 (Phase 11), 12-01 through 12-05 (Phase 12), 13-01 through 13-05 (Phase 13)
+**Plans ready:** None (Phase 13 in progress)
 
 **Phase 1 progress:** 100% (4/4 plans complete)
 **Phase 2 progress:** 100% (11/11 plans complete)
@@ -24,7 +24,7 @@
 **Phase 11 progress:** 100% (1/1 plans complete)
 
 **Phase 12 progress:** 100% (5/5 plans - ALL COMPLETE)
-**Phase 13 progress:** 60% (3/5 plans - config module split, config setup extraction, daemon lifecycle extraction complete)
+**Phase 13 progress:** 80% (4/5 plans - config module split, config setup extraction, daemon lifecycle extraction, command router extraction complete)
 **Phase 14 progress:** 0% (0/TBD plans - not started)
 **Phase 15 progress:** 0% (0/TBD plans - not started)
 **Phase 16 progress:** 0% (0/TBD plans - not started)
@@ -38,15 +38,16 @@
 ## Current Position
 
 Phase: 13 of 16 (Code Organization)
-Plan: 13-04 complete
-Status: Daemon lifecycle extracted to daemon_lifecycle.rs
-Last activity: 2026-02-12 - Phase 13-04 complete: daemon lifecycle extracted to daemon_lifecycle.rs (485 lines)
+Plan: 13-05 complete
+Status: Command routing extracted to command_router.rs
+Last activity: 2026-02-12 - Phase 13-05 complete: command routing extracted to command_router.rs (316 lines)
 
-Progress: [██████████████████░░░░░░░] 59.0% (46/78 plans executed, 32 remaining)
+Progress: [████████████████████░░░░] 64.1% (47/78 plans executed, 31 remaining)
 
 ## Accumulated Context
 
 **Decisions:**
+- [2026-02-12] Phase 13-05 complete - Command routing extracted to src/cli/command_router.rs (316 lines), Commands enum defined, dispatch_command and execute_command functions handle routing, main.rs reduced from ~800+ to 265 lines, minor fix: removed unused Parser import
 - [2026-02-12] Phase 13-04 complete - Daemon lifecycle extracted to src/cli/daemon_lifecycle.rs (485 lines), main.rs reduced by 406 lines (809→403), core client creation functions extracted (create_auto_daemon_client, create_require_daemon_client, DirectProtocolClient)
 - [2026-02-12] Phase 13-02 complete - Config setup extracted to src/cli/config_setup.rs with 3 functions (setup_config, setup_config_optional, setup_config_for_daemon), main.rs reduced by 24 lines (809→785), 3 new tests added
 - [2026-02-12] Phase 13-01 complete - Config module split into focused submodules (types.rs, parser.rs, validator.rs), backward compatibility maintained via re-exports
@@ -93,8 +94,9 @@ Progress: [██████████████████░░░░░
   - 13-01 complete: Config module split (types.rs, parser.rs, validator.rs)
   - 13-02 complete: Config setup extracted to config_setup.rs (3 functions, 102 lines)
   - 13-04 complete: Daemon lifecycle extracted to daemon_lifecycle.rs (485 lines)
+  - 13-05 complete: Command routing extracted to command_router.rs (316 lines)
 - All config tests pass (15 unit tests + 6 integration tests + 3 new config_setup tests)
-- Ready for Phase 13-05: Continue code organization - split other large files
+- Ready for Phase 13-06: Continue code organization - split other large files
 
 **Planning docs committed:** true
 
@@ -104,6 +106,7 @@ Progress: [██████████████████░░░░░
 
 | Date | Decision |
 |------|----------|
+| 2026-02-12 | Phase 13-05 complete - Command routing extracted to command_router.rs (316 lines), Commands enum defined, dispatch_command and execute_command functions handle routing, main.rs reduced from ~800+ to 265 lines |
 | 2026-02-12 | Phase 13-04 complete - Daemon lifecycle extracted to daemon_lifecycle.rs (485 lines), main.rs reduced from 809 to 403 lines (50% reduction), client creation functions (create_auto_daemon_client, create_require_daemon_client, create_direct_client) extracted |
 | 2026-02-12 | Phase 13-01 complete - Config module split into focused submodules (types.rs, parser.rs, validator.rs), backward compatibility maintained via re-exports |
 | 2026-02-12 | Phase 12-05 complete - cross_platform_daemon_tests.rs split into platform modules (614→102 lines, 512 removed, 83% reduction); created tests/unix/ (6 tests), tests/windows/ (7 tests), tests/common/ (shared patterns) |
@@ -162,7 +165,7 @@ Progress: [██████████████████░░░░░
 | Phase 10: Phase 6 Verification Documentation | ✅ Complete | 100% (1/1 plans) | Phase 6 verification documented, all 14 requirements verified |
 | Phase 11: Code Quality Cleanup | ✅ Complete | 100% (1/1 plans) | Zero clippy warnings, proper formatting, fixed shutdown() bug |
 | Phase 12: Test Infrastructure | ✅ Complete | 100% (5/5 plans) | Test helpers module created, 4 test files refactored, tests organized by platform, ~219 lines removed |
-| Phase 13: Code Organization | 🚧 In Progress | 60% (3/5 plans) | Config module split (types.rs, parser.rs, validator.rs), config_setup.rs created (102 lines), daemon_lifecycle.rs created (485 lines), backward compatible re-exports |
+| Phase 13: Code Organization | 🚧 In Progress | 80% (4/5 plans) | Config module split (types.rs, parser.rs, validator.rs), config_setup.rs created (102 lines), daemon_lifecycle.rs created (485 lines), command_router.rs created (316 lines), backward compatible re-exports |
 | Phase 14: Duplication Elimination | 📋 Planned | 0% (0/TBD plans) | Consolidate JSON commands, unify connection interfaces |
 | Phase 15: Documentation & API | 📋 Planned | 0% (0/TBD plans) | Fix doc warnings, audit public API, improve module docs |
 | Phase 16: Code Quality Sweep | 📋 Planned | 0% (0/TBD plans) | Replace unwrap(), consistent error handling, final size reduction |
