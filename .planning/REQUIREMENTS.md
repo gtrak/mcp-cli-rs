@@ -9,14 +9,14 @@ Requirements for code quality, maintainability, and duplication elimination.
 
 ### Test Infrastructure
 
-- [ ] **TEST-01**: Create test setup helpers module (`tests/helpers.rs`) with TestEnvironment struct for temp directory management
-- [ ] **TEST-02**: Create platform-specific socket/pipe path generators with unified interface in helpers module
-- [ ] **TEST-03**: Create IPC test helpers (server/client roundtrip patterns) in helpers module
-- [ ] **TEST-04**: Create test config factories for common server/tool configurations
-- [ ] **TEST-05**: Refactor ipc_tests.rs, cross_platform_daemon_tests.rs, lifecycle_tests.rs, windows_process_spawn_tests.rs, orphan_cleanup_tests.rs to use helpers
-- [ ] **TEST-06**: Split cross_platform_daemon_tests.rs (785 lines) into tests/unix/*.rs, tests/windows/*.rs, tests/common/*.rs
-- [ ] **TEST-07**: Organize test files by platform and common patterns, maintain test coverage
-- [ ] **TEST-08**: All tests use helpers instead of inline setup (eliminate ~200-300 lines of duplication)
+- [x] **TEST-01**: Create test setup helpers module (`tests/helpers.rs`) with TestEnvironment struct for temp directory management
+- [x] **TEST-02**: Create platform-specific socket/pipe path generators with unified interface in helpers module
+- [x] **TEST-03**: Create IPC test helpers (server/client roundtrip patterns) in helpers module
+- [x] **TEST-04**: Create test config factories for common server/tool configurations
+- [x] **TEST-05**: Refactor ipc_tests.rs, cross_platform_daemon_tests.rs, lifecycle_tests.rs, windows_process_spawn_tests.rs, orphan_cleanup_tests.rs to use helpers
+- [x] **TEST-06**: Split cross_platform_daemon_tests.rs (785 lines) into tests/unix/*.rs, tests/windows/*.rs, tests/common/*.rs
+- [x] **TEST-07**: Organize test files by platform and common patterns, maintain test coverage
+- [x] **TEST-08**: All tests use helpers instead of inline setup (eliminate ~200-300 lines of duplication)
 
 ### Code Organization
 
@@ -59,7 +59,7 @@ Requirements for code quality, maintainability, and duplication elimination.
 
 - [ ] **SIZE-01**: Overall codebase reduced to 10,800-11,500 lines (from 12,408 lines = 8-13% reduction)
 - [ ] **SIZE-02**: No single file >600 lines (commands.rs was 1850)
-- [ ] **SIZE-03**: Test duplication reduced by ~200-300 lines
+- [x] **SIZE-03**: Test duplication reduced by ~200-300 lines (actually reduced by ~683 lines cross_platform_daemon_tests.rs split: 785→102)
 - [ ] **SIZE-04**: Command duplication reduced by ~200-300 lines
 - [ ] **SIZE-05**: API surface reduced by ~50-100 lines
 
@@ -76,18 +76,23 @@ Requirements for code quality, maintainability, and duplication elimination.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TEST-01 through TEST-08 | Phase 12 | Pending |
+| TEST-01 through TEST-08 | Phase 12 | Complete |
 | ORG-01 through ORG-08 | Phase 13 | Pending |
 | DUP-01 through DUP-06 | Phase 14 | Pending |
 | DOC-01 through DOC-06 | Phase 15 | Pending |
 | QUAL-01 through QUAL-05 | Phase 16 | Pending |
-| SIZE-01 through SIZE-05 | Phases 12-16 | Pending |
+| SIZE-01 | Phase 16 | Pending |
+| SIZE-02 | Phase 13 | Pending |
+| SIZE-03 | Phase 12 | Complete |
+| SIZE-04 | Phase 14 | Pending |
+| SIZE-05 | Phase 15 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 37 total
+- Complete: 9 (all TEST requirements + SIZE-03)
 - Mapped to phases: 37
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-12*
-*Last updated: 2026-02-12 after requirements definition*
+*Last updated: 2026-02-12 after Phase 12 completion (TEST requirements complete)*
