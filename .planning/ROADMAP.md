@@ -88,13 +88,11 @@ Project follows a solo developer + Claude workflow with no team coordination art
 **Plans**: 5 plans in 5 waves
 
 **Plan Details:**
-- [ ] 12-01-PLAN.md — Create comprehensive test helpers module (TestEnvironment, path generators, IPC helpers, config factories)
-- [ ] 12-02-PLAN.md — Refactor ipc_tests.rs and orphan_cleanup_tests.rs to use helpers
-- [ ] 12-03-PLAN.md — Refactor cross_platform_daemon_tests.rs (785 lines) to use helpers
+- [x] 12-01-PLAN.md — Create comprehensive test helpers module (TestEnvironment, path generators, IPC helpers, config factories)
+- [x] 12-02-PLAN.md — Refactor ipc_tests.rs and orphan_cleanup_tests.rs to use helpers
+- [x] 12-03-PLAN.md — Refactor cross_platform_daemon_tests.rs (786->613 lines) to use helpers
 - [ ] 12-04-PLAN.md — Refactor lifecycle_tests.rs and windows_process_spawn_tests.rs to use helpers
 - [ ] 12-05-PLAN.md — Split cross_platform_daemon_tests.rs into platform modules (unix/, windows/, common/)
-- [ ] 12-04-PLAN.md — Refactor lifecycle_tests.rs and windows_process_spawn_tests.rs to use helpers
-- [ ] 12-05-PLAN.md — Split cross_platform_daemon_tests.rs into tests/unix/*.rs, tests/windows/*.rs, tests/common/*.rs
 
 ### Phase 13: Code Organization
 **Goal**: Restructure large files into focused modules with clear separation of concerns
