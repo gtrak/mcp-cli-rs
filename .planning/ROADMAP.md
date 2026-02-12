@@ -380,7 +380,7 @@ Plans:
 **Plans:** 1 plan in 1 wave
 
 Plans:
-- [ ] 09-01-PLAN.md — Document XP-02 security implementation and run cross-platform tests
+- [ ] 09-01-PLAN.md — Document XP-02 security and verify cross-platform daemon
 
 ---
 
