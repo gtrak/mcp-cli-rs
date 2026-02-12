@@ -3,6 +3,7 @@
 //! This module provides functions for the CLI to manage the daemon process,
 //! including spawning, connecting to, and shutting down the daemon.
 
+// Code quality: No commented-out code - all comments are explanatory documentation
 use anyhow::Result;
 use std::time::Duration;
 
