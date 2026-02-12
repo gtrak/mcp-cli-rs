@@ -2,8 +2,7 @@
 //!
 //! Tests TOML parsing, validation, and tool filtering configuration fields.
 
-use mcp_cli_rs::config::loader;
-use mcp_cli_rs::config::{Config, ServerConfig, ServerTransport};
+use mcp_cli_rs::config::{validate_server_config, Config, ServerConfig, ServerTransport};
 
 #[cfg(test)]
 mod tests {
@@ -96,7 +95,7 @@ args = ["-m", "mcp_server"]
         let server = config.servers.first().unwrap();
 
         // This should pass validation - no error when both lists are empty
-        let validation_error = loader::validate_server_config(server, "test.toml");
+        let validation_error = validate_server_config(server, "test.toml");
 
         // Empty lists are valid - they mean no filtering
         assert!(validation_error.is_ok());
