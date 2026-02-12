@@ -74,65 +74,9 @@ async fn test_windows_named_pipe_creation() {
 #[tokio::test]
 async fn test_unix_socket_client_server_roundtrip() {
     let socket_path = crate::helpers::get_test_socket_path();
-
-    // Create IPC server
-    let mut server =
-        mcp_cli_rs::ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
-
-    // Spawn server task
-    let server_handle = tokio::spawn(async move {
-        let (mut stream, _addr) = match timeout(Duration::from_secs(5), server.accept()).await {
-            Ok(result) => match result {
-                Ok(stream) => stream,
-                Err(e) => panic!("Server accept failed: {}", e),
-            },
-            Err(e) => panic!("Server accept timed out: {}", e),
-        };
-
-        // Read request - wrap in BufReader for AsyncBufRead requirement
-        let mut buf_reader = tokio::io::BufReader::new(stream);
-        let request = mcp_cli_rs::daemon::protocol::receive_request(&mut buf_reader)
-            .await
-            .expect("Failed to receive request");
-
-        // Verify we got a Ping request
-        assert!(
-            matches!(request, DaemonRequest::Ping),
-            "Expected Ping request, got {:?}",
-            request
-        );
-
-        // Send response
-        let response = DaemonResponse::Pong;
-        mcp_cli_rs::daemon::protocol::send_response(&mut buf_reader, &response)
-            .await
-            .expect("Failed to send response");
-    });
-
-    // Create IPC client
-    let config = crate::helpers::create_test_config();
-    let mut client = mcp_cli_rs::ipc::create_ipc_client(config)
-        .expect("Failed to create IPC client");
-
-    // Send request and get response
-    let request = DaemonRequest::Ping;
-    let response = client
-        .send_request(&request)
+    crate::helpers::run_ping_pong_roundtrip(socket_path)
         .await
-        .expect("Failed to send request");
-
-    // Verify response
-    assert!(
-        matches!(response, DaemonResponse::Pong),
-        "Expected Pong response, got {:?}",
-        response
-    );
-
-    // Wait for server to complete
-    server_handle.await.expect("Server task failed to join");
-
-    // Clean up socket
-    let _ = std::fs::remove_file(&socket_path);
+        .expect("Ping/Pong roundtrip failed");
 }
 
 /// Test Unix socket multiple concurrent connections
@@ -343,75 +287,10 @@ async fn test_windows_named_pipe_server_creation() {
 #[cfg(windows)]
 #[tokio::test]
 async fn test_windows_named_pipe_client_server_roundtrip() {
-    // Use a unique pipe name for this test
     let pipe_path = crate::helpers::get_test_socket_path_with_suffix("roundtrip");
-    let pipe_path_for_server = pipe_path.clone();
-
-    // Create IPC server
-    let _server =
-        mcp_cli_rs::ipc::create_ipc_server(&pipe_path).expect("Failed to create IPC server");
-
-    // Spawn server task
-    let server_handle = tokio::spawn(async move {
-        // Create server instance for this connection with reject_remote_clients
-        let pipe_name_str = pipe_path_for_server.to_string_lossy().to_string();
-        let server_instance = tokio::net::windows::named_pipe::ServerOptions::new()
-            .reject_remote_clients(true)
-            .create(&pipe_name_str)
-            .expect("Failed to create named pipe");
-
-        // Wait for client connection
-        server_instance
-            .connect()
-            .await
-            .expect("Failed to connect named pipe");
-
-        // Server now has the pipe stream
-
-        // Read request - wrap in BufReader for AsyncBufRead requirement
-        let mut buf_reader = tokio::io::BufReader::new(server_instance);
-        let request = mcp_cli_rs::daemon::protocol::receive_request(&mut buf_reader)
-            .await
-            .expect("Failed to receive request");
-
-        // Verify we got a Ping request
-        assert!(
-            matches!(request, DaemonRequest::Ping),
-            "Expected Ping request, got {:?}",
-            request
-        );
-
-        // Send response
-        let response = DaemonResponse::Pong;
-        mcp_cli_rs::daemon::protocol::send_response(&mut buf_reader, &response)
-            .await
-            .expect("Failed to send response");
-    });
-
-    // Give server time to create the named pipe before client connects
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-
-    // Create IPC client with matching socket path
-    let config = crate::helpers::create_test_config_with_socket(pipe_path);
-    let mut client =
-        mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
-
-    // Send request and get response
-    let request = DaemonRequest::Ping;
-    let response = client
-        .send_request(&request)
+    crate::helpers::run_ping_pong_roundtrip(pipe_path)
         .await
-        .expect("Failed to send request");
-
-    // Verify response
-    assert!(
-        matches!(response, DaemonResponse::Pong),
-        "Expected Pong response, got {:?}",
-        response
-    );
-
-    // Wait for server to complete
-    server_handle.await.expect("Server task failed to join");
+        .expect("Ping/Pong roundtrip failed");
 }
 
 /// Test Windows named pipe multiple concurrent connections
