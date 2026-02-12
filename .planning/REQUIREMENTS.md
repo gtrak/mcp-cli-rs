@@ -20,14 +20,14 @@ Requirements for code quality, maintainability, and duplication elimination.
 
 ### Code Organization
 
-- [ ] **ORG-01**: Split src/cli/commands.rs (1850 lines) into src/cli/list_commands.rs (list, grep), src/cli/info_commands.rs (info), src/cli/call_commands.rs (call), src/cli/commands.rs (orchestration)
-- [ ] **ORG-02**: Extract daemon lifecycle from src/main.rs (809 lines) to src/cli/daemon_lifecycle.rs
-- [ ] **ORG-03**: Extract command routing from src/main.rs to src/cli/command_routing.rs
-- [ ] **ORG-04**: Extract config loading/merging from src/main.rs to src/cli/config_setup.rs
-- [ ] **ORG-05**: Extract CLI entry point from src/main.rs to src/cli/entry.rs, leaving main.rs as thin entry wrapper
-- [ ] **ORG-06**: Split src/config/mod.rs (432 lines) into src/config/types.rs (Config structs), src/config/parser.rs (TOML parsing), src/config/validator.rs (validation)
-- [ ] **ORG-07**: All module re-exports updated to reflect new structure
-- [ ] **ORG-08**: Module structure is clear with separation of concerns, no file >600 lines
+- [x] **ORG-01**: Split src/cli/commands.rs (1850 lines) into src/cli/list_commands.rs (list, grep), src/cli/info_commands.rs (info), src/cli/call_commands.rs (call), src/cli/commands.rs (orchestration)
+- [x] **ORG-02**: Extract daemon lifecycle from src/main.rs (809 lines) to src/cli/daemon_lifecycle.rs
+- [x] **ORG-03**: Extract command routing from src/main.rs to src/cli/command_routing.rs
+- [x] **ORG-04**: Extract config loading/merging from src/main.rs to src/cli/config_setup.rs
+- [x] **ORG-05**: Extract CLI entry point from src/main.rs to src/cli/entry.rs, leaving main.rs as thin entry wrapper
+- [x] **ORG-06**: Split src/config/mod.rs (432 lines) into src/config/types.rs (Config structs), src/config/parser.rs (TOML parsing), src/config/validator.rs (validation)
+- [x] **ORG-07**: All module re-exports updated to reflect new structure
+- [x] **ORG-08**: Module structure is clear with separation of concerns, no file >600 lines
 
 ### Duplication Elimination
 
@@ -58,7 +58,7 @@ Requirements for code quality, maintainability, and duplication elimination.
 ### Codebase Size Target
 
 - [ ] **SIZE-01**: Overall codebase reduced to 10,800-11,500 lines (from 12,408 lines = 8-13% reduction)
-- [ ] **SIZE-02**: No single file >600 lines (commands.rs was 1850)
+- [x] **SIZE-02**: No single file >600 lines (commands.rs was 1850)
 - [x] **SIZE-03**: Test duplication reduced by ~200-300 lines (actually reduced by ~683 lines cross_platform_daemon_tests.rs split: 785→102)
 - [ ] **SIZE-04**: Command duplication reduced by ~200-300 lines
 - [ ] **SIZE-05**: API surface reduced by ~50-100 lines
@@ -77,22 +77,22 @@ Requirements for code quality, maintainability, and duplication elimination.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | TEST-01 through TEST-08 | Phase 12 | Complete |
-| ORG-01 through ORG-08 | Phase 13 | Pending |
+| ORG-01 through ORG-08 | Phase 13 | Complete |
 | DUP-01 through DUP-06 | Phase 14 | Pending |
 | DOC-01 through DOC-06 | Phase 15 | Pending |
 | QUAL-01 through QUAL-05 | Phase 16 | Pending |
 | SIZE-01 | Phase 16 | Pending |
-| SIZE-02 | Phase 13 | Pending |
+| SIZE-02 | Phase 13 | Complete |
 | SIZE-03 | Phase 12 | Complete |
 | SIZE-04 | Phase 14 | Pending |
 | SIZE-05 | Phase 15 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 37 total
-- Complete: 9 (all TEST requirements + SIZE-03)
+- Complete: 17 (all TEST + all ORG + SIZE-02 + SIZE-03)
 - Mapped to phases: 37
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-12*
-*Last updated: 2026-02-12 after Phase 12 completion (TEST requirements complete)*
+*Last updated: 2026-02-12 after Phase 13 completion (ORG + SIZE-02 complete)*
