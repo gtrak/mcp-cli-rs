@@ -69,7 +69,14 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 
 ### Active
 
-(No active requirements - use `/gsd-new-milestone` to define next milestone)
+**v1.3: Tech Debt Cleanup & Code Quality** (In Progress)
+
+- [ ] Test setup helpers module reduces duplication across 8+ test files
+- [ ] commands.rs refactored from 1850 lines into focused modules
+- [ ] Documentation warnings fixed (cargo doc clean)
+- [ ] Public API surface audited and reduced where appropriate
+- [ ] main.rs cleanup with extracted daemon lifecycle functions
+- [ ] Codebase size reduced by ~10-15% with equivalent functionality
 
 ### Out of Scope
 
@@ -83,15 +90,15 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 
 ---
 
-## Current State: v1.2 Shipped
+## Current State: v1.3 Tech Debt Cleanup
 
-**Status:** Production Ready ✅
+**Status:** In cleanup phase 🧹
 
-**Codebase:**
+**Codebase Before Cleanup:**
 - **12,408** lines of Rust code
-- **4** executable binary (mcp-cli-rs for all platforms)
-- **281** files created/modified
-- **221** commits across 6 days (2026-02-06 → 2026-02-12)
+- **9** documentation warnings (cargo doc)
+- **1850** lines in single commands.rs file
+- **8+** test files with repeated setup patterns
 
 **Milestones Shipped:**
 - **v1.0:** Core implementation with daemon connection pooling (Phases 1-5, 42 requirements)
@@ -155,22 +162,17 @@ The tool will be wrapped in a skill for LLM use, so error messages and output sh
 
 ---
 
-## Next Milestone Goals
+## Current Milestone: v1.3 Tech Debt Cleanup
 
-**Status:** Ready to define next milestone
+**Goal:** Reduce codebase size, eliminate duplication, improve maintainability
 
-Use `/gsd-new-milestone` to:
-1. Question user about next goals
-2. Research requirements and technical approach
-3. Define new requirements (REQUIREMENTS.md)
-4. Create roadmap (ROADMAP.md)
-
-**Potential Directions** (examples - user to decide):
-- Performance optimization
-- Advanced features (e.g., workspaces, profiles)
-- Server management tools
-- Monitoring/observability
-- Plugin/extensibility system
+**Target:**
+- Eliminate 200-300 lines of test duplication via helpers module
+- Refactor 1850-line commands.rs into 3-4 focused files
+- Fix 9 documentation warnings
+- Audit and reduce public API surface
+- Extract daemon lifecycle from main.rs
+- Overall codebase reduction: target 10-15% with equivalent functionality
 
 ---
 
