@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod helpers;
+
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
