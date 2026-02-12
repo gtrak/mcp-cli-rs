@@ -8,7 +8,7 @@ pub use client::{McpClient, ToolInfo};
 pub mod config;
 pub mod config_fingerprint;
 pub mod error;
-pub use error::{exit_code, McpError, Result as DaemonResult};
+pub use error::{McpError, Result as DaemonResult, exit_code};
 
 // Output module (Phase 3)
 pub mod output;
@@ -18,12 +18,12 @@ pub mod format;
 
 // Re-export modules for easy access
 pub mod transport;
-pub use transport::{Transport, TransportFactory};
 pub use config::ServerTransport;
+pub use transport::{Transport, TransportFactory};
 
 // Daemon module
 pub mod daemon;
-pub use daemon::{run_daemon, DaemonState};
+pub use daemon::{DaemonState, run_daemon};
 pub mod ipc;
 pub use ipc::{create_ipc_server, get_socket_path};
 

@@ -1,3 +1,6 @@
+#![allow(clippy::field_reassign_with_default)] // Test code uses default + field reassignment for clarity
+#![allow(clippy::needless_borrows_for_generic_args)] // Minor style preference
+
 use mcp_cli_rs::config::Config;
 use mcp_cli_rs::config_fingerprint::{config_fingerprint, config_hash_changed};
 

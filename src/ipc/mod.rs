@@ -259,7 +259,8 @@ impl<T: IpcClient + Send + Sync + Clone> ProtocolClient for IpcClientWrapper<T> 
 pub fn create_ipc_client(config: &Config) -> Result<Box<dyn ProtocolClient>, McpError> {
     let client = crate::ipc::UnixIpcClient::new(config.clone().into());
     Ok(Box::new(crate::ipc::IpcClientWrapper::with_config(
-        client, config.clone(),
+        client,
+        config.clone(),
     )))
 }
 

@@ -99,7 +99,7 @@ pub async fn shutdown_daemon(daemon_config: &Config) -> Result<()> {
 
     let start = std::time::Instant::now();
     let timeout = Duration::from_secs(10);
-    
+
     loop {
         // Check if socket file still exists
         if !socket_path.exists() {
@@ -150,12 +150,13 @@ async fn cleanup_orphaned_daemons(daemon_config: &Config) -> Result<()> {
             .map_err(|_| anyhow::anyhow!("Failed to check for orphaned daemon process"))?;
 
         if output.status.success() && !output.stdout.is_empty() {
-            tracing::warn!("Found orphaned daemon process: {}", String::from_utf8_lossy(&output.stdout));
-            
+            tracing::warn!(
+                "Found orphaned daemon process: {}",
+                String::from_utf8_lossy(&output.stdout)
+            );
+
             // Kill the orphaned process
-            let _ = Command::new("pkill")
-                .args(["-f", "mcp-daemon"])
-                .output();
+            let _ = Command::new("pkill").args(["-f", "mcp-daemon"]).output();
         }
     }
 

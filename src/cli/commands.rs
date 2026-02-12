@@ -4,9 +4,12 @@
 use crate::cli::DetailLevel;
 use crate::client::ToolInfo;
 use crate::config::{ServerConfig, ServerTransport};
-use crate::daemon::protocol::{ListOutput, ParameterDetail, SearchOutput, SearchMatch, ServerInfo, ServerDetailOutput, ToolDetailOutput, ToolResult, ToolError, ExecutionMetadata};
+use crate::daemon::protocol::{
+    ExecutionMetadata, ListOutput, ParameterDetail, SearchMatch, SearchOutput, ServerDetailOutput,
+    ServerInfo, ToolDetailOutput, ToolError, ToolResult,
+};
 use crate::error::{McpError, Result};
-use crate::format::{extract_params_from_schema, format_param_list, OutputMode};
+use crate::format::{OutputMode, extract_params_from_schema, format_param_list};
 use crate::ipc::ProtocolClient;
 use crate::output::{print_error, print_info, print_json, print_warning};
 use crate::parallel::{ParallelExecutor, list_tools_parallel};
@@ -479,7 +482,11 @@ async fn cmd_list_servers_json(mut daemon: Box<dyn ProtocolClient>) -> Result<()
 ///
 /// # Errors
 /// Returns McpError::ServerNotFound if server doesn't exist (ERR-02)
-pub async fn cmd_server_info(daemon: Box<dyn ProtocolClient>, server_name: &str, output_mode: OutputMode) -> Result<()> {
+pub async fn cmd_server_info(
+    daemon: Box<dyn ProtocolClient>,
+    server_name: &str,
+    output_mode: OutputMode,
+) -> Result<()> {
     // Handle JSON mode separately
     if output_mode == OutputMode::Json {
         return cmd_server_info_json(daemon, server_name).await;
@@ -540,9 +547,11 @@ pub async fn cmd_server_info(daemon: Box<dyn ProtocolClient>, server_name: &str,
 /// Implements OUTP-08: consistent JSON schema with complete server details
 async fn cmd_server_info_json(daemon: Box<dyn ProtocolClient>, server_name: &str) -> Result<()> {
     let config = daemon.config();
-    let server = config.get_server(server_name).ok_or_else(|| McpError::ServerNotFound {
-        server: server_name.to_string(),
-    })?;
+    let server = config
+        .get_server(server_name)
+        .ok_or_else(|| McpError::ServerNotFound {
+            server: server_name.to_string(),
+        })?;
 
     // Build transport details based on type
     let transport_details = match &server.transport {
@@ -558,11 +567,15 @@ async fn cmd_server_info_json(daemon: Box<dyn ProtocolClient>, server_name: &str
             });
             if !args.is_empty() {
                 details["args"] = serde_json::Value::Array(
-                    args.iter().cloned().map(serde_json::Value::String).collect()
+                    args.iter()
+                        .cloned()
+                        .map(serde_json::Value::String)
+                        .collect(),
                 );
             }
             if !env.is_empty() {
-                let env_map: serde_json::Value = env.iter()
+                let env_map: serde_json::Value = env
+                    .iter()
                     .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
                     .collect();
                 details["env"] = env_map;
@@ -578,7 +591,8 @@ async fn cmd_server_info_json(daemon: Box<dyn ProtocolClient>, server_name: &str
                 "url": url,
             });
             if !headers.is_empty() {
-                let headers_map: serde_json::Value = headers.iter()
+                let headers_map: serde_json::Value = headers
+                    .iter()
                     .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
                     .collect();
                 details["headers"] = headers_map;
@@ -808,22 +822,26 @@ pub async fn cmd_tool_info(
 async fn cmd_tool_info_json(mut daemon: Box<dyn ProtocolClient>, tool_id: &str) -> Result<()> {
     let (server_name, tool_name) = parse_tool_id(tool_id)?;
 
-    let _server = daemon.config().get_server(&server_name).ok_or_else(|| {
-        McpError::ToolNotFound {
-            tool: tool_name.clone(),
-            server: server_name.clone(),
-        }
-    })?;
+    let _server =
+        daemon
+            .config()
+            .get_server(&server_name)
+            .ok_or_else(|| McpError::ToolNotFound {
+                tool: tool_name.clone(),
+                server: server_name.clone(),
+            })?;
 
     // Send ListTools request to daemon
     let tools = daemon.list_tools(&server_name).await?;
 
-    let tool = tools.iter().find(|t| t.name == tool_name).ok_or_else(|| {
-        McpError::ToolNotFound {
-            tool: tool_name.clone(),
-            server: server_name.clone(),
-        }
-    })?;
+    let tool =
+        tools
+            .iter()
+            .find(|t| t.name == tool_name)
+            .ok_or_else(|| McpError::ToolNotFound {
+                tool: tool_name.clone(),
+                server: server_name.clone(),
+            })?;
 
     // Get server config for transport info
     let config = daemon.config();
@@ -1036,9 +1054,7 @@ async fn cmd_call_tool_json(
 
     // Parse arguments (inline or from stdin)
     let result_parse: std::result::Result<serde_json::Value, McpError> = match args_json {
-        Some(args) => {
-            serde_json::from_str(args).map_err(|e| McpError::InvalidJson { source: e })
-        }
+        Some(args) => serde_json::from_str(args).map_err(|e| McpError::InvalidJson { source: e }),
         None => {
             // Read from stdin if not provided
             if std::io::stdin().is_terminal() {
@@ -1112,33 +1128,33 @@ async fn cmd_call_tool_json(
 
     // Check if tool is disabled (FILT-04)
     let server_config = config.get_server(&server_name);
-    if let Some(server_config) = server_config {
-        if let Some(disabled_patterns) = &server_config.disabled_tools {
-            let is_disabled = crate::cli::filter::tools_match_any(&tool_name, disabled_patterns);
-            if is_disabled.is_some() {
-                let patterns_str = disabled_patterns.join(", ");
-                let output = ToolResult {
-                    server: server_name.clone(),
-                    tool: tool_name.clone(),
-                    status: "error".to_string(),
-                    result: None,
-                    error: Some(ToolError {
-                        message: format!(
-                            "Tool '{}' on server '{}' is disabled (blocked by patterns: {})",
-                            tool_name, server_name, patterns_str
-                        ),
-                        code: Some(403),
-                    }),
-                    metadata: ExecutionMetadata {
-                        timestamp: timestamp.clone(),
-                        retry_count: Some(0),
-                    },
-                };
-                print_json(&output);
-                return Err(McpError::UsageError {
-                    message: "Tool execution blocked by disabled_tools configuration".to_string(),
-                });
-            }
+    if let Some(server_config) = server_config
+        && let Some(disabled_patterns) = &server_config.disabled_tools
+    {
+        let is_disabled = crate::cli::filter::tools_match_any(&tool_name, disabled_patterns);
+        if is_disabled.is_some() {
+            let patterns_str = disabled_patterns.join(", ");
+            let output = ToolResult {
+                server: server_name.clone(),
+                tool: tool_name.clone(),
+                status: "error".to_string(),
+                result: None,
+                error: Some(ToolError {
+                    message: format!(
+                        "Tool '{}' on server '{}' is disabled (blocked by patterns: {})",
+                        tool_name, server_name, patterns_str
+                    ),
+                    code: Some(403),
+                }),
+                metadata: ExecutionMetadata {
+                    timestamp: timestamp.clone(),
+                    retry_count: Some(0),
+                },
+            };
+            print_json(&output);
+            return Err(McpError::UsageError {
+                message: "Tool execution blocked by disabled_tools configuration".to_string(),
+            });
         }
     }
 
@@ -1192,15 +1208,12 @@ async fn cmd_call_tool_json(
                 status: "error".to_string(),
                 result: None,
                 error: Some(ToolError {
-                    message: format!(
-                        "Tool execution failed after {} retry attempts",
-                        attempts
-                    ),
+                    message: format!("Tool execution failed after {} retry attempts", attempts),
                     code: Some(503),
                 }),
                 metadata: ExecutionMetadata {
                     timestamp: timestamp.clone(),
-                    retry_count: Some(attempts as u32),
+                    retry_count: Some(attempts),
                 },
             };
             print_json(&output);
@@ -1617,9 +1630,7 @@ async fn cmd_search_tools_json(mut daemon: Box<dyn ProtocolClient>, pattern: &st
     // Parse glob pattern
     let pattern_obj = match glob::Pattern::new(pattern) {
         Ok(p) => p,
-        Err(_) => {
-            glob::Pattern::new("*").unwrap()
-        }
+        Err(_) => glob::Pattern::new("*").unwrap(),
     };
 
     // Search for matching tools across all servers
@@ -1647,7 +1658,7 @@ async fn cmd_search_tools_json(mut daemon: Box<dyn ProtocolClient>, pattern: &st
     print_json(&output);
     Ok(())
 }
- 
+
 /// Parse a tool identifier from a string.
 ///
 /// Supports both "server/tool" and "server tool" formats (CLI-05).

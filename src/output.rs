@@ -19,7 +19,7 @@
 
 use colored::*;
 use serde::Serialize;
-use std::io::{stdout, IsTerminal};
+use std::io::{IsTerminal, stdout};
 use tracing;
 
 /// Determines whether colored output should be used based on:

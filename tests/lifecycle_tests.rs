@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
-use mcp_cli_rs::daemon::lifecycle::{DaemonLifecycle, run_idle_timer};
+use mcp_cli_rs::daemon::lifecycle::DaemonLifecycle;
 
 /// Test 1: Basic idle timeout detection
 #[tokio::test]
@@ -11,7 +11,10 @@ async fn test_idle_timeout_detection() {
 
     // Initial state should be active
     let lifecycle_guard = lifecycle.lock().await;
-    assert!(!lifecycle_guard.is_shutting_down().await, "Daemon should not be in shutdown state initially");
+    assert!(
+        !lifecycle_guard.is_shutting_down().await,
+        "Daemon should not be in shutdown state initially"
+    );
     drop(lifecycle_guard);
 
     // Simulate activity
@@ -19,7 +22,10 @@ async fn test_idle_timeout_detection() {
 
     // Verify not shutdown after activity
     let lifecycle_guard = lifecycle.lock().await;
-    assert!(!lifecycle_guard.is_shutting_down().await, "Daemon should not be in shutdown state after activity");
+    assert!(
+        !lifecycle_guard.is_shutting_down().await,
+        "Daemon should not be in shutdown state after activity"
+    );
     drop(lifecycle_guard);
 
     // Simulate idle timeout
@@ -30,7 +36,10 @@ async fn test_idle_timeout_detection() {
 
     // Verify shutdown was triggered
     let lifecycle_guard = lifecycle.lock().await;
-    assert!(lifecycle_guard.is_shutting_down().await, "Daemon should be marked for shutdown after idle timeout");
+    assert!(
+        lifecycle_guard.is_shutting_down().await,
+        "Daemon should be marked for shutdown after idle timeout"
+    );
 }
 
 /// Test 2: Graceful shutdown handling
@@ -40,18 +49,27 @@ async fn test_graceful_shutdown_handling() {
 
     // Initial state should be active
     let lifecycle_guard = lifecycle.lock().await;
-    assert!(!lifecycle_guard.is_shutting_down().await, "Daemon should not be in shutdown state initially");
+    assert!(
+        !lifecycle_guard.is_shutting_down().await,
+        "Daemon should not be in shutdown state initially"
+    );
 
     // Shutdown the daemon
     lifecycle.lock().await.shutdown().await;
 
     // Verify shutdown was triggered
     let lifecycle_guard = lifecycle.lock().await;
-    assert!(lifecycle_guard.is_shutting_down().await, "Daemon should be marked for shutdown");
+    assert!(
+        lifecycle_guard.is_shutting_down().await,
+        "Daemon should be marked for shutdown"
+    );
     drop(lifecycle_guard);
 
     // Shutdown has proceeded (already triggered)
-    assert!(lifecycle.lock().await.shutdown_proceeded().await, "Shutdown should have proceeded");
+    assert!(
+        lifecycle.lock().await.shutdown_proceeded().await,
+        "Shutdown should have proceeded"
+    );
 }
 
 /// Test 3: Lifecycle manager concurrency
@@ -68,8 +86,14 @@ async fn test_lifecycle_manager_concurrency() {
     let lifecycle_guard1 = lifecycle1.lock().await;
     let lifecycle_guard2 = lifecycle2.lock().await;
 
-    assert!(!lifecycle_guard1.is_shutting_down().await, "lifecycle1 should not be in shutdown state");
-    assert!(!lifecycle_guard2.is_shutting_down().await, "lifecycle2 should not be in shutdown state");
+    assert!(
+        !lifecycle_guard1.is_shutting_down().await,
+        "lifecycle1 should not be in shutdown state"
+    );
+    assert!(
+        !lifecycle_guard2.is_shutting_down().await,
+        "lifecycle2 should not be in shutdown state"
+    );
 }
 
 /// Test 4: State machine transitions
@@ -79,21 +103,30 @@ async fn test_lifecycle_state_transition() {
 
     // Initial state should be active (not shutdown)
     let lifecycle_guard = lifecycle.lock().await;
-    assert!(!lifecycle_guard.is_shutting_down().await, "Daemon should not be in shutdown state initially");
+    assert!(
+        !lifecycle_guard.is_shutting_down().await,
+        "Daemon should not be in shutdown state initially"
+    );
 
     // Simulate activity
     lifecycle_guard.update_activity().await;
 
     // Verify not shutdown after activity
     let lifecycle_guard = lifecycle.lock().await;
-    assert!(!lifecycle_guard.is_shutting_down().await, "Daemon should not be in shutdown state after activity");
+    assert!(
+        !lifecycle_guard.is_shutting_down().await,
+        "Daemon should not be in shutdown state after activity"
+    );
 
     // Shutdown the daemon
     lifecycle.lock().await.shutdown().await;
 
     // Verify shutdown was triggered
     let lifecycle_guard = lifecycle.lock().await;
-    assert!(lifecycle_guard.is_shutting_down().await, "Daemon should be marked for shutdown");
+    assert!(
+        lifecycle_guard.is_shutting_down().await,
+        "Daemon should be marked for shutdown"
+    );
 }
 
 /// Test 5: Activity tracking with timestamps
@@ -152,7 +185,7 @@ async fn test_config_hash_detection_logic() {
     {
         let lifecycle_guard = lifecycle.lock().await;
         if let Some(hash) = lifecycle_guard.get_config_hash() {
-            assert!(hash.is_empty() || hash.len() > 0);
+            assert!(hash.is_empty() || !hash.is_empty());
         }
     }
 
@@ -190,14 +223,20 @@ async fn test_shutdown_confirmation() {
 
     // Verify not shutting down initially
     let lifecycle_guard = lifecycle.lock().await;
-    assert!(!lifecycle_guard.is_shutting_down().await, "Should not be shutting down initially");
+    assert!(
+        !lifecycle_guard.is_shutting_down().await,
+        "Should not be shutting down initially"
+    );
 
     // Trigger shutdown
     lifecycle.lock().await.shutdown().await;
 
     // Verify shutdown has proceeded
     let lifecycle_guard = lifecycle.lock().await;
-    assert!(lifecycle_guard.shutdown_proceeded().await, "Shutdown should have proceeded");
+    assert!(
+        lifecycle_guard.shutdown_proceeded().await,
+        "Shutdown should have proceeded"
+    );
 }
 
 /// Test 10: Multiple lifecycle instances
@@ -216,13 +255,19 @@ async fn test_multiple_lifecycle_instances() {
     // Verify lifecycle1 is shutting down
     {
         let lifecycle_guard = lifecycle1.lock().await;
-        assert!(lifecycle_guard.is_shutting_down().await, "lifecycle1 should be in shutdown state");
+        assert!(
+            lifecycle_guard.is_shutting_down().await,
+            "lifecycle1 should be in shutdown state"
+        );
     }
 
     // Verify lifecycle2 is not shutting down
     {
         let lifecycle_guard = lifecycle2.lock().await;
-        assert!(!lifecycle_guard.is_shutting_down().await, "lifecycle2 should not be in shutdown state");
+        assert!(
+            !lifecycle_guard.is_shutting_down().await,
+            "lifecycle2 should not be in shutdown state"
+        );
     }
 }
 
@@ -241,7 +286,10 @@ async fn test_activity_pruning_on_timeout() {
     let lifecycle_guard = lifecycle.lock().await;
     let elapsed = lifecycle_guard.elapsed_since_last_activity().await;
     drop(lifecycle_guard);
-    assert!(elapsed >= std::time::Duration::from_secs(5), "Activity should have been pruned after timeout");
+    assert!(
+        elapsed >= std::time::Duration::from_secs(5),
+        "Activity should have been pruned after timeout"
+    );
 }
 
 /// Test 12: Config hash validation
@@ -253,7 +301,7 @@ async fn test_config_hash_validation() {
     {
         let lifecycle_guard = lifecycle.lock().await;
         if let Some(hash) = lifecycle_guard.get_config_hash() {
-            assert!(hash.is_empty() || hash.len() > 0);
+            assert!(hash.is_empty() || !hash.is_empty());
         }
     }
 
@@ -371,7 +419,10 @@ async fn test_activity_timestamp_validation() {
     drop(lifecycle);
 
     // Elapsed time should be small (just updated)
-    assert!(elapsed < std::time::Duration::from_secs(1), "Elapsed time should be very small");
+    assert!(
+        elapsed < std::time::Duration::from_secs(1),
+        "Elapsed time should be very small"
+    );
 }
 
 /// Test 19: Shutdown timeout behavior

@@ -6,14 +6,16 @@
 
 use std::io::Write;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
 use tempfile::TempDir;
 
-use mcp_cli_rs::daemon::orphan::{cleanup_orphaned_daemon, get_pid_file_path, get_fingerprint_file_path, is_daemon_running, read_daemon_pid, write_daemon_pid};
 use mcp_cli_rs::config::Config;
+use mcp_cli_rs::daemon::orphan::{
+    cleanup_orphaned_daemon, get_fingerprint_file_path, get_pid_file_path, is_daemon_running,
+    write_daemon_pid,
+};
 
 #[cfg(unix)]
-use nix::sys::signal::{kill, Signal};
+use nix::sys::signal::{Signal, kill};
 #[cfg(unix)]
 use nix::unistd::Pid;
 
@@ -36,7 +38,10 @@ async fn test_orphan_socket_cleanup_unix() {
     assert!(result.is_ok());
 
     // Verify the socket was cleaned up
-    assert!(!socket_path.exists(), "Orphaned socket should be cleaned up");
+    assert!(
+        !socket_path.exists(),
+        "Orphaned socket should be cleaned up"
+    );
 }
 
 #[tokio::test]
@@ -97,7 +102,10 @@ async fn test_orphan_fingerprint_file_cleanup() {
     assert!(result.is_ok());
 
     // Verify the fingerprint file was cleaned up
-    assert!(!fp_file.exists(), "Orphaned fingerprint file should be cleaned up");
+    assert!(
+        !fp_file.exists(),
+        "Orphaned fingerprint file should be cleaned up"
+    );
 }
 
 #[tokio::test]
@@ -110,11 +118,14 @@ async fn test_no_false_positives() {
 
     // Write PID to the PID file for a non-existent process
     let pid = std::process::id();
-    let pid_file = get_pid_file_path(&socket_path);
+    let _pid_file = get_pid_file_path(&socket_path);
     write_daemon_pid(&socket_path, pid).unwrap();
 
     // Verify the current process is still running (no false positive cleanup)
-    assert!(is_daemon_running(pid), "Current process should be detected as running");
+    assert!(
+        is_daemon_running(pid),
+        "Current process should be detected as running"
+    );
 
     // Clean up the orphaned resources
     let result: anyhow::Result<()> = cleanup_orphaned_daemon(&config, &socket_path).await;
@@ -167,7 +178,10 @@ async fn test_partial_cleanup_on_error() {
     assert!(result.is_ok());
 
     // Verify that partial cleanup occurred (socket cleaned up, PID file cleaned up)
-    assert!(!socket_path.exists(), "Socket should be cleaned up even if PID doesn't exist");
+    assert!(
+        !socket_path.exists(),
+        "Socket should be cleaned up even if PID doesn't exist"
+    );
     assert!(!pid_file.exists(), "PID file should be cleaned up");
 }
 
@@ -180,7 +194,10 @@ fn test_get_pid_file_path_unix() {
 #[test]
 fn test_get_pid_file_path_windows() {
     let socket = PathBuf::from("C:\\tmp\\mcp.pipe");
-    assert_eq!(get_pid_file_path(&socket), PathBuf::from("C:\\tmp\\mcp.pid"));
+    assert_eq!(
+        get_pid_file_path(&socket),
+        PathBuf::from("C:\\tmp\\mcp.pid")
+    );
 }
 
 #[test]
@@ -217,5 +234,8 @@ fn test_kill_daemon_process_unix() {
     let result = super::kill_daemon_process(pid);
     // This will fail because we don't want to kill the current process
     // in a test, but it shows the function works for the target PID
-    assert!(result.is_err(), "Killing current process should return an error");
+    assert!(
+        result.is_err(),
+        "Killing current process should return an error"
+    );
 }

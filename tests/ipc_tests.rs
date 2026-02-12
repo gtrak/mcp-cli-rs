@@ -12,6 +12,7 @@ mod ipc_tests {
     use tokio::time::timeout;
 
     /// Get a temporary socket/pipe path for testing
+    #[allow(dead_code)] // Helper function for future test additions
     fn get_test_socket_path() -> PathBuf {
         #[cfg(unix)]
         {
@@ -35,7 +36,10 @@ mod ipc_tests {
             #[cfg(unix)]
             path.push(format!("mcp-test-roundtrip-{}.sock", std::process::id()));
             #[cfg(windows)]
-            path.push(format!("\\\\.\\pipe\\mcp-test-roundtrip-{}", std::process::id()));
+            path.push(format!(
+                "\\\\.\\pipe\\mcp-test-roundtrip-{}",
+                std::process::id()
+            ));
             path
         };
 
@@ -106,7 +110,10 @@ mod ipc_tests {
             #[cfg(unix)]
             path.push(format!("mcp-test-concurrent-{}.sock", std::process::id()));
             #[cfg(windows)]
-            path.push(format!("\\\\.\\pipe\\mcp-test-concurrent-{}", std::process::id()));
+            path.push(format!(
+                "\\\\.\\pipe\\mcp-test-concurrent-{}",
+                std::process::id()
+            ));
             path
         };
 
@@ -145,7 +152,9 @@ mod ipc_tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
         // Create 3 sequential clients (Windows named pipes don't support concurrent connections)
-        let config = std::sync::Arc::new(mcp_cli_rs::config::Config::with_socket_path(socket_path.clone()));
+        let config = std::sync::Arc::new(mcp_cli_rs::config::Config::with_socket_path(
+            socket_path.clone(),
+        ));
         for _ in 0..3 {
             let mut client =
                 mcp_cli_rs::ipc::create_ipc_client(&config).expect("Failed to create IPC client");
@@ -177,7 +186,10 @@ mod ipc_tests {
             #[cfg(unix)]
             path.push(format!("mcp-test-large-{}.sock", std::process::id()));
             #[cfg(windows)]
-            path.push(format!("\\\\.\\pipe\\mcp-test-large-{}", std::process::id()));
+            path.push(format!(
+                "\\\\.\\pipe\\mcp-test-large-{}",
+                std::process::id()
+            ));
             path
         };
 
@@ -230,7 +242,10 @@ mod ipc_tests {
             .await
             .expect("Failed to send request");
 
-        eprintln!("test_large_message_transfer: received response: {:?}", response);
+        eprintln!(
+            "test_large_message_transfer: received response: {:?}",
+            response
+        );
 
         // Verify large content was transferred correctly
         assert!(matches!(response, DaemonResponse::ToolResult(_)));

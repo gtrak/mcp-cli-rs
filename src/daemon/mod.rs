@@ -39,7 +39,7 @@ impl DaemonState {
 
     /// Signal that daemon should shut down
     pub async fn shutdown(&self) {
-        self.lifecycle.lock().await.shutdown();
+        self.lifecycle.lock().await.shutdown().await;
     }
 }
 

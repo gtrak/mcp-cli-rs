@@ -11,10 +11,6 @@ pub mod filter;
 pub use crate::format::DetailLevel;
 
 pub use commands::{
-    cmd_list_servers,
-    cmd_server_info,
-    cmd_tool_info,
-    cmd_call_tool,
-    cmd_search_tools,
+    cmd_call_tool, cmd_list_servers, cmd_search_tools, cmd_server_info, cmd_tool_info,
     parse_tool_id,
 };

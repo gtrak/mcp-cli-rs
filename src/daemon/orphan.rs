@@ -39,7 +39,7 @@ pub fn get_fingerprint_file_path(socket_path: &Path) -> PathBuf {
 /// Platform-specific implementation using native APIs.
 #[cfg(unix)]
 pub fn is_daemon_running(pid: u32) -> bool {
-    use nix::sys::signal::{kill, Signal};
+    use nix::sys::signal::{Signal, kill};
     use nix::unistd::Pid;
 
     // Send signal 0 to check if process exists
@@ -52,8 +52,8 @@ pub fn is_daemon_running(pid: u32) -> bool {
 
 #[cfg(windows)]
 pub fn is_daemon_running(pid: u32) -> bool {
-    use windows_sys::Win32::System::Threading::{GetExitCodeProcess, OpenProcess};
     use windows_sys::Win32::System::Threading::PROCESS_QUERY_INFORMATION;
+    use windows_sys::Win32::System::Threading::{GetExitCodeProcess, OpenProcess};
 
     const STILL_ACTIVE: u32 = 259;
 
@@ -166,10 +166,10 @@ pub async fn cleanup_orphaned_daemon(daemon_config: &Config, socket_path: &Path)
 
     // Remove fingerprint file (this happens regardless of PID file existence)
     let fingerprint_file = get_fingerprint_file_path(socket_path);
-    if fingerprint_file.exists() {
-        if let Err(e) = fs::remove_file(&fingerprint_file) {
-            tracing::warn!("Failed to remove fingerprint file: {}", e);
-        }
+    if fingerprint_file.exists()
+        && let Err(e) = fs::remove_file(&fingerprint_file)
+    {
+        tracing::warn!("Failed to remove fingerprint file: {}", e);
     }
 
     tracing::info!("Orphaned daemon cleanup complete");
@@ -179,12 +179,12 @@ pub async fn cleanup_orphaned_daemon(daemon_config: &Config, socket_path: &Path)
 /// Remove PID file
 ///
 /// Public helper for daemon shutdown cleanup
-pub fn remove_pid_file(socket_path: &PathBuf) -> Result<()> {
+pub fn remove_pid_file(socket_path: &Path) -> Result<()> {
     let pid_file = get_pid_file_path(socket_path);
-    if pid_file.exists() {
-        if let Err(e) = fs::remove_file(&pid_file) {
-            tracing::warn!("Failed to remove PID file: {}", e);
-        }
+    if pid_file.exists()
+        && let Err(e) = fs::remove_file(&pid_file)
+    {
+        tracing::warn!("Failed to remove PID file: {}", e);
     }
     Ok(())
 }
@@ -192,12 +192,12 @@ pub fn remove_pid_file(socket_path: &PathBuf) -> Result<()> {
 /// Remove fingerprint file
 ///
 /// Public helper for daemon shutdown cleanup
-pub fn remove_fingerprint_file(socket_path: &PathBuf) -> Result<()> {
+pub fn remove_fingerprint_file(socket_path: &Path) -> Result<()> {
     let fp_file = get_fingerprint_file_path(socket_path);
-    if fp_file.exists() {
-        if let Err(e) = fs::remove_file(&fp_file) {
-            tracing::warn!("Failed to remove fingerprint file: {}", e);
-        }
+    if fp_file.exists()
+        && let Err(e) = fs::remove_file(&fp_file)
+    {
+        tracing::warn!("Failed to remove fingerprint file: {}", e);
     }
     Ok(())
 }
@@ -208,19 +208,24 @@ pub fn remove_fingerprint_file(socket_path: &PathBuf) -> Result<()> {
 /// Actually sends a Ping request to verify the daemon is responsive.
 async fn try_connect_via_ipc(daemon_config: &Config, socket_path: &Path) -> Result<()> {
     use crate::daemon::protocol::DaemonRequest;
-    use tokio::time::{timeout, Duration};
-    
+    use tokio::time::{Duration, timeout};
+
     // Create a config with the custom socket path
     let custom_config = Config {
         socket_path: socket_path.to_path_buf(),
         ..daemon_config.clone()
     };
-    
+
     // Create IPC client
     let mut client = crate::ipc::create_ipc_client(&custom_config)?;
-    
+
     // Try to send a Ping request with a short timeout
-    match timeout(Duration::from_secs(1), client.send_request(&DaemonRequest::Ping)).await {
+    match timeout(
+        Duration::from_secs(1),
+        client.send_request(&DaemonRequest::Ping),
+    )
+    .await
+    {
         Ok(Ok(_)) => {
             // Successfully connected and received response
             Ok(())
@@ -238,7 +243,7 @@ async fn try_connect_via_ipc(daemon_config: &Config, socket_path: &Path) -> Resu
 pub fn kill_daemon_process(pid: u32) -> Result<()> {
     #[cfg(unix)]
     {
-        use nix::sys::signal::{kill, Signal};
+        use nix::sys::signal::{Signal, kill};
         use nix::unistd::Pid;
 
         kill(Pid::from_raw(pid as i32), Signal::SIGTERM)?;
@@ -247,8 +252,8 @@ pub fn kill_daemon_process(pid: u32) -> Result<()> {
 
     #[cfg(windows)]
     {
-        use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess};
         use windows_sys::Win32::System::Threading::PROCESS_TERMINATE;
+        use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess};
 
         unsafe {
             let process_handle = OpenProcess(PROCESS_TERMINATE, 0, pid);
@@ -296,7 +301,10 @@ mod tests {
         assert_eq!(get_pid_file_path(&socket), PathBuf::from("/tmp/mcp.pid"));
 
         let socket = PathBuf::from("C:\\tmp\\mcp.sock");
-        assert_eq!(get_pid_file_path(&socket), PathBuf::from("C:\\tmp\\mcp.pid"));
+        assert_eq!(
+            get_pid_file_path(&socket),
+            PathBuf::from("C:\\tmp\\mcp.pid")
+        );
     }
 
     #[test]

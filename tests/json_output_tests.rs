@@ -10,9 +10,9 @@ use std::process::Command;
 /// Helper to run the CLI and capture JSON output
 fn run_json_command(args: &[&str]) -> Result<serde_json::Value, String> {
     let output = Command::new("cargo")
-        .args(&["run", "--"])
+        .args(["run", "--"])
         .args(args)
-        .args(&["--json"])
+        .args(["--json"])
         .output()
         .map_err(|e| format!("Failed to run command: {}", e))?;
 
@@ -60,10 +60,6 @@ fn test_list_json_schema() {
 
 #[test]
 fn test_list_json_with_mock_config() {
-    // Create a temporary config file for testing
-    let temp_dir = std::env::temp_dir();
-    let config_path = temp_dir.join("mcp_test_config_XXXXX.toml");
-
     // Create a unique temp config
     let config_path =
         std::env::temp_dir().join(format!("mcp_test_config_{}.toml", std::process::id()));
@@ -83,9 +79,9 @@ args = ["test"]
 
     // Use the config file
     let output = Command::new("cargo")
-        .args(&["run", "--", "-c"])
+        .args(["run", "--", "-c"])
         .arg(&config_path)
-        .args(&["list", "--json"])
+        .args(["list", "--json"])
         .output()
         .expect("Failed to run command");
 
@@ -96,7 +92,7 @@ args = ["test"]
     let stdout = String::from_utf8_lossy(&output.stdout);
     if !stdout.trim().is_empty() {
         let json: serde_json::Value =
-            serde_json::from_str(&stdout).expect(&format!("Invalid JSON: {}", stdout));
+            serde_json::from_str(&stdout).unwrap_or_else(|_| panic!("Invalid JSON: {}", stdout));
         assert!(json.get("servers").is_some(), "Missing 'servers' field");
     }
 }
@@ -105,7 +101,7 @@ args = ["test"]
 fn test_json_no_color_interference() {
     // Verify that JSON output doesn't include ANSI color codes
     let output = Command::new("cargo")
-        .args(&["run", "--", "list", "--json"])
+        .args(["run", "--", "list", "--json"])
         .env("NO_COLOR", "1")
         .output()
         .expect("Failed to run command");
@@ -134,7 +130,7 @@ fn test_plain_text_when_piped() {
 fn test_info_command_json_with_help() {
     // Test that `info --help` still works (not affected by --json flag in normal usage)
     let output = Command::new("cargo")
-        .args(&["run", "--", "info", "--help"])
+        .args(["run", "--", "info", "--help"])
         .output()
         .expect("Failed to run command");
 
@@ -153,7 +149,7 @@ fn test_info_command_json_with_help() {
 fn test_call_command_json_without_args() {
     // Test that call without required args produces an error
     let output = Command::new("cargo")
-        .args(&["run", "--", "call", "server/tool", "--json"])
+        .args(["run", "--", "call", "server/tool", "--json"])
         .output()
         .expect("Failed to run command");
 

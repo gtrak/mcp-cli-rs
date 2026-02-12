@@ -69,7 +69,7 @@ impl DaemonLifecycle {
 
     /// Get the current idle timeout value
     pub fn get_idle_timeout(&self) -> Duration {
-        self.idle_timeout.clone()
+        self.idle_timeout
     }
 
     /// Check if the daemon is shutting down

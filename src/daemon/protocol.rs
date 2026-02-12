@@ -17,9 +17,7 @@ pub enum DaemonRequest {
         arguments: serde_json::Value,
     },
     /// List available tools on a specific server
-    ListTools {
-        server_name: String,
-    },
+    ListTools { server_name: String },
     /// List all configured servers
     ListServers,
     /// Request daemon shutdown
@@ -43,10 +41,7 @@ pub enum DaemonResponse {
     /// Acknowledge shutdown request
     ShutdownAck,
     /// Error response
-    Error {
-        code: u32,
-        message: String,
-    },
+    Error { code: u32, message: String },
 }
 
 /// Tool information returned by daemon
@@ -58,7 +53,11 @@ pub struct ToolInfo {
 }
 
 impl ToolInfo {
-    pub fn new(name: impl Into<String>, description: impl Into<String>, input_schema: serde_json::Value) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        input_schema: serde_json::Value,
+    ) -> Self {
         Self {
             name: name.into(),
             description: description.into(),
@@ -186,8 +185,14 @@ where
     W: AsyncWrite + Unpin,
 {
     let json = serde_json::to_string(request).context("Failed to serialize request")?;
-    writer.write_all(json.as_bytes()).await.context("Failed to write request")?;
-    writer.write_all(b"\n").await.context("Failed to write newline")?;
+    writer
+        .write_all(json.as_bytes())
+        .await
+        .context("Failed to write request")?;
+    writer
+        .write_all(b"\n")
+        .await
+        .context("Failed to write newline")?;
     writer.flush().await.context("Failed to flush request")?;
     Ok(())
 }
@@ -198,7 +203,10 @@ where
     R: AsyncBufRead + Unpin,
 {
     let mut line = String::new();
-    reader.read_line(&mut line).await.context("Failed to read request")?;
+    reader
+        .read_line(&mut line)
+        .await
+        .context("Failed to read request")?;
     let line = line.trim();
     if line.is_empty() {
         return Err(anyhow::anyhow!("Received empty NDJSON line"));
@@ -212,8 +220,14 @@ where
     W: AsyncWrite + Unpin,
 {
     let json = serde_json::to_string(response).context("Failed to serialize response")?;
-    writer.write_all(json.as_bytes()).await.context("Failed to write response")?;
-    writer.write_all(b"\n").await.context("Failed to write newline")?;
+    writer
+        .write_all(json.as_bytes())
+        .await
+        .context("Failed to write response")?;
+    writer
+        .write_all(b"\n")
+        .await
+        .context("Failed to write newline")?;
     writer.flush().await.context("Failed to flush response")?;
     Ok(())
 }
@@ -224,7 +238,10 @@ where
     R: AsyncBufRead + Unpin,
 {
     let mut line = String::new();
-    reader.read_line(&mut line).await.context("Failed to read response")?;
+    reader
+        .read_line(&mut line)
+        .await
+        .context("Failed to read response")?;
     let line = line.trim();
     if line.is_empty() {
         return Err(anyhow::anyhow!("Received empty NDJSON line"));

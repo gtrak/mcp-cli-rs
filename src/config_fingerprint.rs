@@ -67,6 +67,7 @@ pub fn config_hash_changed(old_config: &Config, new_config: &Config) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::field_reassign_with_default)] // Test code uses default + field reassignment for clarity
     use super::*;
 
     #[test]

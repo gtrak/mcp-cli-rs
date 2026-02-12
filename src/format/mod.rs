@@ -31,8 +31,8 @@ pub mod params;
 pub mod schema;
 
 // Re-export commonly used items
-pub use params::{format_param_help, format_param_list, DetailLevel};
-pub use schema::{extract_params_from_schema, ParameterInfo};
+pub use params::{DetailLevel, format_param_help, format_param_list};
+pub use schema::{ParameterInfo, extract_params_from_schema};
 
 /// Output format mode for CLI commands
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

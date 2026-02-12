@@ -48,8 +48,8 @@
 #[cfg(test)]
 #[cfg(windows)]
 mod windows_process_spawn_tests {
-    use std::time::Duration;
     use futures::future::join_all;
+    use std::time::Duration;
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
     /// Test CLI command execution with clean shutdown.
@@ -77,7 +77,10 @@ mod windows_process_spawn_tests {
         let mut line = String::new();
         let _ = reader.read_line(&mut line).await;
 
-        assert!(line.contains("test_result"), "Expected 'test_result' in output");
+        assert!(
+            line.contains("test_result"),
+            "Expected 'test_result' in output"
+        );
 
         // Explicitly kill and wait for process
         let _ = child.kill().await;
@@ -174,10 +177,7 @@ mod windows_process_spawn_tests {
             .expect("Failed to spawn long-running process");
 
         // Use tokio::time::timeout with 2 second limit
-        let timeout_result = tokio::time::timeout(
-            Duration::from_secs(2),
-            child.wait(),
-        ).await;
+        let timeout_result = tokio::time::timeout(Duration::from_secs(2), child.wait()).await;
 
         // Verify timeout fired
         assert!(timeout_result.is_err(), "Process should have timed out");
@@ -239,7 +239,16 @@ mod windows_process_spawn_tests {
                 let tool_input = format!("tool_{}_input", i);
                 let tool_output = format!("tool_{}_output", i);
                 let mut child = tokio::process::Command::new("cmd.exe")
-                    .args(["/c", "set", "/p", "tool_input=", &tool_input, "&&", "echo", &tool_output])
+                    .args([
+                        "/c",
+                        "set",
+                        "/p",
+                        "tool_input=",
+                        &tool_input,
+                        "&&",
+                        "echo",
+                        &tool_output,
+                    ])
                     .kill_on_drop(true)
                     .stdin(std::process::Stdio::piped())
                     .stdout(std::process::Stdio::piped())
@@ -385,10 +394,7 @@ mod windows_process_spawn_tests {
             .expect("Failed to spawn long-waiting process");
 
         // Use tokio::time::timeout with 500ms limit
-        let timeout_result = tokio::time::timeout(
-            Duration::from_millis(500),
-            child.wait(),
-        ).await;
+        let timeout_result = tokio::time::timeout(Duration::from_millis(500), child.wait()).await;
 
         // Verify timeout fires
         assert!(timeout_result.is_err(), "Should have timed out after 500ms");
@@ -423,14 +429,12 @@ mod windows_process_spawn_tests {
         // Attempt to write to stdin using AsyncWriteExt
         // The write_result is intentionally ignored - this test verifies cleanup
         // regardless of whether the write succeeds or fails
-        let _write_result = tokio::time::timeout(
-            Duration::from_millis(1000),
-            async {
-                stdin.write_all(b"test_input").await?;
-                stdin.flush().await?;
-                Ok::<(), std::io::Error>(())
-            },
-        ).await;
+        let _write_result = tokio::time::timeout(Duration::from_millis(1000), async {
+            stdin.write_all(b"test_input").await?;
+            stdin.flush().await?;
+            Ok::<(), std::io::Error>(())
+        })
+        .await;
 
         // The write might succeed or fail depending on timing
         // Either way, verify child handle cleanup

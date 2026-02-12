@@ -6,9 +6,9 @@ use std::sync::Arc;
 use tokio::net::UnixListener;
 use tokio::net::UnixStream;
 
-use crate::ipc::IpcServer;
-use crate::error::McpError;
 use crate::config::Config;
+use crate::error::McpError;
+use crate::ipc::IpcServer;
 
 /// Unix socket implementation of IPC server
 ///
@@ -24,24 +24,25 @@ impl UnixIpcServer {
     pub async fn new(path: &Path) -> Result<Self, McpError> {
         // Create parent directory if needed
         if let Some(parent) = path.parent() {
-            tokio::fs::create_dir_all(parent).await
+            tokio::fs::create_dir_all(parent)
+                .await
                 .map_err(|e| McpError::IOError { source: e })?;
         }
 
         // Remove stale socket file if exists
         if path.exists() {
-            tokio::fs::remove_file(path).await
+            tokio::fs::remove_file(path)
+                .await
                 .map_err(|e| McpError::IpcError {
                     message: format!("Failed to remove stale socket file: {}", path.display()),
                 })?;
         }
 
         // Bind Unix listener to the socket path
-        let listener = UnixListener::bind(path)
-            .map_err(|e| McpError::SocketBindError {
-                path: path.to_string_lossy().to_string(),
-                source: e,
-            })?;
+        let listener = UnixListener::bind(path).map_err(|e| McpError::SocketBindError {
+            path: path.to_string_lossy().to_string(),
+            source: e,
+        })?;
 
         Ok(Self { listener })
     }
@@ -56,7 +57,10 @@ impl IpcServer for UnixIpcServer {
         match self.listener.accept().await {
             Ok((stream, addr)) => {
                 // UnixStream already implements AsyncRead + AsyncWrite
-                Ok((Box::new(stream) as Box<dyn crate::ipc::IpcStream>, addr.to_string_lossy().to_string()))
+                Ok((
+                    Box::new(stream) as Box<dyn crate::ipc::IpcStream>,
+                    addr.to_string_lossy().to_string(),
+                ))
             }
             Err(e) => Err(McpError::IpcError {
                 message: format!("Failed to accept connection: {}", e),
@@ -88,23 +92,28 @@ impl crate::ipc::IpcClient for UnixIpcClient {
     }
 
     /// Send a daemon protocol request and receive response
-    async fn send_request(&self, request: &crate::daemon::protocol::DaemonRequest) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
+    async fn send_request(
+        &self,
+        request: &crate::daemon::protocol::DaemonRequest,
+    ) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
         // Connect to daemon
         let stream = self.connect(&self.config.socket_path).await?;
 
         // Split stream for reading and writing
-        use tokio::io::{BufReader};
+        use tokio::io::BufReader;
         let (reader, mut writer) = tokio::io::split(stream);
         let mut buf_reader = BufReader::new(reader);
 
         // Send request using NDJSON protocol
-        crate::daemon::protocol::send_request(&mut writer, request).await
+        crate::daemon::protocol::send_request(&mut writer, request)
+            .await
             .map_err(|e| McpError::IpcError {
                 message: format!("Failed to send IPC request: {}", e),
             })?;
 
         // Receive response using NDJSON protocol
-        crate::daemon::protocol::receive_response(&mut buf_reader).await
+        crate::daemon::protocol::receive_response(&mut buf_reader)
+            .await
             .map_err(|e| McpError::IpcError {
                 message: format!("Failed to receive IPC response: {}", e),
             })

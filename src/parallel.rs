@@ -3,13 +3,13 @@
 //! Provides concurrent processing of multiple servers with configurable
 //! concurrency limits. Implements DISC-05: parallel server discovery.
 
-use futures_util::stream::{self, StreamExt};
-use tokio::sync::Semaphore;
-use std::sync::Arc;
-use crate::client::ToolInfo;
-use crate::error::Result;
-use crate::config::{ServerConfig, Config};
 use crate::cli::filter::tools_match_any;
+use crate::client::ToolInfo;
+use crate::config::{Config, ServerConfig};
+use crate::error::Result;
+use futures_util::stream::{self, StreamExt};
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 /// Parallel executor for MCP operations with concurrency control.
 ///
@@ -29,9 +29,7 @@ impl ParallelExecutor {
     /// # Default
     /// Uses DISC-05 default: 5 concurrent operations
     pub fn new(concurrency_limit: usize) -> Self {
-        Self {
-            concurrency_limit,
-        }
+        Self { concurrency_limit }
     }
 
     /// Get the concurrency limit.
