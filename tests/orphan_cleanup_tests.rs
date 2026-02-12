@@ -6,13 +6,15 @@
 
 use std::io::Write;
 use std::path::PathBuf;
-use tempfile::TempDir;
 
 use mcp_cli_rs::config::Config;
 use mcp_cli_rs::daemon::orphan::{
     cleanup_orphaned_daemon, get_fingerprint_file_path, get_pid_file_path, is_daemon_running,
     write_daemon_pid,
 };
+
+#[cfg(test)]
+mod helpers;
 
 #[cfg(unix)]
 use nix::sys::signal::{Signal, kill};
@@ -21,8 +23,8 @@ use nix::unistd::Pid;
 
 #[tokio::test]
 async fn test_orphan_socket_cleanup_unix() {
-    let temp_dir = TempDir::new().unwrap();
-    let socket_path = temp_dir.path().join("test_orphan.sock");
+    let env = helpers::TestEnvironment::new();
+    let socket_path = env.path().join("test_orphan.sock");
 
     // Create a fake socket file
     let mut fake_socket = std::fs::File::create(&socket_path).unwrap();
@@ -46,8 +48,8 @@ async fn test_orphan_socket_cleanup_unix() {
 
 #[tokio::test]
 async fn test_orphan_socket_cleanup_windows() {
-    let temp_dir = TempDir::new().unwrap();
-    let socket_path = temp_dir.path().join("test_orphan.pipe");
+    let env = helpers::TestEnvironment::new();
+    let socket_path = env.path().join("test_orphan.pipe");
 
     // Create a fake named pipe file
     let mut fake_pipe = std::fs::File::create(&socket_path).unwrap();
@@ -66,8 +68,8 @@ async fn test_orphan_socket_cleanup_windows() {
 
 #[tokio::test]
 async fn test_orphan_pid_file_cleanup() {
-    let temp_dir = TempDir::new().unwrap();
-    let socket_path = temp_dir.path().join("test_orphan.sock");
+    let env = helpers::TestEnvironment::new();
+    let socket_path = env.path().join("test_orphan.sock");
 
     // Write PID to the PID file
     let pid = std::process::id();
@@ -87,8 +89,8 @@ async fn test_orphan_pid_file_cleanup() {
 
 #[tokio::test]
 async fn test_orphan_fingerprint_file_cleanup() {
-    let temp_dir = TempDir::new().unwrap();
-    let socket_path = temp_dir.path().join("test_orphan.sock");
+    let env = helpers::TestEnvironment::new();
+    let socket_path = env.path().join("test_orphan.sock");
 
     // Write fingerprint to the fingerprint file
     let fp_file = get_fingerprint_file_path(&socket_path);
@@ -110,8 +112,8 @@ async fn test_orphan_fingerprint_file_cleanup() {
 
 #[tokio::test]
 async fn test_no_false_positives() {
-    let temp_dir = TempDir::new().unwrap();
-    let socket_path = temp_dir.path().join("test_active.sock");
+    let env = helpers::TestEnvironment::new();
+    let socket_path = env.path().join("test_active.sock");
 
     // Create a config
     let config = Config::default();
@@ -139,8 +141,8 @@ async fn test_no_false_positives() {
 
 #[tokio::test]
 async fn test_pid_file_validation() {
-    let temp_dir = TempDir::new().unwrap();
-    let socket_path = temp_dir.path().join("test_orphan.sock");
+    let env = helpers::TestEnvironment::new();
+    let socket_path = env.path().join("test_orphan.sock");
 
     // Create invalid PID file (non-numeric content)
     let pid_file = get_pid_file_path(&socket_path);
@@ -159,8 +161,8 @@ async fn test_pid_file_validation() {
 
 #[tokio::test]
 async fn test_partial_cleanup_on_error() {
-    let temp_dir = TempDir::new().unwrap();
-    let socket_path = temp_dir.path().join("test_partial.sock");
+    let env = helpers::TestEnvironment::new();
+    let socket_path = env.path().join("test_partial.sock");
 
     // Create socket file
     std::fs::File::create(&socket_path).unwrap();
