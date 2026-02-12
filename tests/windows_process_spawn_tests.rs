@@ -46,11 +46,11 @@
 //! prevent them from running in normal test suites (they spawn real processes).
 
 #[cfg(test)]
+mod helpers;
+
+#[cfg(test)]
 #[cfg(windows)]
 mod windows_process_spawn_tests {
-    #[cfg(test)]
-    mod helpers;
-
     use futures::future::join_all;
     use std::time::Duration;
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
