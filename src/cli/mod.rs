@@ -4,6 +4,7 @@
 //! for the MCP CLI application.
 
 pub mod commands;
+pub mod config_setup;
 pub mod daemon;
 pub mod filter;
 

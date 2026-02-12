@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
+use mcp_cli_rs::cli::config_setup::{setup_config, setup_config_optional, setup_config_for_daemon};
 use mcp_cli_rs::config::Config;
-use mcp_cli_rs::config::loader::{find_and_load, load_config};
 use mcp_cli_rs::error::{Result, exit_code};
 use mcp_cli_rs::format::OutputMode;
 use mcp_cli_rs::ipc::create_ipc_client;
@@ -181,13 +181,7 @@ async fn run(cli: Cli) -> Result<()> {
     }
 
     // Load configuration using the loader
-    let config = if let Some(path) = &cli.config {
-        // Use explicitly provided config path
-        load_config(path).await?
-    } else {
-        // Search for config in standard locations
-        find_and_load(None).await?
-    };
+    let config = setup_config(cli.config.clone()).await?;
 
     // Wrap config in Arc for shared ownership
     let daemon_config = Arc::new(config);
@@ -302,16 +296,8 @@ async fn execute_command(
 
 /// Shutdown the running daemon via IPC
 async fn shutdown_daemon() -> Result<()> {
-    use mcp_cli_rs::config::loader::find_and_load;
-
     // Load configuration - use default config if no file found
-    let config = match find_and_load(None).await {
-        Ok(cfg) => cfg,
-        Err(e) => {
-            tracing::warn!("No config file found, using default for IPC: {}", e);
-            mcp_cli_rs::config::Config::default()
-        }
-    };
+    let config = setup_config_optional(None).await?;
 
     // Create IPC client to connect to daemon
     let mut client = create_ipc_client(&config).map_err(|e| {
@@ -336,20 +322,10 @@ async fn run_standalone_daemon(
     cli_ttl: Option<u64>,
     cli_socket_path: Option<PathBuf>,
 ) -> mcp_cli_rs::error::Result<()> {
-    use mcp_cli_rs::config::loader::find_and_load;
     use mcp_cli_rs::daemon::run_daemon;
 
     // Load configuration - allow daemon to start even without config file
-    let mut config = match find_and_load(None).await {
-        Ok(cfg) => cfg,
-        Err(e) => {
-            tracing::warn!(
-                "No config file found, starting daemon with empty config: {}",
-                e
-            );
-            Config::default()
-        }
-    };
+    let mut config = setup_config_for_daemon(None).await?;
 
     // Determine TTL: CLI flag > env var > config > default (60s)
     let ttl = cli_ttl
