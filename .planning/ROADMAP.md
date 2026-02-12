@@ -91,7 +91,7 @@ Project follows a solo developer + Claude workflow with no team coordination art
 - [x] 12-01-PLAN.md — Create comprehensive test helpers module (TestEnvironment, path generators, IPC helpers, config factories)
 - [x] 12-02-PLAN.md — Refactor ipc_tests.rs and orphan_cleanup_tests.rs to use helpers
 - [x] 12-03-PLAN.md — Refactor cross_platform_daemon_tests.rs (786->613 lines) to use helpers
-- [ ] 12-04-PLAN.md — Refactor lifecycle_tests.rs and windows_process_spawn_tests.rs to use helpers
+- [x] 12-04-PLAN.md — Refactor lifecycle_tests.rs and windows_process_spawn_tests.rs to use helpers (mod helpers added, no code lines removed - files test specialized patterns)
 - [ ] 12-05-PLAN.md — Split cross_platform_daemon_tests.rs into platform modules (unix/, windows/, common/)
 
 ### Phase 13: Code Organization
@@ -156,7 +156,7 @@ Phases execute in numeric order: 12 → 13 → 14 → 15 → 16
 | 9 | Cross-Platform Verification (XP-02, XP-04) | Complete | 100% |
 | 10 | Phase 6 Verification Documentation | Complete | 100% |
 | 11 | Code Quality Cleanup | Complete | 100% |
-| 12 | Test Infrastructure | Not started | 0% (5 plans ready) |
+| 12 | Test Infrastructure | In Progress | 80% (4/5 plans) | Test helpers module created, IPC/orphan/cross_platform_daemon tests refactored, lifecycle/windows_process tests analyzed (mod helpers added), tests pass |
 | 13 | Code Organization | Not started | 0% |
 | 14 | Duplication Elimination | Not started | 0% |
 | 15 | Documentation & API | Not started | 0% |
