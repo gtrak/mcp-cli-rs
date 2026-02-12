@@ -72,7 +72,100 @@ Project follows a solo developer + Claude workflow with no team coordination art
 
 ---
 
-**Last updated:** 2026-02-12 (v1.2 milestone complete)
+## 🚧 v1.3 Tech Debt Cleanup & Code Quality (In Progress)
+
+**Milestone Goal:** Reduce codebase by 8-13% through test helpers, code organization, duplication elimination, documentation improvements, and code quality enhancements, while maintaining zero compilation and clippy warnings.
+
+### Phase 12: Test Infrastructure
+**Goal**: Eliminate test duplication and create reusable test helpers foundation
+**Depends on**: v1.2 completion
+**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, TEST-05, TEST-06, TEST-07, TEST-08, SIZE-03
+**Success Criteria** (what must be TRUE):
+  1. All test files use helpers from `tests/helpers.rs` instead of inline setup code
+  2. Test suite organized by platform (tests/unix/*.rs, tests/windows/*.rs, tests/common/*.rs)
+  3. Running all tests produces identical results before and after refactoring
+  4. Test setup code reduced by ~200-300 lines through helper reuse
+**Plans**: TBD
+
+### Phase 13: Code Organization
+**Goal**: Restructure large files into focused modules with clear separation of concerns
+**Depends on**: Phase 12 (stable test infrastructure to verify after refactoring)
+**Requirements**: ORG-01, ORG-02, ORG-03, ORG-04, ORG-05, ORG-06, ORG-07, ORG-08, SIZE-02
+**Success Criteria** (what must be TRUE):
+  1. All source files under 600 lines (commands.rs was 1850, main.rs was 809)
+  2. Module structure clearly separates concerns based on functionality area
+  3. All module re-exports compile without errors
+  4. Full test suite passes after restructuring (verifies no behavior changes)
+**Plans**: TBD
+
+### Phase 14: Duplication Elimination
+**Goal**: Remove duplicate code across command functions and connection interfaces
+**Depends on**: Phase 13 (clear structure reveals duplication opportunities)
+**Requirements**: DUP-01, DUP-02, DUP-03, DUP-04, DUP-05, DUP-06, SIZE-04
+**Success Criteria** (what must be TRUE):
+  1. 16 JSON command functions consolidated into 8 multi-mode commands with OutputMode parameter
+  2. Single connection interface (McpClient trait) used by pool, client, and IPC modules
+  3. No duplicate list_tools(), call_tool(), or formatting helper implementations exist
+  4. All tests pass with identical behavior (consolidation maintains functionality)
+**Plans**: TBD
+
+### Phase 15: Documentation & API
+**Goal**: Fix documentation warnings, audit public API, improve module docs
+**Depends on**: Phase 14 (stable structure for accurate documentation)
+**Requirements**: DOC-01, DOC-02, DOC-03, DOC-04, DOC-05, DOC-06, SIZE-05
+**Success Criteria** (what must be TRUE):
+  1. Running `cargo doc` produces zero warnings
+  2. Public API surface reduced by 50-100 lines of unnecessary exports
+  3. All publicly exported functions and structs have rustdoc comments
+  4. Module-level documentation clearly describes scope and provides usage examples
+**Plans**: TBD
+
+### Phase 16: Code Quality Sweep
+**Goal**: Replace unsafe unwrap() calls, remove dead code attributes, enforce consistent error handling
+**Depends on**: Phase 15 (documentation complete, API surface stable)
+**Requirements**: QUAL-01, QUAL-02, QUAL-03, QUAL-04, QUAL-05, SIZE-01
+**Success Criteria** (what must be TRUE):
+  1. No unwrap() calls exist in production code (all replaced with proper error handling)
+  2. No unnecessary #[allow(dead_code)] attributes remain
+  3. All functions returning Result<> follow consistent error handling patterns
+  4. Overall codebase reduced to 10,800-11,500 lines (8-13% reduction from 12,408)
+**Plans**: TBD
+
+## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 12 → 13 → 14 → 15 → 16
+
+| Phase | Name | Status | Completion |
+|-------|------|--------|------------|
+| 1 | Core Protocol & Configuration | Complete | 100% |
+| 2 | Connection Daemon & Cross-Platform IPC | Complete | 100% |
+| 3 | Performance & Reliability | Complete | 100% |
+| 4 | Tool Filtering & Cross-Platform Validation | Complete | 100% |
+| 5 | Unified Daemon Architecture | Complete | 100% |
+| 6 | Output Formatting & Visual Hierarchy | Complete | 100% |
+| 7 | JSON Output & Machine-Readable Modes | Complete | 100% |
+| 8 | Fix Phase 4 Windows Tests (XP-01) | Complete | 100% |
+| 9 | Cross-Platform Verification (XP-02, XP-04) | Complete | 100% |
+| 10 | Phase 6 Verification Documentation | Complete | 100% |
+| 11 | Code Quality Cleanup | Complete | 100% |
+| 12 | Test Infrastructure | Not started | 0% |
+| 13 | Code Organization | Not started | 0% |
+| 14 | Duplication Elimination | Not started | 0% |
+| 15 | Documentation & API | Not started | 0% |
+| 16 | Code Quality Sweep | Not started | 0% |
+
+**Progress Summary:**
+- **Phases completed:** 11/16
+- **Total plans:** 39 plans executed (v1.0 + v1.2)
+- **v1 Coverage:** 42/42 requirements satisfied ✅
+- **v1.2 Coverage:** 18/18 requirements satisfied ✅
+- **v1.3 Coverage:** 37/37 requirements mapped (0% delivered)
+- **Total Coverage:** 97/97 requirements (60 delivered, 37 planned)
+
+---
+
+**Last updated:** 2026-02-12 (v1.3 roadmap created)
 
 ---
 

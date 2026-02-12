@@ -1,239 +1,93 @@
-# Requirements: MCP CLI Rust Rewrite
+# Requirements: MCP CLI Rust Cleanup
 
-**Defined:** 2025-02-06
-**Core Value:** Reliable cross-platform MCP server interaction without dependencies
+**Defined:** 2026-02-12
+**Core Value:** Reliable cross-platform MCP server interaction without dependencies.
 
-## v1 Requirements
+## v1.3 Requirements Tech Debt Cleanup & Code Quality
 
-Requirements for initial release. Each maps to roadmap phases.
+Requirements for code quality, maintainability, and duplication elimination.
 
-### Configuration
+### Test Infrastructure
 
-- [ ] **CONFIG-01**: Parse server configuration from mcp_servers.toml file with support for both stdio (command, args, env, cwd) and HTTP (url, headers) server definitions
-- [ ] **CONFIG-02**: Search for configuration files in priority order: explicit path (MCP_CONFIG_PATH), command line (-c/--config), current directory mcp_servers.toml, home directory .mcp_servers.toml, ~/.config/mcp/mcp_servers.toml
-- [ ] **CONFIG-03**: Support environment variable overrides for layered configuration (env vars take precedence over config file values)
-- [ ] **CONFIG-04**: Validate TOML structure and display clear errors for missing fields, invalid TOML, or server misconfiguration
-- [ ] **CONFIG-05**: Display warning message when no servers are configured
+- [ ] **TEST-01**: Create test setup helpers module (`tests/helpers.rs`) with TestEnvironment struct for temp directory management
+- [ ] **TEST-02**: Create platform-specific socket/pipe path generators with unified interface in helpers module
+- [ ] **TEST-03**: Create IPC test helpers (server/client roundtrip patterns) in helpers module
+- [ ] **TEST-04**: Create test config factories for common server/tool configurations
+- [ ] **TEST-05**: Refactor ipc_tests.rs, cross_platform_daemon_tests.rs, lifecycle_tests.rs, windows_process_spawn_tests.rs, orphan_cleanup_tests.rs to use helpers
+- [ ] **TEST-06**: Split cross_platform_daemon_tests.rs (785 lines) into tests/unix/*.rs, tests/windows/*.rs, tests/common/*.rs
+- [ ] **TEST-07**: Organize test files by platform and common patterns, maintain test coverage
+- [ ] **TEST-08**: All tests use helpers instead of inline setup (eliminate ~200-300 lines of duplication)
 
-### Server Connections
+### Code Organization
 
-- [ ] **CONN-01**: Connect to MCP servers via stdio transport (local process spawning)
-- [ ] **CONN-02**: Connect to MCP servers via HTTP transport (remote API)
-- [ ] **CONN-03**: Handle connection lifecycle (connect, disconnect, timeouts)
-- [ ] **CONN-04**: Use tokio::process for async process spawning with kill_on_drop(true) to prevent zombie processes on Windows
-- [x] **CONN-05**: Implement connection daemon using Unix sockets (*nix) and Windows named pipes for cross-platform IPC
-- [x] **CONN-06**: Spawn daemon lazily on first access with idle timeout (60s default)
-- [x] **CONN-07**: Detect configuration changes and spawn new daemon when cached config becomes stale
-- [x] **CONN-08**: Cleanup orphaned daemon processes and sockets on startup
+- [ ] **ORG-01**: Split src/cli/commands.rs (1850 lines) into src/cli/list_commands.rs (list, grep), src/cli/info_commands.rs (info), src/cli/call_commands.rs (call), src/cli/commands.rs (orchestration)
+- [ ] **ORG-02**: Extract daemon lifecycle from src/main.rs (809 lines) to src/cli/daemon_lifecycle.rs
+- [ ] **ORG-03**: Extract command routing from src/main.rs to src/cli/command_routing.rs
+- [ ] **ORG-04**: Extract config loading/merging from src/main.rs to src/cli/config_setup.rs
+- [ ] **ORG-05**: Extract CLI entry point from src/main.rs to src/cli/entry.rs, leaving main.rs as thin entry wrapper
+- [ ] **ORG-06**: Split src/config/mod.rs (432 lines) into src/config/types.rs (Config structs), src/config/parser.rs (TOML parsing), src/config/validator.rs (validation)
+- [ ] **ORG-07**: All module re-exports updated to reflect new structure
+- [ ] **ORG-08**: Module structure is clear with separation of concerns, no file >600 lines
 
-### Discovery & Search
+### Duplication Elimination
 
-- [ ] **DISC-01**: List all configured servers with their available tools when no subcommand is provided
-- [ ] **DISC-02**: Display server details including transport type, connection information, tool count, and server instructions
-- [ ] **DISC-03**: Display tool details (name, description, input JSON Schema) for inspection
-- [ ] **DISC-04**: Search tool names (not server names) using glob patterns with wildcards (*, ?, etc.)
-- [x] **DISC-05**: Process servers in parallel with configurable concurrency limits (default 5)
-- [ ] **DISC-06**: Support optional display of descriptions via -d/--with-descriptions flag
+- [ ] **DUP-01**: Consolidate 16 JSON command functions (cmd_xxx, cmd_xxx_json pairs) into 8 multi-mode commands with OutputMode parameter
+- [ ] **DUP-02**: Create format_for_json() and format_for_human() helper methods to eliminate duplicate formatting logic (~200-300 lines)
+- [ ] **DUP-03**: Unify duplicate connection interfaces (daemon/pool.rs, client/mod.rs, ipc/mod.rs) into single McpClient trait
+- [ ] **DUP-04**: Remove duplicate list_tools() and call_tool() implementations across pool, client, ipc
+- [ ] **DUP-05**: Merge src/transport.rs (81 lines) and src/client/transport.rs (68 lines) into single transport abstraction or eliminate duplicate
+- [ ] **DUP-06**: All duplicate interfaces eliminated, single source of truth for MCP client operations
 
-### Tool Execution
+### Documentation & API
 
-- [ ] **EXEC-01**: Execute tools with JSON arguments provided either inline or via stdin pipe
-- [ ] **EXEC-02**: Automatically detect stdin input when TTY is not present (pipe redirection)
-- [ ] **EXEC-03**: Format tool call results to extract text content for CLI-friendly display
-- [ ] **EXEC-04**: Validate JSON tool arguments and display parse errors with context
-- [x] **EXEC-05**: Implement automatic retry logic with exponential backoff for transient errors (network timeouts, HTTP 502/503/504/429)
-- [x] **EXEC-06**: Respect overall operation timeout (default 1800s) and stop retries if budget exhausted
-- [x] **EXEC-07**: Configure retry limits (max 3 attempts, base 1000ms delay)
+- [ ] **DOC-01**: Fix all 9 cargo doc warnings (unclosed HTML tags, URL formatting)
+- [ ] **DOC-02**: Audit 106 public functions and 34 public structs, mark unnecessary exports as private
+- [ ] **DOC-03**: Reduce public API surface by removing 50-100 lines of unnecessary exports
+- [ ] **DOC-04**: Improve module-level documentation with clear scope and usage examples
+- [ ] **DOC-05**: All public APIs have rustdoc comments with examples
+- [ ] **DOC-06**: cargo doc generates zero warnings
 
-### Tool Filtering
+### Code Quality
 
-- [ ] **FILT-01**: Filter tool availability based on server configuration using allowedTools glob patterns
-- [ ] **FILT-02**: Filter tool availability based on server configuration using disabledTools glob patterns
-- [ ] **FILT-03**: Ensure disabledTools patterns take precedence over allowedTools patterns when both are defined
-- [ ] **FILT-04**: Display error message when user attempts to call disabled tool
-- [ ] **FILT-05**: Support glob pattern wildcards (*, ?) in filter rules
+- [ ] **QUAL-01**: Review 72 unwrap() usages for safety, replace with ok_or_else() or expect() with context where appropriate
+- [ ] **QUAL-02**: Review and remove unnecessary #[allow(dead_code)] attributes
+- [ ] **QUAL-03**: Ensure consistent error handling patterns across codebase
+- [ ] **QUAL-04**: Consistent use of Result<> return types, no bare unwrap() in production code
+- [ ] **QUAL-05**: All clippy warnings addressed (currently zero, maintain)
 
-### Error Handling
+### Codebase Size Target
 
-- [ ] **ERR-01**: Provide structured error messages with error type, message, details, and actionable recovery suggestions
-- [ ] **ERR-02**: Display context-aware error suggestions (e.g., list available servers when server not found)
-- [ ] **ERR-03**: Implement exit code conventions: 0 for success, 1 for client errors, 2 for server errors, 3 for network errors
-- [x] **ERR-04**: Display colored terminal output when stdout is a TTY and NO_COLOR is not set
-- [ ] **ERR-05**: Capture and forward stderr output from stdio-based MCP servers to the user
-- [ ] **ERR-06**: Handle ambiguous commands (e.g., "server tool" without subcommand) and prompt user to specify info vs call
-- [x] **ERR-07**: Warn when some servers fail to connect during parallel operations
-
-### CLI Support
-
-- [ ] **CLI-01**: Display help information when -h/--help flag is provided
-- [ ] **CLI-02**: Display version information when -v/--version flag is provided
-- [ ] **CLI-03**: Support custom config file path via -c/--config command line option
-- [x] **CLI-04**: Gracefully handle signals (SIGINT, SIGTERM) with proper cleanup of connections and resources
-- [ ] **CLI-05**: Support both space-separated (server tool) and slash-separated (server/tool) argument formats for info, grep, and call commands
-
-### Cross-Platform Support
-
-- [x] **XP-01**: Test stdio process spawning on Windows and ensure no zombie processes remain
-- [ ] **XP-02**: Implement Windows named pipe security flags (security_qos_flags) to prevent privilege escalation
-- [ ] **XP-03**: Ensure MCP protocol compliance for stdio transport (newline-delimited messages, no embedded newlines)
-- [ ] **XP-04**: Validate connection daemon functionality on Linux, macOS, and Windows
-
-## v2 Requirements
-
-Deferred to future release. Tracked but not in current roadmap.
-
-### TBD
-(None identified yet)
+- [ ] **SIZE-01**: Overall codebase reduced to 10,800-11,500 lines (from 12,408 lines = 8-13% reduction)
+- [ ] **SIZE-02**: No single file >600 lines (commands.rs was 1850)
+- [ ] **SIZE-03**: Test duplication reduced by ~200-300 lines
+- [ ] **SIZE-04**: Command duplication reduced by ~200-300 lines
+- [ ] **SIZE-05**: API surface reduced by ~50-100 lines
 
 ## Out of Scope
 
-Explicitly excluded. Documented to prevent scope creep.
-
 | Feature | Reason |
 |---------|--------|
-| Bug-for-bug compatibility with Bun implementation | Opportunity to improve where reasonable; focus on core functionality parity |
-| Public distribution/crates.io publishing | For personal use only, local compilation sufficient |
-| MCP server implementation | This tool is a client only; server implementation is separate project |
-| Interactive REPL mode | CLI tools are for scripting/automation; MCP Inspector provides UI-based exploration |
-| Shell completion scripts | Maintenance burden for dynamic tool discovery; use editor integrations instead |
-| Persistent connection storage (database) | Adds database dependency; CLI should remain stateless |
-| SSE and Streamable HTTP transports | Original implementation uses basic HTTP only; defer to post-MVP |
-| Tool aliasing/shortcuts | Config complexity without clear benefit over shell aliases |
-| Multi-server transactions | MCP doesn't support transactions; not feasible to implement generically |
-| Tool output caching | Cache invalidation complexity; tools can implement their own caching if needed |
-| Environment variable substitution within config (${VAR}) | Using env vars to override layered config instead (simpler pattern) |
+| Test fixtures and assertion helpers | Low priority, test helpers sufficient for now |
+| Comprehensive rewrite of modules | Refactor only, no behavior changes |
+| New features or functionality | This is cleanup only |
+| Performance optimization | Code organization focus, not performance |
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CONFIG-01 | Phase 1 | Pending |
-| CONFIG-02 | Phase 1 | Pending |
-| CONFIG-03 | Phase 1 | Pending |
-| CONFIG-04 | Phase 1 | Pending |
-| CONFIG-05 | Phase 1 | Pending |
-| CONN-01 | Phase 1 | Pending |
-| CONN-02 | Phase 1 | Pending |
-| CONN-03 | Phase 1 | Pending |
-| CONN-04 | Phase 1 | Pending |
-| CONN-05 | Phase 2 | Complete |
-| CONN-06 | Phase 2 | Complete |
-| CONN-07 | Phase 2 | Complete |
-| CONN-08 | Phase 2 | Complete |
-| DISC-01 | Phase 1 | Pending |
-| DISC-02 | Phase 1 | Pending |
-| DISC-03 | Phase 1 | Pending |
-| DISC-04 | Phase 1 | Pending |
-| DISC-05 | Phase 3 | Complete |
-| DISC-06 | Phase 1 | Pending |
-| EXEC-01 | Phase 1 | Pending |
-| EXEC-02 | Phase 1 | Pending |
-| EXEC-03 | Phase 1 | Pending |
-| EXEC-04 | Phase 1 | Pending |
-| EXEC-05 | Phase 3 | Complete |
-| EXEC-06 | Phase 3 | Complete |
-| EXEC-07 | Phase 3 | Complete |
-| FILT-01 | Phase 4 | Pending |
-| FILT-02 | Phase 4 | Pending |
-| FILT-03 | Phase 4 | Pending |
-| FILT-04 | Phase 4 | Pending |
-| FILT-05 | Phase 4 | Pending |
-| ERR-01 | Phase 1 | Pending |
-| ERR-02 | Phase 1 | Pending |
-| ERR-03 | Phase 1 | Pending |
-| ERR-04 | Phase 3 | Complete |
-| ERR-05 | Phase 1 | Pending |
-| ERR-06 | Phase 1 | Pending |
-| ERR-07 | Phase 3 | Complete |
-| CLI-01 | Phase 1 | Pending |
-| CLI-02 | Phase 1 | Pending |
-| CLI-03 | Phase 1 | Pending |
-| CLI-04 | Phase 3 | Complete |
-| CLI-05 | Phase 4 | Pending |
-| XP-01 | Phase 8 | Complete |
-| XP-02 | Phase 4 | Pending |
-| XP-03 | Phase 1 | Pending |
-| XP-04 | Phase 4 | Pending |
+| TEST-01 through TEST-08 | Phase 12 | Pending |
+| ORG-01 through ORG-08 | Phase 13 | Pending |
+| DUP-01 through DUP-06 | Phase 14 | Pending |
+| DOC-01 through DOC-06 | Phase 15 | Pending |
+| QUAL-01 through QUAL-05 | Phase 16 | Pending |
+| SIZE-01 through SIZE-05 | Phases 12-16 | Pending |
 
 **Coverage:**
-- v1 requirements: 42 total
-- Mapped to phases: 42 ✅
-- Unmapped: 0
-
-**Phase Distribution:**
-- Phase 1: 25 requirements (Configuration, Core Connections, Discovery, Basic Execution, Basic Errors, CLI Foundation)
-- Phase 2: 4 requirements (Connection Daemon, IPC)
-- Phase 3: 6 requirements (Concurrency, Retry, Colored Output, Signal Handling)
-- Phase 4: 7 requirements (Tool Filtering, Argument Formats, Windows Validation, Cross-Platform Daemon)
-
-## v1.2 Requirements
-
-Requirements for ergonomic CLI output improvements.
-
-### Output Formatting
-
-- [ ] **OUTP-01**: Tool listing shows parameter overview (names, types, required/optional status) in help-style format
-- [ ] **OUTP-02**: Progressive detail levels via flags: default (summary) → `-d` (with descriptions) → `-v` (verbose with full schema)
-- [ ] **OUTP-03**: Default `list` command shows tool count and brief descriptions per server
-- [ ] **OUTP-04**: Multi-server listings have clear visual hierarchy (server headers, grouped tools)
-- [ ] **OUTP-05**: Consistent formatting across all commands (list, info, grep, call)
-- [ ] **OUTP-06**: Parameter display uses standard CLI conventions (e.g., `name <type>` for required, `name [type]` for optional)
-
-### Output Modes
-
-- [x] **OUTP-07**: JSON output mode (`--json` flag) for programmatic use and scripting
-- [x] **OUTP-08**: JSON output includes complete tool metadata (name, description, parameters, schema)
-- [x] **OUTP-09**: Plain text mode (`--no-color` or when piped) works correctly for all commands
-- [x] **OUTP-10**: Machine-readable output follows consistent schema across all commands
-
-### Tool Discovery UX
-
-- [ ] **OUTP-11**: Tool descriptions are prominently displayed (not truncated in default view)
-- [ ] **OUTP-12**: Usage hints shown in tool listings (e.g., "Use `mcp info server tool` for full schema")
-- [ ] **OUTP-13**: Server status clearly indicated (connected, failed, disabled tools present)
-- [ ] **OUTP-14**: Tool search (grep) results show context (server name + tool description)
-- [ ] **OUTP-15**: Empty states have helpful messages (no servers configured, no tools found)
-
-### Error & Warning Display
-
-- [ ] **OUTP-16**: Error messages maintain consistent format with context and suggestions
-- [ ] **OUTP-17**: Warnings are visually distinct but not overwhelming
-- [ ] **OUTP-18**: Partial failures (some servers down) show which succeeded and which failed
-
-## Traceability (v1.2)
-
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| OUTP-01 | Phase 6 | Complete |
-| OUTP-02 | Phase 6 | Complete |
-| OUTP-03 | Phase 6 | Complete |
-| OUTP-04 | Phase 6 | Complete |
-| OUTP-05 | Phase 6 | Complete |
-| OUTP-06 | Phase 6 | Complete |
-| OUTP-07 | Phase 7 | Complete |
-| OUTP-08 | Phase 7 | Complete |
-| OUTP-09 | Phase 7 | Complete |
-| OUTP-10 | Phase 7 | Complete |
-| OUTP-11 | Phase 6 | Complete |
-| OUTP-12 | Phase 6 | Complete |
-| OUTP-13 | Phase 6 | Complete |
-| OUTP-14 | Phase 6 | Complete |
-| OUTP-15 | Phase 6 | Complete |
-| OUTP-16 | Phase 6 | Complete |
-| OUTP-17 | Phase 6 | Complete |
-| OUTP-18 | Phase 6 | Complete |
-
-**v1.2 Coverage:**
-- v1.2 requirements: 18 total
-- Mapped to phases: 18 ✅ (roadmap complete)
-- Unmapped: 0
-
-**Phase Distribution:**
-- Phase 6: 14 requirements (Output Formatting, Tool Discovery UX, Error Display)
-- Phase 7: 4 requirements (JSON Output, Machine-Readable Modes)
+- v1.3 requirements: 37 total
+- Mapped to phases: 37
+- Unmapped: 0 ✓
 
 ---
-*Requirements defined: 2025-02-06 (v1), 2026-02-10 (v1.2)*
-*Last updated: 2026-02-10 after v1.2 milestone initialization*
+*Requirements defined: 2026-02-12*
+*Last updated: 2026-02-12 after requirements definition*
