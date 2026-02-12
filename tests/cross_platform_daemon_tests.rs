@@ -578,74 +578,36 @@ async fn test_ipc_client_trait_consistency() {
     #[cfg(unix)]
     {
         let config = crate::helpers::create_test_config();
-
         let client = mcp_cli_rs::ipc::UnixIpcClient::new(config);
-
-        // Verify trait methods are implemented
-        assert!(
-            client.config().is_empty(),
-            "UnixIpcClient should have config method"
-        );
+        assert!(client.config().is_empty());
     }
 
     // Test on Windows
     #[cfg(windows)]
     {
         let config = crate::helpers::create_test_config();
-
         let client = mcp_cli_rs::ipc::windows::NamedPipeIpcClient::with_config(config);
-
-        // Verify trait methods are implemented
-        assert!(
-            client.config().is_empty(),
-            "NamedPipeIpcClient should have config method"
-        );
+        assert!(client.config().is_empty());
     }
 }
 
 /// Test protocol (NDJSON) is consistent across platforms
 #[tokio::test]
 async fn test_ndjson_protocol_consistency() {
-    // Test on Unix
-    #[cfg(unix)]
-    {
-        let _socket_path = crate::helpers::get_test_socket_path();
-        let request = DaemonRequest::ListServers;
+    let request = DaemonRequest::ListServers;
 
-        // Serialize to NDJSON (one-line JSON)
-        let serialized = serde_json::to_string(&request).unwrap();
-        assert!(
-            !serialized.contains("\n"),
-            "Serialized request should be single line"
-        );
+    // Serialize to NDJSON (one-line JSON)
+    let serialized = serde_json::to_string(&request).unwrap();
+    assert!(
+        !serialized.contains("\n"),
+        "Serialized request should be single line"
+    );
 
-        // Deserialize back
-        let deserialized: DaemonRequest = serde_json::from_str(&serialized).unwrap();
-        assert!(
-            matches!(deserialized, DaemonRequest::ListServers),
-            "Expected ListServers request, got {:?}",
-            deserialized
-        );
-    }
-
-    // Test on Windows
-    #[cfg(windows)]
-    {
-        let request = DaemonRequest::ListServers;
-
-        // Serialize to NDJSON (one-line JSON)
-        let serialized = serde_json::to_string(&request).unwrap();
-        assert!(
-            !serialized.contains("\n"),
-            "Serialized request should be single line"
-        );
-
-        // Deserialize back
-        let deserialized: DaemonRequest = serde_json::from_str(&serialized).unwrap();
-        assert!(
-            matches!(deserialized, DaemonRequest::ListServers),
-            "Expected ListServers request, got {:?}",
-            deserialized
-        );
-    }
+    // Deserialize back
+    let deserialized: DaemonRequest = serde_json::from_str(&serialized).unwrap();
+    assert!(
+        matches!(deserialized, DaemonRequest::ListServers),
+        "Expected ListServers request, got {:?}",
+        deserialized
+    );
 }
