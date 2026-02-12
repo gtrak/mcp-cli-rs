@@ -433,10 +433,15 @@ Plans:
 2. No commented-out code in src/cli/daemon.rs
 3. Code passes clippy/format checks
 
-**Tasks:**
-- Remove unused imports in commands.rs
-- Remove commented-out code in src/cli/daemon.rs
-- Run clippy and fmt checks
+**What This Delivers:**
+- Clean codebase with no unused imports
+- Source files free of commented-out code
+- Code passes all clippy and fmt checks
+
+**Plans:** 1 plan in 1 wave
+
+Plans:
+- [ ] 11-01-PLAN.md — Remove unused imports, commented-out code, run linting checks
 
 ---
 
@@ -453,11 +458,11 @@ Plans:
 | 7 | JSON Output & Machine-Readable Modes | Complete | 100% (4/4 plans) |
 | 8 | Fix Phase 4 Windows Tests (XP-01) | Complete | 100% |
 | 9 | Cross-Platform Verification (XP-02, XP-04) | Complete | 100% |
-| 10 | Phase 6 Verification Documentation | Complete | 100% (1/1 plans) |
-| 11 | Code Quality Cleanup | Pending | 0% |
+ | 10 | Phase 6 Verification Documentation | Complete | 100% (1/1 plans) |
+ | 11 | Code Quality Cleanup | Pending | 0% (1/1 plans) |
 
 **v1.2 Tech Debt Coverage:** 2/3 items pending
 
 ---
 
-**Last updated:** 2026-02-11 (Phase 9 complete - XP-02 documented, XP-04 Windows verified)
+**Last updated:** 2026-02-12 (Phase 11 planned - Code quality cleanup)
