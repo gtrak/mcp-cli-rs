@@ -1,14 +1,14 @@
 # State: MCP CLI Rust Rewrite
 
 **Created:** 2025-02-06
-**Last updated:** 2026-02-13 - Phase 16 complete: Code Quality Sweep finished - 19 unwrap() calls replaced, 2 dead_code attrs removed, 9,568 lines, zero clippy warnings
+**Last updated:** 2026-02-13 - Phase 15-03 complete: Module-level docs and public API documentation for 7 files, zero cargo doc warnings
 **Mode:** yolo
 **Depth:** standard
 
 **Last session:** 2026-02-13
-**Stopped at:** Completed Phase 15-02 - Reduce public API surface complete
+**Stopped at:** Completed Phase 15-03 - Module & public API documentation
 **Resume file:** None
-**Plans completed:** 01-01 through 01-04 (Phase 1), 02-01 through 02-11 (Phase 2), 03-01 through 03-06 (Phase 3), 04-01 through 04-03 (Phase 4), 05-01 through 05-03 (Phase 5), 06-01 through 06-04 (Phase 6), 07-01 through 07-04 (Phase 7), 08-01 (Phase 8), 09-01 (Phase 9), 10-01 (Phase 10), 11-01 (Phase 11), 12-01 through 12-05 (Phase 12), 13-01 through 13-07 (Phase 13), 14-01 through 14-05 (Phase 14), 15-01 through 15-02 (Phase 15), 16-01 through 16-04 (Phase 16)
+**Plans completed:** 01-01 through 01-04 (Phase 1), 02-01 through 02-11 (Phase 2), 03-01 through 03-06 (Phase 3), 04-01 through 04-03 (Phase 4), 05-01 through 05-03 (Phase 5), 06-01 through 06-04 (Phase 6), 07-01 through 07-04 (Phase 7), 08-01 (Phase 8), 09-01 (Phase 9), 10-01 (Phase 10), 11-01 (Phase 11), 12-01 through 12-05 (Phase 12), 13-01 through 13-07 (Phase 13), 14-01 through 14-05 (Phase 14), 15-01 through 15-03 (Phase 15), 16-01 through 16-04 (Phase 16)
 **Plans ready:** None (All phases through 16 complete, v1.3 milestone ready)
 
 **Phase 1 progress:** 100% (4/4 plans complete)
@@ -26,7 +26,7 @@
 **Phase 12 progress:** 100% (5/5 plans - ALL COMPLETE)
 **Phase 13 progress:** 100% (6/6 plans - ALL COMPLETE)
 **Phase 14 progress:** 100% (5/5 plans - ALL COMPLETE)
-**Phase 15 progress:** 50% (2/4 plans - DOC-01, DOC-02 complete)
+**Phase 15 progress:** 75% (3/4 plans - DOC-01, DOC-02, DOC-03 complete)
 **Phase 16 progress:** 100% (4/4 plans - ALL COMPLETE)
 
 **Milestone Status:** v1.3 IN PROGRESS
@@ -38,15 +38,16 @@
 ## Current Position
 
 Phase: 15 of 16 (Documentation & API)
-Plan: 15-02 complete (of 4 in phase)
-Status: DOC-02 complete - public API surface reduced by 16 lines
-Last activity: 2026-02-13 - Phase 15-02 complete: Reduced public API exports
+Plan: 15-03 complete (of 4 in phase)
+Status: DOC-04/DOC-05 complete - module docs and public API documented
+Last activity: 2026-02-13 - Completed 15-03-PLAN.md
 
-Progress: [████████████████░] 75% (62/65 plans executed)
+Progress: [█████████████████░] 97% (63/65 plans executed)
 
 ## Accumulated Context
 
 **Decisions:**
+- [2026-02-13] Phase 15-03 complete - Module-level docs with examples for cli/config/daemon/pool/format modules, rustdoc comments on all public functions in error.rs/retry.rs, 7 doc tests pass, zero cargo doc warnings
 - [2026-02-13] Phase 15-01 complete - Fixed 8 cargo doc warnings: unclosed HTML tags for Arc<Mutex>, dyn, ToolInfo, String (using backticks), bare URLs (using angle brackets), cargo doc now produces zero warnings
 - [2026-02-13] Phase 16-02 complete - Removed 2 #[allow(dead_code)] attributes from src/cli/models.rs, is_false() and is_zero() helper functions are used by serde skip_serializing_if (not dead code), grep shows zero matches in src/, cargo clippy passes, 98 tests pass
 - [2026-02-13] Phase 16-01 complete - Replaced 19 unsafe unwrap() calls with proper error handling: 5 mutex locks in pool.rs replaced with expect(), 3 serde_json in config_fingerprint.rs/daemon/mod.rs/parallel.rs, 6 CLI unwraps in call.rs/formatters.rs/search.rs/http.rs/loader.rs replaced with expect/if-let patterns, cargo clippy --lib passes with zero warnings, 98 tests pass
@@ -102,6 +103,8 @@ Progress: [████████████████░] 75% (62/65 plans
 **Next Phase Readiness:**
 - Phase 15 IN PROGRESS:
   - 15-01 complete: Fixed 8 cargo doc warnings - backtick syntax for types, angle brackets for URLs, zero warnings now
+  - 15-02 complete: Reduced public API surface by 16 lines
+  - 15-03 complete: Module-level docs for 5 modules, public API docs for error.rs/retry.rs, 7 doc tests pass
 - Phase 16 COMPLETE:
   - 16-04 complete: Final verification - all QUAL requirements met, zero unwrap in production, zero dead_code attrs, cargo clippy passes, cargo fmt passes, 9,568 lines (below target)
   - 16-03 complete: Verified thiserror for library (McpError with 20+ variants), anyhow in CLI daemon.rs, exit_code mapping works
@@ -120,6 +123,7 @@ Progress: [████████████████░] 75% (62/65 plans
 - Phase 15 IN PROGRESS:
   - 15-01 complete: Fixed 8 cargo doc warnings (DOC-01 complete)
   - 15-02 complete: Reduced public API surface (DOC-02 complete)
+  - 15-03 complete: Module docs and public API documentation (DOC-04/DOC-05 complete)
 - Phase 14 COMPLETE:
   - 14-01 complete: Transport trait consolidated (DUP-05)
   - 14-02 complete: Model + Formatter architecture (9 models, 5 formatters)
@@ -145,6 +149,7 @@ Progress: [████████████████░] 75% (62/65 plans
 
 | Date | Decision |
 |------|----------|
+| 2026-02-13 | Phase 15-03 complete - Module-level docs with examples for 5 modules, rustdoc on all public functions in error.rs/retry.rs, fixed 3 private submodule link warnings, 7 doc tests pass, zero cargo doc warnings |
 | 2026-02-13 | Phase 15-02 complete - Reduced public API surface by 16 lines: removed re-exports from cli/mod.rs, made daemon internal functions private (handle_client, handle_request, cleanup_socket), removed unnecessary re-exports from lib.rs, all 98 library tests pass |
 | 2026-02-13 | Phase 15-01 complete - Fixed 8 cargo doc warnings: unclosed HTML tags for Arc<Mutex>, dyn, ToolInfo, String (using backticks \`code\`), bare URLs (using angle brackets <https://...>), cargo doc now produces zero warnings |
 | 2026-02-13 | Phase 16-04 complete - Final verification of all QUAL requirements: zero unwrap in production (all 18 matches are test code), zero dead_code attrs, cargo clippy --lib zero warnings, cargo fmt passes, 9,568 lines (below 10,800-11,500 target), 98 tests pass |
@@ -221,7 +226,7 @@ Progress: [████████████████░] 75% (62/65 plans
 | Phase 12: Test Infrastructure | ✅ Complete | 100% (5/5 plans) | Test helpers module created, 4 test files refactored, tests organized by platform, ~219 lines removed |
 | Phase 13: Code Organization | ✅ Complete | 100% (7/7 plans) | Config split, config_setup.rs, daemon_lifecycle.rs, command_router.rs, entry.rs created, main.rs thin wrapper (16 lines), final verification passed |
 | Phase 14: Duplication Elimination | ✅ Complete | 100% (5/5 plans) | Transport consolidated (DUP-05), Model+Formatter architecture (DUP-01/02), connection interfaces deduplicated (DUP-03/04), 918 lines removed, all tests pass |
-| Phase 15: Documentation & API | 📋 In Progress | 50% (2/4 plans) | DOC-01 complete: cargo doc warnings fixed, DOC-02 complete: public API surface reduced |
+| Phase 15: Documentation & API | 📋 In Progress | 75% (3/4 plans) | DOC-01 complete: cargo doc warnings fixed, DOC-02 complete: public API surface reduced, DOC-04/05 complete: module docs and public API documented |
 | Phase 16: Code Quality Sweep | ✅ Complete | 100% (4/4 plans) | 19 unwrap() replaced, 2 dead_code attrs removed, thiserror/anyhow verified, 9,568 lines, zero clippy warnings |
 
 ## Milestone Readiness
@@ -233,7 +238,7 @@ Progress: [████████████████░] 75% (62/65 plans
 | v1.2 | ✅ COMPLETE | 18/18 (100%) | 6/6 (100%) | PASSED | PASSED |
 | v1.3 | 🚧 IN PROGRESS | 38/38 mapped | Phase 15 (25%), Phase 16 (100%) | — | — |
 
-**Cumulative Progress:** 61/65 plans complete (93.8%)
+**Cumulative Progress:** 63/65 plans complete (96.9%)
 
 ---
 
