@@ -1,7 +1,19 @@
-//! Connection pool for server connections managed by daemon
+//! Connection pool interface for MCP server connections.
 //!
-//! Full implementation in 02-04. This provides a placeholder trait
-//! for daemon state.
+//! This module defines the [`ConnectionPoolInterface`] trait used by the daemon
+//! to manage persistent connections to MCP servers. The actual connection pool
+//! implementation lives in [`crate::daemon::pool`]; this module provides the
+//! trait abstraction and a [`DummyConnectionPool`] for testing.
+//!
+//! # Usage
+//!
+//! ```rust,ignore
+//! use mcp_cli_rs::pool::{ConnectionPoolInterface, DummyConnectionPool};
+//!
+//! let pool = DummyConnectionPool::new();
+//! let servers = pool.list_servers();
+//! assert!(servers.is_empty());
+//! ```
 
 use crate::client::ToolInfo;
 use async_trait::async_trait;

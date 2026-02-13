@@ -3,36 +3,36 @@
 //! This module provides utilities for extracting and formatting parameter information
 //! from JSON Schema, enabling consistent help-style output across all CLI commands.
 //!
-//! # Integration with Existing Code
+//! # Module Structure
 //!
-//! The formatting utilities work alongside `crate::output` for colored terminal output.
-//! Use `output.rs` for printing messages with colors, and this module for structuring
-//! tool parameter information in help-style formats.
+//! - [`params`] — Parameter formatting with [`DetailLevel`] control
+//! - [`schema`] — JSON Schema extraction into [`ParameterInfo`] structs
+//! - [`OutputMode`] — Human vs JSON output mode selection
 //!
-//! # Usage Examples
+//! # Integration
 //!
-//! ```rust,ignore
-//! use crate::format::{extract_params_from_schema, format_param_list, DetailLevel};
-//! use serde_json::Value;
+//! Use [`crate::output`] for colored terminal messages (errors, warnings, info).
+//! Use this module for structuring tool parameter information in help-style formats.
 //!
-//! // Extract parameters from a tool's input schema
-//! let schema: Value = /* JSON Schema */;
-//! let params = extract_params_from_schema(&schema);
+//! # Examples
 //!
-//! // Format for display (summary view)
-//! let summary = format_param_list(&params, DetailLevel::Summary);
-//! // Output: "query <string> limit [number]"
+//! ```rust
+//! use mcp_cli_rs::format::{OutputMode, DetailLevel};
 //!
-//! // Format with descriptions (-d flag)
-//! let detailed = format_param_list(&params, DetailLevel::WithDescriptions);
+//! // Determine output mode from CLI flags
+//! let mode = OutputMode::from_flags(false);
+//! assert!(mode.is_human());
+//!
+//! // DetailLevel controls how much parameter info is shown
+//! let level = DetailLevel::Summary;
 //! ```
 
 pub mod params;
 pub mod schema;
 
 // Re-export commonly used items
-pub use params::{DetailLevel, format_param_help, format_param_list};
-pub use schema::{ParameterInfo, extract_params_from_schema};
+pub use params::{format_param_help, format_param_list, DetailLevel};
+pub use schema::{extract_params_from_schema, ParameterInfo};
 
 /// Output format mode for CLI commands
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

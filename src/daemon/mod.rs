@@ -1,3 +1,27 @@
+//! Daemon lifecycle and IPC server for persistent MCP connections.
+//!
+//! The daemon runs as a background process, maintaining persistent connections
+//! to configured MCP servers via a connection pool. CLI commands communicate
+//! with the daemon over IPC (Unix sockets on Linux/macOS, named pipes on Windows).
+//!
+//! # Module Structure
+//!
+//! - [`lifecycle`] — Idle timeout monitoring and shutdown signaling
+//! - [`pool`] — Connection pool managing persistent MCP server connections
+//! - [`protocol`] — JSON-based request/response protocol over IPC
+//! - [`orphan`] — Cleanup of stale daemon processes and socket files
+//!
+//! # Architecture
+//!
+//! ```text
+//! CLI command ──IPC──▶ Daemon ──MCP──▶ Server A
+//!                         │
+//!                         └──MCP──▶ Server B
+//! ```
+//!
+//! The daemon auto-spawns when a CLI command needs it (unless `--no-daemon`)
+//! and self-terminates after an idle timeout (default 60s).
+
 use anyhow::Result;
 use std::io::ErrorKind;
 use std::path::PathBuf;

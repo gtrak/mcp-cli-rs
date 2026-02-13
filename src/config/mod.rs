@@ -1,13 +1,35 @@
-//! Configuration module for MCP server definitions.
+//! Configuration types and parsing for MCP server definitions.
 //!
 //! This module provides types and utilities for parsing MCP server configurations
 //! from TOML files, supporting both stdio and HTTP transports.
 //!
-//! The module is organized into focused sub-modules:
-//! - [`types`](types::index.html) - Core config types (ServerConfig, ServerTransport, Config)
-//! - [`parser`](parser::index.html) - TOML parsing logic
-//! - [`validator`](validator::index.html) - Configuration validation
-//! - [`loader`](loader::index.html) - File loading and discovery utilities
+//! # Module Structure
+//!
+//! - **types** — Core types: [`Config`], [`ServerConfig`], [`ServerTransport`]
+//! - **parser** — TOML parsing logic ([`parse_toml`])
+//! - **validator** — Configuration validation ([`validate_config`], [`validate_server_config`])
+//! - [`loader`] — File loading and config discovery utilities
+//!
+//! # Usage
+//!
+//! ```rust
+//! use mcp_cli_rs::config::{Config, ServerConfig, ServerTransport, parse_toml};
+//! use std::path::Path;
+//!
+//! // Parse a TOML configuration string
+//! let toml = r#"
+//! [[servers]]
+//! name = "my-server"
+//! [servers.transport]
+//! type = "stdio"
+//! command = "npx"
+//! args = ["-y", "@modelcontextprotocol/server-everything"]
+//! "#;
+//!
+//! let config = parse_toml(toml, Path::new("example.toml")).expect("valid TOML");
+//! assert_eq!(config.servers.len(), 1);
+//! assert_eq!(config.servers[0].name, "my-server");
+//! ```
 
 // Re-export all public items for backward compatibility
 pub use crate::config::parser::parse_toml;
