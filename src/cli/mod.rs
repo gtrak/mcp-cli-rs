@@ -11,6 +11,7 @@ pub mod daemon;
 pub mod daemon_lifecycle;
 pub mod entry;
 pub mod filter;
+pub mod formatters;
 pub mod info;
 pub mod list;
 pub mod models;
