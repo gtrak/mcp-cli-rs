@@ -105,7 +105,7 @@ pub async fn main() -> Result<()> {
 async fn run(cli: Cli) -> Result<()> {
     // Handle daemon subcommand first (standalone mode)
     if let Some(Commands::Daemon { ttl, socket_path }) = &cli.command {
-        return run_standalone_daemon(*ttl, socket_path.clone()).await;
+        return run_standalone_daemon(*ttl, socket_path.clone(), cli.config.clone()).await;
     }
 
     // Handle shutdown command
@@ -213,11 +213,13 @@ async fn shutdown_daemon() -> Result<()> {
 async fn run_standalone_daemon(
     cli_ttl: Option<u64>,
     cli_socket_path: Option<PathBuf>,
+    cli_config_path: Option<PathBuf>,
 ) -> crate::error::Result<()> {
     use crate::daemon::run_daemon;
 
     // Load configuration - allow daemon to start even without config file
-    let mut config = setup_config_for_daemon(None).await?;
+    // Pass the CLI config path so daemon respects --config flag
+    let mut config = setup_config_for_daemon(cli_config_path).await?;
 
     // Determine TTL: CLI flag > env var > config > default (60s)
     let ttl = cli_ttl
