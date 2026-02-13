@@ -1,14 +1,14 @@
 # State: MCP CLI Rust Rewrite
 
 **Created:** 2025-02-06
-**Last updated:** 2026-02-12 - Phase 14-02 complete: Model + Formatter architecture foundation - models and formatters in place
+**Last updated:** 2026-02-12 - Phase 14-04 complete: Connection interface deduplication - ProtocolClient trait delegates to methods, pool.rs shares MCP init
 **Mode:** yolo
 **Depth:** standard
 
 **Last session:** 2026-02-12
-**Stopped at:** Completed 14-02-SUMMARY.md - Model + Formatter architecture foundation in place
+**Stopped at:** Completed 14-04-SUMMARY.md - Connection interface deduplication complete
 **Resume file:** None
-**Plans completed:** 01-01 through 01-04 (Phase 1), 02-01 through 02-11 (Phase 2), 03-01 through 03-06 (Phase 3), 04-01 through 04-03 (Phase 4), 05-01 through 05-03 (Phase 5), 06-01 through 06-04 (Phase 6), 07-01 through 07-04 (Phase 7), 08-01 (Phase 8), 09-01 (Phase 9), 10-01 (Phase 10), 11-01 (Phase 11), 12-01 through 12-05 (Phase 12), 13-01 through 13-07 (Phase 13), 14-01 through 14-03 (Phase 14)
+**Plans completed:** 01-01 through 01-04 (Phase 1), 02-01 through 02-11 (Phase 2), 03-01 through 03-06 (Phase 3), 04-01 through 04-03 (Phase 4), 05-01 through 05-03 (Phase 5), 06-01 through 06-04 (Phase 6), 07-01 through 07-04 (Phase 7), 08-01 (Phase 8), 09-01 (Phase 9), 10-01 (Phase 10), 11-01 (Phase 11), 12-01 through 12-05 (Phase 12), 13-01 through 13-07 (Phase 13), 14-01 through 14-04 (Phase 14)
 **Plans ready:** None (Phase 13 complete, Phase 14 pending)
 
 **Phase 1 progress:** 100% (4/4 plans complete)
@@ -25,7 +25,7 @@
 
 **Phase 12 progress:** 100% (5/5 plans - ALL COMPLETE)
 **Phase 13 progress:** 100% (6/6 plans - ALL COMPLETE)
-**Phase 14 progress:** 50% (3/6 plans - IN PROGRESS)
+**Phase 14 progress:** 67% (4/6 plans - IN PROGRESS)
 **Phase 15 progress:** 0% (0/TBD plans - not started)
 **Phase 16 progress:** 0% (0/TBD plans - not started)
 
@@ -38,15 +38,16 @@
 ## Current Position
 
 Phase: 14 of 16 (Duplication Elimination)
-Plan: 14-03 complete
-Status: All 5 command pairs migrated to Model+Formatter pattern - 16→8 functions consolidated, 847 lines removed, DUP-01 and DUP-02 satisfied
-Last activity: 2026-02-12 - Phase 14-03 complete: Command migration finished
+Plan: 14-04 complete
+Status: Connection interface deduplication complete - ProtocolClient trait delegates to inherent methods (DUP-03), pool.rs shares MCP init helper (DUP-04 partially), ~76 lines removed
+Last activity: 2026-02-12 - Phase 14-04 complete: Connection interface deduplication
 
-Progress: [███████████████████████░] 67.9% (51/78 plans executed, 27 remaining)
+Progress: [███████████████████████░] 68.4% (52/78 plans executed, 26 remaining)
 
 ## Accumulated Context
 
 **Decisions:**
+- [2026-02-12] Phase 14-04 complete - Connection interface deduplication: ProtocolClient trait impl delegates to IpcClientWrapper inherent methods (list_servers, list_tools, execute_tool), removed ~60 lines of duplicated request/response matching (DUP-03 satisfied), extracted initialize_mcp_connection helper in pool.rs shared by execute() and list_tools(), removed ~35 lines of duplicate MCP init code (DUP-04 partially satisfied), kept ProtocolClient name to avoid collision with McpClient struct in client module, 98 library tests pass, zero clippy warnings
 - [2026-02-12] Phase 14-03 complete - Migrated all 5 command pairs to Model+Formatter pattern, deleted 8 _json command variants (cmd_list_servers_json, cmd_search_tools_json, cmd_server_info_json, cmd_tool_info_json, cmd_call_tool_json), consolidated 16→8 command functions (DUP-01 satisfied), formatting centralized in formatters.rs (DUP-02 satisfied), 847 lines removed (SIZE-04 exceeded target of 200-300), 98 library tests pass, zero clippy warnings
 - [2026-02-12] Phase 14-02 complete - Added From<&ParameterModel> for ParameterInfo conversion to bridge model and format modules, created formatters.rs with 5 format functions (format_list_servers, format_server_info, format_tool_info, format_call_result, format_search_results), all support Human/JSON OutputMode, fixed clippy warnings (collapsible_if, useless_format, format_in_format_args), 89 library tests pass, Model + Formatter architecture foundation ready for command migration
 - [2026-02-12] Phase 14-01 complete - Deleted src/client/transport.rs (69 lines), single Transport trait now exists in src/transport.rs (82 lines), all code already used crate::transport, DUP-05 satisfied, cargo check passes, cargo clippy --lib clean, 101/102 tests pass (1 pre-existing failure unrelated)
@@ -99,7 +100,8 @@ Progress: [███████████████████████
   - 14-01 complete: Deleted src/client/transport.rs (69 lines), Transport trait consolidated to src/transport.rs, DUP-05 satisfied
   - 14-02 complete: Model + Formatter architecture foundation in place (9 models, 5 formatters)
   - 14-03 complete: Command migration finished, 16→8 functions consolidated, 847 lines removed, DUP-01 and DUP-02 satisfied
-  - Ready for remaining Phase 14 plans (14-04 through 14-06: JSON consolidation review, connection interfaces, final verification)
+  - 14-04 complete: Connection interface deduplication, ProtocolClient trait delegates to methods, pool.rs shares MCP init, ~76 lines removed, DUP-03 satisfied, DUP-04 partially satisfied
+  - Ready for remaining Phase 14 plans (14-05 through 14-06: JSON consolidation review, final verification)
 - All tests pass (101/102, 1 pre-existing failure unrelated)
 - Single Transport trait source of truth established
 - Model + Formatter architecture ready for DUP-01 through DUP-04 implementation
@@ -124,6 +126,7 @@ Progress: [███████████████████████
 
 | Date | Decision |
 |------|----------|
+| 2026-02-12 | Phase 14-04 complete - ProtocolClient trait impl delegates to IpcClientWrapper inherent methods, ~60 lines removed (DUP-03), initialize_mcp_connection helper shared in pool.rs, ~35 lines removed (DUP-04 partially), 98 library tests pass, zero clippy warnings |
 | 2026-02-12 | Phase 14-03 complete - Migrated all 5 command pairs to Model+Formatter pattern, deleted 8 _json command variants, consolidated 16→8 command functions (DUP-01), formatting centralized in formatters.rs (DUP-02), 847 lines removed (SIZE-04), 98 library tests pass |
 | 2026-02-12 | Phase 14-02 complete - Model + Formatter architecture foundation established: 9 model types, 5 format functions, all supporting Human/JSON OutputMode, From<&ParameterModel> for ParameterInfo conversion added, 89 library tests pass |
 | 2026-02-12 | Phase 14-01 complete - Deleted src/client/transport.rs (69 lines), single Transport trait now exists in src/transport.rs (82 lines) with all 5 methods (send, send_notification, receive_notification, ping, transport_type), all imports already used crate::transport, DUP-05 satisfied
@@ -187,7 +190,7 @@ Progress: [███████████████████████
 | Phase 11: Code Quality Cleanup | ✅ Complete | 100% (1/1 plans) | Zero clippy warnings, proper formatting, fixed shutdown() bug |
 | Phase 12: Test Infrastructure | ✅ Complete | 100% (5/5 plans) | Test helpers module created, 4 test files refactored, tests organized by platform, ~219 lines removed |
 | Phase 13: Code Organization | ✅ Complete | 100% (7/7 plans) | Config split, config_setup.rs, daemon_lifecycle.rs, command_router.rs, entry.rs created, main.rs thin wrapper (16 lines), final verification passed |
-| Phase 14: Duplication Elimination | 🚧 In Progress | 50% (3/6 plans) | Transport trait consolidated (DUP-05), Model + Formatter foundation in place, command migration complete (DUP-01, DUP-02, SIZE-04), remaining: JSON consolidation review, connection interfaces (DUP-06), final verification |
+| Phase 14: Duplication Elimination | 🚧 In Progress | 67% (4/6 plans) | Transport trait consolidated (DUP-05), Model + Formatter foundation in place, command migration complete (DUP-01, DUP-02, SIZE-04), connection interfaces deduplicated (DUP-03, DUP-04 partially), remaining: JSON consolidation review, final verification |
 | Phase 15: Documentation & API | 📋 Planned | 0% (0/TBD plans) | Fix doc warnings, audit public API, improve module docs |
 | Phase 16: Code Quality Sweep | 📋 Planned | 0% (0/TBD plans) | Replace unwrap(), consistent error handling, final size reduction |
 
@@ -200,7 +203,7 @@ Progress: [███████████████████████
 | v1.2 | ✅ COMPLETE | 18/18 (100%) | 6/6 (100%) | PASSED | PASSED |
 | v1.3 | 🚧 IN PROGRESS | 37/37 (100% mapped) | 5/5 (40% delivered) | — | — |
 
-**Cumulative Progress:** 51/78 plans complete (65.4%)
+**Cumulative Progress:** 52/78 plans complete (66.7%)
 
 ---
 
