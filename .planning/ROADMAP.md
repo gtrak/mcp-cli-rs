@@ -230,7 +230,7 @@ Project follows a solo developer + Claude workflow with no team coordination art
 **Plans**: 1 plan
 
 **Plan Details:**
-- [ ] 21-01-PLAN.md — Fix identified UX issues from audit
+- [x] 21-01-PLAN.md — Fix identified UX issues from audit (PLANNED)
 
 ---
 
