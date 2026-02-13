@@ -90,6 +90,42 @@ impl ConnectionPool {
         tracing::debug!("Returned connection to pool");
     }
 
+    /// Initialize MCP protocol on a connection (shared between execute and list_tools)
+    async fn initialize_mcp_connection(transport: &mut BoxedTransport) -> Result<()> {
+        let init_request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {
+                    "roots": {},
+                    "sampling": {},
+                    "tools": {}
+                },
+                "clientInfo": {
+                    "name": "mcp-cli-rs",
+                    "version": env!("CARGO_PKG_VERSION")
+                }
+            }
+        });
+
+        transport.send(init_request).await.map_err(|e| McpError::InvalidProtocol {
+            message: format!("Initialize request failed: {}", e),
+        })?;
+
+        let initialized_notification = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+        });
+
+        transport.send_notification(initialized_notification).await.map_err(|e| McpError::InvalidProtocol {
+            message: format!("Failed to send initialized notification: {}", e),
+        })?;
+
+        Ok(())
+    }
+
     /// Execute a tool using cached or new connection
     pub async fn execute(
         &self,
@@ -112,45 +148,7 @@ impl ConnectionPool {
         };
         tracing::debug!("Got connection, initializing MCP connection");
 
-        // MCP Protocol: Send initialize request first
-        let init_request = serde_json::json!({
-            "jsonrpc": "2.0",
-            "id": 0,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {
-                    "roots": {},
-                    "sampling": {},
-                    "tools": {}
-                },
-                "clientInfo": {
-                    "name": "mcp-cli-rs",
-                    "version": env!("CARGO_PKG_VERSION")
-                }
-            }
-        });
-
-        // Send initialize and get response
-        conn.transport
-            .send(init_request)
-            .await
-            .map_err(|e| McpError::InvalidProtocol {
-                message: format!("Initialize request failed: {}", e),
-            })?;
-
-        // Send initialized notification
-        let initialized_notification = serde_json::json!({
-            "jsonrpc": "2.0",
-            "method": "notifications/initialized"
-        });
-
-        conn.transport
-            .send_notification(initialized_notification)
-            .await
-            .map_err(|e| McpError::InvalidProtocol {
-                message: format!("Failed to send initialized notification: {}", e),
-            })?;
+        Self::initialize_mcp_connection(&mut conn.transport).await?;
 
         tracing::debug!("MCP connection initialized, sending tools/call request");
 
@@ -201,45 +199,7 @@ impl ConnectionPool {
         };
         tracing::debug!("Got connection, initializing MCP connection");
 
-        // MCP Protocol: Send initialize request first
-        let init_request = serde_json::json!({
-            "jsonrpc": "2.0",
-            "id": 0,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {
-                    "roots": {},
-                    "sampling": {},
-                    "tools": {}
-                },
-                "clientInfo": {
-                    "name": "mcp-cli-rs",
-                    "version": env!("CARGO_PKG_VERSION")
-                }
-            }
-        });
-
-        // Send initialize and get response
-        conn.transport
-            .send(init_request)
-            .await
-            .map_err(|e| McpError::InvalidProtocol {
-                message: format!("Initialize request failed: {}", e),
-            })?;
-
-        // Send initialized notification
-        let initialized_notification = serde_json::json!({
-            "jsonrpc": "2.0",
-            "method": "notifications/initialized"
-        });
-
-        conn.transport
-            .send_notification(initialized_notification)
-            .await
-            .map_err(|e| McpError::InvalidProtocol {
-                message: format!("Failed to send initialized notification: {}", e),
-            })?;
+        Self::initialize_mcp_connection(&mut conn.transport).await?;
 
         tracing::debug!("MCP connection initialized, sending tools/list request");
 
