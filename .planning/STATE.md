@@ -8,16 +8,16 @@
 **Last session:** 2026-02-13
 **Stopped at:** v1.4 started - Test Coverage for Tool Execution
 **Resume file:** None
-**Plans completed:** 01-01 through 16-04 (All 65 plans complete)
-**Plans ready:** Phase 17 (Tool Call Integration Tests)
+**Plans completed:** 01-01 through 17-01 (66 plans complete)
+**Plans ready:** Phase 17-02 through 17-05
 
 ## Current Position
 
-Phase: v1.4 IN PROGRESS
-Plan: Ready to plan Phase 17
-Status: Test Coverage milestone - defining requirements
+Phase: 17 of 19 (Tool Call Integration Tests)
+Plan: 17-01 complete (1/5 plans in phase)
+Status: Mock MCP servers created for integration testing
 
-Progress: [████████████░░░░░░░░] 84% (65/77 planned, 3 milestones shipped)
+Progress: [████████████░░░░░░░░] 85% (66/78 planned, 3 milestones shipped)
 
 ## Milestone Status
 
@@ -41,6 +41,7 @@ Progress: [████████████░░░░░░░░] 84% (65
 **Decisions:**
 - [2026-02-13] v1.3 milestone COMPLETE - Tech debt cleanup shipped: 23% codebase reduction, zero doc warnings, all files under 600 lines
 - [2026-02-13] v1.4 started - Test Coverage for Tool Execution to add integration tests for call command
+- [2026-02-13] Phase 17-01 complete - Mock MCP servers created with stdio binary and HTTP helper
 
 **Issues:**
 - None
@@ -48,6 +49,11 @@ Progress: [████████████░░░░░░░░] 84% (65
 **Completed:**
 - All phases through v1.3 complete
 - v1.3: Tech Debt Cleanup & Code Quality (46/47 requirements)
+- Phase 17-01: Mock MCP servers for integration tests
+  - Stdio mock server binary (465 lines)
+  - HTTP mock server helper (592 lines)
+  - Fixtures module with shared types (566 lines)
+  - JSON fixture files for tools and responses
 - v1.4: Requirements defined - Test Coverage for Tool Execution (17 tests)
 
 ## Current Position
@@ -306,6 +312,7 @@ Progress: [██████████████████] 100% (65/65 p
 | Phase 14: Duplication Elimination | ✅ Complete | 100% (5/5 plans) | Transport consolidated (DUP-05), Model+Formatter architecture (DUP-01/02), connection interfaces deduplicated (DUP-03/04), 918 lines removed, all tests pass |
 | Phase 15: Documentation & API | ✅ Complete | 100% (4/4 plans) | DOC-01 complete: cargo doc warnings fixed, DOC-02 complete: public API surface reduced (16 lines), DOC-04/05 complete: module docs and public API documented, final verification passed |
 | Phase 16: Code Quality Sweep | ✅ Complete | 100% (4/4 plans) | 19 unwrap() replaced, 2 dead_code attrs removed, thiserror/anyhow verified, 9,568 lines, zero clippy warnings |
+| Phase 17: Tool Call Integration Tests | 🚧 IN PROGRESS | 20% (1/5 plans) | Mock MCP servers created: stdio binary, HTTP helper, fixture module |
 
 ## Milestone Readiness
 
