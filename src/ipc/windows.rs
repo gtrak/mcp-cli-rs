@@ -51,8 +51,8 @@ use crate::ipc::IpcServer;
 /// - **Flag:** `PIPE_REJECT_REMOTE_CLIENTS` (0x00000008)
 /// - **API:** `CreateNamedPipeW()` dwPipeMode parameter
 /// - **Tokio Wrapper:** `tokio::net::windows::named_pipe::ServerOptions::reject_remote_clients()`
-/// - **Reference:** https://docs.rs/tokio/latest/tokio/net/windows/named_pipe/struct.ServerOptions.html
-/// - **MSDN:** https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
+/// - **Reference:** <https://docs.rs/tokio/latest/tokio/net/windows/named_pipe/struct.ServerOptions.html>
+/// - **MSDN:** <https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea>
 ///
 /// ## Security Properties
 ///

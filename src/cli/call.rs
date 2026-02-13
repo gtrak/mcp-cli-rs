@@ -20,7 +20,7 @@ use std::sync::Arc;
 /// Implements OUTP-07, OUTP-08: JSON output mode
 ///
 /// # Arguments
-/// * `daemon` - Daemon IPC client (will be wrapped in Arc<Mutex>)
+/// * `daemon` - Daemon IPC client (will be wrapped in `Arc<Mutex>`)
 /// * `tool_id` - Tool identifier in format "server/tool" or "server tool"
 /// * `args_json` - JSON arguments as a string, or None to read from stdin
 /// * `output_mode` - Output format (human or JSON)

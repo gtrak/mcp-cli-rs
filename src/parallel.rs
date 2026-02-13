@@ -120,8 +120,8 @@ pub fn filter_tools(tools: Vec<ToolInfo>, server_config: &ServerConfig) -> Vec<T
 ///
 /// # Returns
 /// Tuple of (successes, failures) where:
-/// - successes: Vec<(String, Vec<ToolInfo>)> of server name and filtered tools
-/// - failures: Vec<String> of server names that failed
+/// - successes: `Vec<(String, Vec<ToolInfo>)>` of server name and filtered tools
+/// - failures: `Vec<String>` of server names that failed
 ///
 /// # Example
 /// ```rust,ignore

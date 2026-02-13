@@ -59,7 +59,7 @@ pub trait IpcClient: Send + Sync {
 
 /// Wrapper struct that implements concrete protocol methods using a generic IpcClient
 ///
-/// This allows Box<dyn IpcClient> to have protocol-specific methods added to it
+/// This allows `Box<dyn IpcClient>` to have protocol-specific methods added to it
 #[derive(Clone)]
 pub struct IpcClientWrapper<T: Clone> {
     client: T,
@@ -219,7 +219,7 @@ impl<T: IpcClient + Send + Sync + Clone> ProtocolClient for IpcClientWrapper<T> 
 
 /// Factory function to create platform-specific IPC client wrapper
 ///
-/// Returns Box<dyn ProtocolClient> with platform-specific implementation
+/// Returns `Box<dyn ProtocolClient>` with platform-specific implementation
 #[cfg(unix)]
 pub fn create_ipc_client(config: &Config) -> Result<Box<dyn ProtocolClient>, McpError> {
     let client = crate::ipc::UnixIpcClient::new(config.clone().into());
@@ -231,7 +231,7 @@ pub fn create_ipc_client(config: &Config) -> Result<Box<dyn ProtocolClient>, Mcp
 
 /// Factory function to create platform-specific IPC client wrapper
 ///
-/// Returns Box<dyn ProtocolClient> with platform-specific implementation
+/// Returns `Box<dyn ProtocolClient>` with platform-specific implementation
 #[cfg(windows)]
 pub fn create_ipc_client(config: &Config) -> Result<Box<dyn ProtocolClient>, McpError> {
     let client = crate::ipc::NamedPipeIpcClient::with_config(config.clone().into());
@@ -243,7 +243,7 @@ pub fn create_ipc_client(config: &Config) -> Result<Box<dyn ProtocolClient>, Mcp
 
 /// Factory function to create platform-specific IPC server
 ///
-/// Returns Box<dyn IpcServer> with platform-specific implementation
+/// Returns `Box<dyn IpcServer>` with platform-specific implementation
 #[cfg(windows)]
 pub fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, McpError> {
     Ok(Box::new(crate::ipc::windows::NamedPipeIpcServer::new(
