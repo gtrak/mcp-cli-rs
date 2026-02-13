@@ -1,7 +1,7 @@
 # State: MCP CLI Rust Rewrite
 
 **Created:** 2025-02-06
-**Last updated:** 2026-02-13 - v1.4 started: Test Coverage for Tool Execution
+**Last updated:** 2026-02-13 - Phase 17 COMPLETE: Tool Call Integration Tests
 **Mode:** yolo
 **Depth:** standard
 
@@ -13,11 +13,11 @@
 
 ## Current Position
 
-Phase: 17 of 19 (Tool Call Integration Tests)
-Plan: 17-04 complete (4/5 plans in phase)
-Status: HTTP test flakiness fixed - all 13 tests pass consistently in parallel
+Phase: 17 of 19 (Tool Call Integration Tests) ✅ COMPLETE
+Plan: All 4 plans executed (17-01 through 17-04)
+Status: Phase verified — 5/5 must-haves, 24/24 tests passing
 
-Progress: [█████████████░░░░░░░] 87% (68/78 planned, 3 milestones shipped)
+Progress: [██████████████░░░░░░] 88% (68/77 planned, 3 milestones shipped)
 
 ## Milestone Status
 
@@ -26,13 +26,13 @@ Progress: [█████████████░░░░░░░] 87% (68
 | v1.0 | ✅ COMPLETE | 42/42 (100%) | 5/5 |
 | v1.2 | ✅ COMPLETE | 18/18 (100%) | 6/6 |
 | v1.3 | ✅ COMPLETE | 46/47 (98%) | 5/5 |
-| v1.4 | 🚧 IN PROGRESS | 0/17 (0%) | Phase 17-19 |
+| v1.4 | 🚧 IN PROGRESS | 5/17 (29%) | Phase 18-19 remaining |
 
-**Cumulative Progress:** 65/65 plans complete (v1.0-v1.3), v1.4 starting
+**Cumulative Progress:** 68/68 plans complete (v1.0-v1.3 + Phase 17)
 
 ## Next
 
-*Ready for `/gsd-plan-phase 17` to start test coverage work.*
+*Ready for `/gsd-plan-phase 18` — Retry and IPC Tests*
 
 ---
 

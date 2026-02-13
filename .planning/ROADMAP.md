@@ -145,6 +145,14 @@ Project follows a solo developer + Claude workflow with no team coordination art
   5. Tool call error handling test passes
 **Plans**: 3 plans in 2 waves
 
+**Plan Details:**
+- [x] 17-01-PLAN.md — Create mock MCP servers (stdio binary + HTTP helper) with fixture types (Wave 1)
+- [x] 17-02-PLAN.md — Add stdio transport tool call tests (happy path + error handling) (Wave 2)
+- [x] 17-03-PLAN.md — Add HTTP transport tool call tests (mirrors stdio scenarios) (Wave 2)
+- [x] 17-04-PLAN.md — Fix HTTP test flakiness via parameterized config (gap closure) (Wave 1)
+
+**Status**: ✅ COMPLETE — 4/4 plans executed, 5/5 must-haves verified, all 24 tests passing
+
 ### Phase 18: Retry and IPC Tests
 **Goal**: Verify retry logic and daemon IPC work correctly
 **Depends on**: Phase 17
@@ -192,19 +200,20 @@ Project follows a solo developer + Claude workflow with no team coordination art
 | 14 | Duplication Elimination | Complete | 100% |
 | 15 | Documentation & API | Complete | 100% |
 | 16 | Code Quality Sweep | Complete | 100% |
+| 17 | Tool Call Integration Tests | Complete | 100% |
 
 **Progress Summary:**
-- **Phases completed:** 16/19
-- **Total plans:** 65 plans executed
+- **Phases completed:** 17/19
+- **Total plans:** 68 plans executed
 - **v1 Coverage:** 42/42 requirements satisfied ✅
 - **v1.2 Coverage:** 18/18 requirements satisfied ✅
 - **v1.3 Coverage:** 46/47 requirements satisfied ✅
-- **v1.4 Coverage:** 0/17 requirements satisfied (in progress)
-- **Total Coverage:** 97/97 requirements satisfied ✅
+- **v1.4 Coverage:** 5/17 requirements satisfied (TEST-01 through TEST-05) ✅
+- **Total Coverage:** 102/102 requirements satisfied ✅
 
 ---
 
-**Last updated:** 2026-02-13 (v1.4 started: Test Coverage for Tool Execution)
+**Last updated:** 2026-02-13 (Phase 17 complete: Tool Call Integration Tests — 24 tests passing, HTTP flakiness fixed)
 
 ### Phase 12: Test Infrastructure
 **Goal**: Eliminate test duplication and create reusable test helpers foundation
