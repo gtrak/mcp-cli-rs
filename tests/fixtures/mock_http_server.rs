@@ -74,41 +74,20 @@ struct MockServerState {
 }
 
 impl MockServerState {
-    fn new() -> Self {
-        let tools = Self::load_tools_from_env();
-        let responses = Self::load_responses_from_env();
-        let errors = Self::load_errors_from_env();
-
+    /// Create state from explicit configuration (preferred for parallel tests)
+    fn from_config(config: MockServerConfig) -> Self {
         Self {
-            tools,
-            responses,
-            errors,
+            tools: config.tools,
+            responses: config.responses,
+            errors: config.errors,
             initialized: false,
         }
     }
 
-    fn load_tools_from_env() -> Vec<ToolDefinition> {
-        if let Ok(tools_json) = std::env::var("MOCK_TOOLS") {
-            serde_json::from_str(&tools_json).unwrap_or_else(|_| Self::default_tools())
-        } else {
-            Self::default_tools()
-        }
-    }
-
-    fn load_responses_from_env() -> HashMap<String, MockResponse> {
-        if let Ok(responses_json) = std::env::var("MOCK_RESPONSES") {
-            serde_json::from_str(&responses_json).unwrap_or_default()
-        } else {
-            Self::default_responses()
-        }
-    }
-
-    fn load_errors_from_env() -> HashMap<String, String> {
-        if let Ok(errors_json) = std::env::var("MOCK_ERRORS") {
-            serde_json::from_str(&errors_json).unwrap_or_default()
-        } else {
-            HashMap::new()
-        }
+    #[cfg(test)]
+    fn new() -> Self {
+        // For internal tests, use defaults
+        Self::from_config(MockServerConfig::default())
     }
 
     fn default_tools() -> Vec<ToolDefinition> {
@@ -176,6 +155,51 @@ impl MockServerState {
     }
 }
 
+/// Configuration for the mock HTTP server
+/// 
+/// This struct holds all configuration needed to set up a mock server instance.
+/// Pass it directly to `MockHttpServer::start()` instead of using environment variables
+/// to avoid race conditions when running tests in parallel.
+#[derive(Debug, Clone)]
+pub struct MockServerConfig {
+    /// Tool definitions available on this server
+    pub tools: Vec<ToolDefinition>,
+    /// Pre-configured responses for tools (template strings with {placeholder} substitution)
+    pub responses: HashMap<String, MockResponse>,
+    /// Pre-configured error messages for tools
+    pub errors: HashMap<String, String>,
+}
+
+impl Default for MockServerConfig {
+    fn default() -> Self {
+        Self {
+            tools: MockServerState::default_tools(),
+            responses: MockServerState::default_responses(),
+            errors: HashMap::new(),
+        }
+    }
+}
+
+impl MockServerConfig {
+    /// Create a new configuration with default tools
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create a configuration from raw components
+    pub fn from_parts(
+        tools: Vec<ToolDefinition>,
+        responses: HashMap<String, MockResponse>,
+        errors: HashMap<String, String>,
+    ) -> Self {
+        Self {
+            tools,
+            responses,
+            errors,
+        }
+    }
+}
+
 /// Mock HTTP server for MCP protocol testing
 pub struct MockHttpServer {
     addr: SocketAddr,
@@ -183,11 +207,25 @@ pub struct MockHttpServer {
 }
 
 impl MockHttpServer {
-    /// Start the mock HTTP server on a random port
+    /// Start the mock HTTP server on a random port with the given configuration
     ///
-    /// Returns the server instance and the URL to connect to
-    pub async fn start() -> (Self, String) {
-        let state = Arc::new(RwLock::new(MockServerState::new()));
+    /// # Arguments
+    /// * `config` - Server configuration including tools, responses, and errors
+    ///
+    /// # Returns
+    /// * `(MockHttpServer, String)` - Server handle and base URL
+    ///
+    /// # Example
+    /// ```rust
+    /// let config = MockServerConfig::new();
+    /// let (server, url) = MockHttpServer::start(config).await;
+    /// ```
+    ///
+    /// # Note
+    /// This method accepts configuration via parameter rather than environment variables
+    /// to avoid race conditions when running tests in parallel.
+    pub async fn start(config: MockServerConfig) -> (Self, String) {
+        let state = Arc::new(RwLock::new(MockServerState::from_config(config)));
 
         // Bind to localhost with random port (let OS assign: 127.0.0.1:0)
         let addr = SocketAddr::from(([127, 0, 0, 1], 0));
@@ -561,7 +599,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_mock_http_server_start() {
-        let (server, url) = MockHttpServer::start().await;
+        let config = MockServerConfig::new();
+        let (server, url) = MockHttpServer::start(config).await;
         assert!(url.starts_with("http://127.0.0.1:"));
         assert_eq!(server.url(), url);
         server.shutdown().await;
@@ -569,7 +608,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_ping() {
-        let (server, url) = MockHttpServer::start().await;
+        let config = MockServerConfig::new();
+        let (server, url) = MockHttpServer::start(config).await;
 
         // Send ping request
         let client = reqwest::Client::new();
