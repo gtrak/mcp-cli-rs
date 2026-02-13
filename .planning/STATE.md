@@ -1,23 +1,23 @@
 # State: MCP CLI Rust Rewrite
 
 **Created:** 2025-02-06
-**Last updated:** 2026-02-13 - Phase 18 COMPLETE: Retry and IPC Tests
+**Last updated:** 2026-02-13 - Phase 19-01 COMPLETE: Error Paths Tests
 **Mode:** yolo
 **Depth:** standard
 
 **Last session:** 2026-02-13
-**Stopped at:** v1.4 started - Test Coverage for Tool Execution
+**Stopped at:** Completed 19-01 - Error path integration tests
 **Resume file:** None
-**Plans completed:** 01-01 through 18-02 (70 plans complete)
-**Plans ready:** Phase 17-02 through 17-05
+**Plans completed:** 01-01 through 19-01 (71 plans complete)
+**Plans ready:** Phase 19 remaining plans
 
 ## Current Position
 
-Phase: 18 of 19 (Retry and IPC Tests) ✅ COMPLETE
-Plan: All 2 plans executed (18-01 through 18-02)
-Status: Phase verified — 5/5 must-haves, 15/15 tests passing
+Phase: 19 of 19 (Error Paths and Regression Tests)
+Plan: 19-01 complete (of multiple in phase)
+Status: Phase in progress — 12/12 tests passing (TEST-12, TEST-13, TEST-14)
 
-Progress: [███████████████░░░░░] 91% (70/77 planned, 3 milestones shipped)
+Progress: [███████████████░░░░] 92% (71/77 planned, 3 milestones shipped)
 
 ## Milestone Status
 
@@ -39,6 +39,7 @@ Progress: [███████████████░░░░░] 91% (70
 ## Accumulated Context
 
 **Decisions:**
+- [2026-02-13] Phase 19-01 complete - Error path integration tests (TEST-12, TEST-13, TEST-14) with 12 total tests passing, added MOCK_DELAY_MS support to mock server
 - [2026-02-13] Phase 18-02 complete - Daemon IPC integration tests (3 tests) with protocol roundtrip verification, concurrent request handling, and connection cleanup tests
 - [2026-02-13] Phase 18-01 complete - Retry logic integration tests (3 tests) with exponential backoff timing verification, max retry limit enforcement, and delay increase measurement
 - [2026-02-13] Phase 17-04 complete - Fixed HTTP test flakiness: refactored MockHttpServer to accept parameterized config instead of env vars, all 13 HTTP tests now pass consistently in parallel execution
@@ -341,7 +342,8 @@ Progress: [██████████████████] 100% (65/65 p
 | Phase 15: Documentation & API | ✅ Complete | 100% (4/4 plans) | DOC-01 complete: cargo doc warnings fixed, DOC-02 complete: public API surface reduced (16 lines), DOC-04/05 complete: module docs and public API documented, final verification passed |
 | Phase 16: Code Quality Sweep | ✅ Complete | 100% (4/4 plans) | 19 unwrap() replaced, 2 dead_code attrs removed, thiserror/anyhow verified, 9,568 lines, zero clippy warnings |
 | Phase 17: Tool Call Integration Tests | ✅ COMPLETE | 100% (5/5 plans) | Mock servers complete, stdio tests (11), HTTP tests (13), error handling tests (7), 24 total tests passing |
-| Phase 18: Retry and IPC Tests | 🚧 IN PROGRESS | 67% (2/3 plans) | Retry logic tests complete (3 tests), daemon IPC tests complete (3 tests), mock servers operational |
+| Phase 18: Retry and IPC Tests | ✅ COMPLETE | 100% (3/3 plans) | Retry logic tests complete (3 tests), daemon IPC tests complete (3 tests), 6 total tests passing |
+| Phase 19: Error Paths and Regression Tests | 🚧 IN PROGRESS | 33% (1/3 plans) | 19-01 complete: TEST-12, TEST-13, TEST-14 (12 tests), remaining plans in progress |
 
 ## Milestone Readiness
 
@@ -351,9 +353,9 @@ Progress: [██████████████████] 100% (65/65 p
 | v1.1 | ✅ COMPLETE | — | Integrated in v1.0 | — | — |
 | v1.2 | ✅ COMPLETE | 18/18 (100%) | 6/6 (100%) | PASSED | PASSED |
 | v1.3 | ✅ COMPLETE | 46/47 (98%) | 5/5 (100%) | PASSED | PASSED |
-| v1.4 | 🚧 IN PROGRESS | 0/17 (0%) | Phases 17-19 | — | — |
+| v1.4 | 🚧 IN PROGRESS | 12/17 (71%) | Phases 17-19 | — | — |
 
-**Cumulative Progress:** 65/65 plans complete (100%)
+**Cumulative Progress:** 71/77 plans complete (92%)
 
 ---
 
