@@ -1,13 +1,13 @@
 //! Show server and tool information command implementation.
 
+use crate::cli::models::{ParameterModel, ServerInfoModel, ToolInfoModel};
 use crate::cli::DetailLevel;
 use crate::config::ServerTransport;
-use crate::daemon::protocol::{ParameterDetail, ServerDetailOutput, ToolDetailOutput};
 use crate::error::{McpError, Result};
-use crate::format::{extract_params_from_schema, format_param_list, OutputMode};
+use crate::format::{extract_params_from_schema, OutputMode};
+use crate::cli::formatters;
 use crate::ipc::ProtocolClient;
-use crate::output::{print_error, print_info, print_json};
-use colored::Colorize;
+use crate::output::print_error;
 
 /// Execute server info command.
 ///
@@ -28,10 +28,16 @@ pub async fn cmd_server_info(
     server_name: &str,
     output_mode: OutputMode,
 ) -> Result<()> {
-    // Handle JSON mode separately
-    if output_mode == OutputMode::Json {
-        return cmd_server_info_json(daemon, server_name).await;
-    }
+    let model = query_server_info(daemon, server_name).await?;
+    formatters::format_server_info(&model, output_mode);
+    Ok(())
+}
+
+/// Query daemon to build server info model.
+async fn query_server_info(
+    daemon: Box<dyn ProtocolClient>,
+    server_name: &str,
+) -> Result<ServerInfoModel> {
     let config = daemon.config();
     let server = config.get_server(server_name).ok_or_else(|| {
         print_error(&format!("Server '{}' not found", server_name));
@@ -40,62 +46,8 @@ pub async fn cmd_server_info(
         }
     })?;
 
-    print_info(&format!("Server: {}", server.name));
-    if let Some(desc) = &server.description {
-        println!("Description: {}", desc);
-    }
-    println!("Transport: {}", server.transport.type_name());
-
-    match &server.transport {
-        ServerTransport::Stdio {
-            command,
-            args,
-            env,
-            cwd,
-        } => {
-            println!("Command: {}", command);
-            if !args.is_empty() {
-                println!("Arguments: {:?}", args);
-            }
-            if !env.is_empty() {
-                println!("Environment:");
-                for (key, value) in env {
-                    println!("  {}={}", key, value);
-                }
-            }
-            if let Some(cwd_path) = cwd {
-                println!("Working directory: {}", cwd_path);
-            }
-        }
-        ServerTransport::Http { url, headers } => {
-            println!("URL: {}", url);
-            if !headers.is_empty() {
-                println!("Headers:");
-                for (key, value) in headers {
-                    println!("  {}: {}", key, value);
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
-
-/// Execute the server info command in JSON mode.
-///
-/// Outputs server configuration details as structured JSON for programmatic use.
-/// Implements OUTP-07: --json flag support
-/// Implements OUTP-08: consistent JSON schema with complete server details
-async fn cmd_server_info_json(daemon: Box<dyn ProtocolClient>, server_name: &str) -> Result<()> {
-    let config = daemon.config();
-    let server = config
-        .get_server(server_name)
-        .ok_or_else(|| McpError::ServerNotFound {
-            server: server_name.to_string(),
-        })?;
-
     // Build transport details based on type
-    let transport_details = match &server.transport {
+    let transport_detail = match &server.transport {
         ServerTransport::Stdio {
             command,
             args,
@@ -142,15 +94,29 @@ async fn cmd_server_info_json(daemon: Box<dyn ProtocolClient>, server_name: &str
         }
     };
 
-    let output = ServerDetailOutput {
+    let environment = match &server.transport {
+        ServerTransport::Stdio { env, .. } => {
+            if env.is_empty() {
+                None
+            } else {
+                Some(env.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+            }
+        }
+        _ => None,
+    };
+
+    let disabled_tools = server.disabled_tools.clone().unwrap_or_default();
+    let allowed_tools = server.allowed_tools.clone().unwrap_or_default();
+
+    Ok(ServerInfoModel {
         name: server.name.clone(),
         description: server.description.clone(),
         transport_type: server.transport.type_name().to_string(),
-        transport: transport_details,
-    };
-
-    print_json(&output);
-    Ok(())
+        transport_detail,
+        environment,
+        disabled_tools,
+        allowed_tools,
+    })
 }
 
 /// Execute tool info command.
@@ -163,7 +129,7 @@ async fn cmd_server_info_json(daemon: Box<dyn ProtocolClient>, server_name: &str
 /// # Arguments
 /// * `daemon` - Daemon IPC client
 /// * `tool_id` - Tool identifier in format "server/tool" or "server tool"
-/// * `detail_level` - Level of detail for display (ignored in JSON mode)
+/// * `detail_level` - Level of detail for display
 /// * `output_mode` - Output format (human or JSON)
 ///
 /// # Errors
@@ -175,10 +141,16 @@ pub async fn cmd_tool_info(
     detail_level: DetailLevel,
     output_mode: OutputMode,
 ) -> Result<()> {
-    // Handle JSON mode separately
-    if output_mode == OutputMode::Json {
-        return cmd_tool_info_json(daemon, tool_id).await;
-    }
+    let model = query_tool_info(&mut daemon, tool_id).await?;
+    formatters::format_tool_info(&model, detail_level, output_mode);
+    Ok(())
+}
+
+/// Query daemon to build tool info model.
+async fn query_tool_info(
+    daemon: &mut Box<dyn ProtocolClient>,
+    tool_id: &str,
+) -> Result<ToolInfoModel> {
     let (server_name, tool_name) = parse_tool_id(tool_id)?;
 
     let _server = daemon.config().get_server(&server_name).ok_or_else(|| {
@@ -206,196 +178,11 @@ pub async fn cmd_tool_info(
         }
     })?;
 
-    // Get server config for transport info
-    let config = daemon.config();
-    let server_config = config.get_server(&server_name);
-    let transport_name = server_config
-        .map(|s| s.transport.type_name())
-        .unwrap_or("unknown");
-
-    // Header with visual hierarchy
-    println!("{} {}", "Tool:".bold(), tool.name.bold());
-    println!("{}", "═".repeat(50).dimmed());
-    println!(
-        "{} {} {}",
-        "Server:".bold(),
-        server_name,
-        format!("({})", transport_name).dimmed()
-    );
-    println!();
-
-    // Description (OUTP-11)
-    let description = if tool.description.is_empty() {
-        "No description available"
-    } else {
-        &tool.description
-    };
-    println!("{} {}", "Description:".bold(), description);
-    println!();
-
     // Extract parameters from schema
     let params = extract_params_from_schema(&tool.input_schema);
-
-    // Format based on detail level (OUTP-02)
-    match detail_level {
-        DetailLevel::Summary => {
-            // Parameter overview
-            if params.is_empty() {
-                println!("{}", "This tool takes no parameters".dimmed());
-            } else {
-                let param_str = format_param_list(&params, detail_level);
-                println!("{} {}", "Parameters:".bold(), param_str);
-            }
-            println!();
-            println!(
-                "{}",
-                format!("Usage: mcp call {}/{} [args]", server_name, tool_name).dimmed()
-            );
-            println!(
-                "{}",
-                "Use -d for parameter details, -v for full schema".dimmed()
-            );
-        }
-        DetailLevel::WithDescriptions => {
-            // Detailed parameter list
-            if params.is_empty() {
-                println!("{}", "Parameters: none".dimmed());
-            } else {
-                println!("{}", "Parameters:".bold());
-                for param in &params {
-                    let type_str = if param.required {
-                        format!("<{}>", param.param_type)
-                    } else {
-                        format!("[{}]", param.param_type)
-                    };
-                    let req_str = if param.required {
-                        "Required"
-                    } else {
-                        "Optional"
-                    };
-
-                    if let Some(ref param_desc) = param.description {
-                        println!(
-                            "  {} {}  {}. {}",
-                            param.name.cyan(),
-                            type_str.dimmed(),
-                            req_str.dimmed(),
-                            param_desc
-                        );
-                    } else {
-                        println!(
-                            "  {} {}  {}",
-                            param.name.cyan(),
-                            type_str.dimmed(),
-                            req_str.dimmed()
-                        );
-                    }
-                }
-            }
-            println!();
-            println!(
-                "{} {}",
-                "Usage:".bold(),
-                format_args!("mcp call {}/{} '{{...}}'", server_name, tool_name)
-            );
-        }
-        DetailLevel::Verbose => {
-            // Full details including schema
-            if params.is_empty() {
-                println!("{}", "Parameters: none".dimmed());
-            } else {
-                println!("{}", "Parameters:".bold());
-                for param in &params {
-                    let type_str = if param.required {
-                        format!("<{}>", param.param_type)
-                    } else {
-                        format!("[{}]", param.param_type)
-                    };
-                    let req_str = if param.required {
-                        "Required"
-                    } else {
-                        "Optional"
-                    };
-
-                    if let Some(ref param_desc) = param.description {
-                        println!(
-                            "  {} {}  {}. {}",
-                            param.name.cyan(),
-                            type_str.dimmed(),
-                            req_str.dimmed(),
-                            param_desc
-                        );
-                    } else {
-                        println!(
-                            "  {} {}  {}",
-                            param.name.cyan(),
-                            type_str.dimmed(),
-                            req_str.dimmed()
-                        );
-                    }
-                }
-            }
-            println!();
-            println!("{}", "JSON Schema:".bold());
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&tool.input_schema)
-                    .unwrap_or_default()
-                    .dimmed()
-            );
-            println!();
-            println!(
-                "{} {}",
-                "Usage:".bold(),
-                format_args!("mcp call {}/{} '{{...}}'", server_name, tool_name)
-            );
-        }
-    }
-
-    Ok(())
-}
-
-/// Execute the tool info command in JSON mode.
-///
-/// Outputs complete tool information including schema as structured JSON.
-/// Implements OUTP-07: --json flag support
-/// Implements OUTP-08: consistent JSON schema with complete tool metadata
-async fn cmd_tool_info_json(mut daemon: Box<dyn ProtocolClient>, tool_id: &str) -> Result<()> {
-    let (server_name, tool_name) = parse_tool_id(tool_id)?;
-
-    let _server =
-        daemon
-            .config()
-            .get_server(&server_name)
-            .ok_or_else(|| McpError::ToolNotFound {
-                tool: tool_name.clone(),
-                server: server_name.clone(),
-            })?;
-
-    // Send ListTools request to daemon
-    let tools = daemon.list_tools(&server_name).await?;
-
-    let tool =
-        tools
-            .iter()
-            .find(|t| t.name == tool_name)
-            .ok_or_else(|| McpError::ToolNotFound {
-                tool: tool_name.clone(),
-                server: server_name.clone(),
-            })?;
-
-    // Get server config for transport info
-    let config = daemon.config();
-    let server_config = config.get_server(&server_name);
-    let transport_name = server_config
-        .map(|s| s.transport.type_name())
-        .unwrap_or("unknown");
-
-    // Extract parameters from schema
-    let params = extract_params_from_schema(&tool.input_schema);
-    let parameters: Vec<ParameterDetail> = params
+    let parameters: Vec<ParameterModel> = params
         .into_iter()
-        .map(|param| ParameterDetail {
+        .map(|param| ParameterModel {
             name: param.name,
             param_type: param.param_type,
             required: param.required,
@@ -403,17 +190,17 @@ async fn cmd_tool_info_json(mut daemon: Box<dyn ProtocolClient>, tool_id: &str) 
         })
         .collect();
 
-    let output = ToolDetailOutput {
-        name: tool_name.clone(),
-        description: tool.description.clone(),
-        server: server_name.clone(),
-        transport: transport_name.to_string(),
+    Ok(ToolInfoModel {
+        server_name: server_name.clone(),
+        tool_name: tool_name.clone(),
+        description: if tool.description.is_empty() {
+            None
+        } else {
+            Some(tool.description.clone())
+        },
         parameters,
         input_schema: tool.input_schema.clone(),
-    };
-
-    print_json(&output);
-    Ok(())
+    })
 }
 
 /// Parse a tool identifier from a string.
@@ -449,4 +236,73 @@ pub fn parse_tool_id(tool_id: &str) -> Result<(String, String)> {
             tool_id
         ),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_tool_id_slash_format() {
+        let result = parse_tool_id("server/tool_name");
+        assert!(result.is_ok());
+        let (server, tool) = result.unwrap();
+        assert_eq!(server, "server");
+        assert_eq!(tool, "tool_name");
+    }
+
+    #[test]
+    fn test_parse_tool_id_space_format() {
+        let result = parse_tool_id("server tool_name");
+        assert!(result.is_ok());
+        let (server, tool) = result.unwrap();
+        assert_eq!(server, "server");
+        assert_eq!(tool, "tool_name");
+    }
+
+    #[test]
+    fn test_parse_tool_id_ambiguous() {
+        let result = parse_tool_id("ambiguous");
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            McpError::AmbiguousCommand { .. }
+        ));
+    }
+
+    #[test]
+    fn test_server_info_model_building() {
+        let model = ServerInfoModel {
+            name: "test".to_string(),
+            description: Some("Test server".to_string()),
+            transport_type: "stdio".to_string(),
+            transport_detail: serde_json::json!({"command": "test"}),
+            environment: None,
+            disabled_tools: vec![],
+            allowed_tools: vec![],
+        };
+
+        assert_eq!(model.name, "test");
+        assert_eq!(model.transport_type, "stdio");
+    }
+
+    #[test]
+    fn test_tool_info_model_building() {
+        let model = ToolInfoModel {
+            server_name: "test-server".to_string(),
+            tool_name: "test-tool".to_string(),
+            description: Some("A test tool".to_string()),
+            parameters: vec![ParameterModel {
+                name: "param1".to_string(),
+                param_type: "string".to_string(),
+                required: true,
+                description: Some("A parameter".to_string()),
+            }],
+            input_schema: serde_json::json!({"type": "object"}),
+        };
+
+        assert_eq!(model.server_name, "test-server");
+        assert_eq!(model.tool_name, "test-tool");
+        assert_eq!(model.parameters.len(), 1);
+    }
 }

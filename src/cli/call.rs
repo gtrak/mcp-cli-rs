@@ -1,10 +1,11 @@
 //! Execute tool command implementation.
 
-use crate::daemon::protocol::{ExecutionMetadata, ToolError, ToolResult};
+use crate::cli::models::CallResultModel;
 use crate::error::{McpError, Result};
 use crate::format::OutputMode;
+use crate::cli::formatters;
 use crate::ipc::ProtocolClient;
-use crate::output::{print_error, print_json};
+use crate::output::print_error;
 use crate::retry::{retry_with_backoff, RetryConfig};
 use futures_util::FutureExt;
 use std::io::{self, IsTerminal, Read};
@@ -34,12 +35,10 @@ pub async fn cmd_call_tool(
     args_json: Option<&str>,
     output_mode: OutputMode,
 ) -> Result<()> {
-    // Handle JSON mode separately
-    if output_mode == OutputMode::Json {
-        return cmd_call_tool_json(daemon, tool_id, args_json).await;
-    }
-
     let (server_name, tool_name) = crate::cli::info::parse_tool_id(tool_id)?;
+
+    // Get current timestamp for metadata
+    let _timestamp = get_timestamp();
 
     // Check if server exists
     let config = daemon.config();
@@ -89,10 +88,26 @@ pub async fn cmd_call_tool(
             let is_disabled = crate::cli::filter::tools_match_any(&tool_name, disabled_patterns);
             if is_disabled.is_some() {
                 let patterns_str = disabled_patterns.join(", ");
-                print_error(&format!(
+                let error_msg = format!(
                     "Tool '{}' on server '{}' is disabled (blocked by patterns: {})",
                     tool_name, server_name, patterns_str
-                ));
+                );
+
+                if output_mode == OutputMode::Json {
+                    let model = CallResultModel {
+                        server_name: server_name.clone(),
+                        tool_name: tool_name.clone(),
+                        success: false,
+                        result: None,
+                        error: Some(error_msg.clone()),
+                        execution_time_ms: None,
+                        retries: 0,
+                    };
+                    formatters::format_call_result(&model, output_mode);
+                } else {
+                    print_error(&error_msg);
+                }
+
                 return Err(McpError::UsageError {
                     message: "Tool execution blocked by disabled_tools configuration. Remove patterns from disabled_tools list to allow this tool.".to_string(),
                 });
@@ -124,273 +139,86 @@ pub async fn cmd_call_tool(
     };
 
     // Execute with retry
+    let start_time = std::time::Instant::now();
     let result = retry_with_backoff(operation, &retry_config).await;
+    let execution_time_ms = start_time.elapsed().as_millis() as u64;
 
-    match result {
-        Ok(result) => {
-            // Format and display the result (EXEC-03)
-            format_and_display_result(&result, &server_name);
-
-            // Print success message with colored output (TASK-03)
-            println!();
-            print_error(&format!(
-                "Tool '{}' executed successfully on server '{}'",
-                tool_name, server_name
-            ));
-
-            Ok(())
-        }
-        Err(McpError::MaxRetriesExceeded { attempts }) => {
-            print_error(&format!(
-                "Tool execution failed after {} retry attempts. Last error: {}",
-                attempts, "No additional information available"
-            ));
-            Err(McpError::MaxRetriesExceeded { attempts })
-        }
-        Err(McpError::OperationCancelled { timeout }) => {
-            print_error(&format!(
-                "Tool execution cancelled after {}s timeout",
-                timeout
-            ));
-            Err(McpError::OperationCancelled { timeout })
-        }
-        Err(e) => {
-            print_error(&format!("Tool execution failed: {}", e));
-            Err(e)
-        }
-    }
-}
-
-/// Execute the call tool command in JSON mode.
-///
-/// Outputs tool execution result as structured JSON for programmatic use.
-/// Implements OUTP-07: --json flag support
-/// Implements OUTP-08: consistent JSON schema with complete execution results
-/// Implements OUTP-10: error responses are valid JSON
-async fn cmd_call_tool_json(
-    daemon: Box<dyn ProtocolClient>,
-    tool_id: &str,
-    args_json: Option<&str>,
-) -> Result<()> {
-    let (server_name, tool_name) = crate::cli::info::parse_tool_id(tool_id)?;
-
-    // Get current timestamp for metadata (RFC 3339 format approximation)
-    let timestamp = {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let duration = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default();
-        let secs = duration.as_secs();
-
-        // Simple conversion to approximate RFC 3339 format
-        // This is good enough for the use case without adding chrono dependency
-        format!("{}s", secs)
-    };
-
-    // Parse arguments (inline or from stdin)
-    let result_parse: std::result::Result<serde_json::Value, McpError> = match args_json {
-        Some(args) => serde_json::from_str(args).map_err(|e| McpError::InvalidJson { source: e }),
-        None => {
-            // Read from stdin if not provided
-            if std::io::stdin().is_terminal() {
-                let output = ToolResult {
-                    server: server_name.clone(),
-                    tool: tool_name.clone(),
-                    status: "error".to_string(),
-                    result: None,
-                    error: Some(ToolError {
-                        message: "No arguments provided. Pass JSON arguments as a command-line argument, or pipe JSON to stdin.".to_string(),
-                        code: Some(400),
-                    }),
-                    metadata: ExecutionMetadata {
-                        timestamp: timestamp.clone(),
-                        retry_count: Some(0),
-                    },
-                };
-                print_json(&output);
-                return Ok(());
-            }
-
-            let input = read_stdin_async()?;
-            serde_json::from_str(&input).map_err(|e| McpError::InvalidJson { source: e })
-        }
-    };
-
-    let arguments = match result_parse {
-        Ok(args) => args,
-        Err(e) => {
-            let output = ToolResult {
-                server: server_name.clone(),
-                tool: tool_name.clone(),
-                status: "error".to_string(),
-                result: None,
-                error: Some(ToolError {
-                    message: format!("Failed to parse arguments: {}", e),
-                    code: Some(400),
-                }),
-                metadata: ExecutionMetadata {
-                    timestamp: timestamp.clone(),
-                    retry_count: Some(0),
-                },
-            };
-            print_json(&output);
-            return Ok(());
-        }
-    };
-
-    // Check if server exists
-    let config = daemon.config();
-    let _server = config.get_server(&server_name).ok_or_else(|| {
-        let output = ToolResult {
-            server: server_name.clone(),
-            tool: tool_name.clone(),
-            status: "error".to_string(),
-            result: None,
-            error: Some(ToolError {
-                message: format!("Server '{}' not found", server_name),
-                code: Some(404),
-            }),
-            metadata: ExecutionMetadata {
-                timestamp: timestamp.clone(),
-                retry_count: Some(0),
-            },
-        };
-        print_json(&output);
-        McpError::ServerNotFound {
-            server: server_name.clone(),
-        }
-    })?;
-
-    // Check if tool is disabled (FILT-04)
-    let server_config = config.get_server(&server_name);
-    if let Some(server_config) = server_config
-        && let Some(disabled_patterns) = &server_config.disabled_tools
-    {
-        let is_disabled = crate::cli::filter::tools_match_any(&tool_name, disabled_patterns);
-        if is_disabled.is_some() {
-            let patterns_str = disabled_patterns.join(", ");
-            let output = ToolResult {
-                server: server_name.clone(),
-                tool: tool_name.clone(),
-                status: "error".to_string(),
-                result: None,
-                error: Some(ToolError {
-                    message: format!(
-                        "Tool '{}' on server '{}' is disabled (blocked by patterns: {})",
-                        tool_name, server_name, patterns_str
-                    ),
-                    code: Some(403),
-                }),
-                metadata: ExecutionMetadata {
-                    timestamp: timestamp.clone(),
-                    retry_count: Some(0),
-                },
-            };
-            print_json(&output);
-            return Err(McpError::UsageError {
-                message: "Tool execution blocked by disabled_tools configuration".to_string(),
-            });
-        }
-    }
-
-    // Execute tool with retry logic
-    let retry_config = RetryConfig::from_config(&config);
-
-    // Create shared access for operation closure
-    let daemon_shared = Arc::new(tokio::sync::Mutex::new(daemon));
-
-    // Execute tool with retry logic - this is an async operation
-    let operation = || {
-        let daemon_shared = daemon_shared.clone();
-        let server_name_clone = server_name.clone();
-        let tool_name_clone = tool_name.clone();
-        let arguments_clone = arguments.clone();
-
-        // Convert async block to boxed trait object Future using futures-util
-        Box::new(async move {
-            let mut daemon_guard = daemon_shared.lock().await;
-            daemon_guard
-                .execute_tool(&server_name_clone, &tool_name_clone, arguments_clone)
-                .await
-        })
-        .boxed()
-    };
-
-    // Execute with retry
-    let result = retry_with_backoff(operation, &retry_config).await;
-
-    match result {
+    // Build model from result and format it
+    let model = match result {
         Ok(tool_result) => {
-            // Output JSON result
-            let output = ToolResult {
-                server: server_name.clone(),
-                tool: tool_name.clone(),
-                status: "success".to_string(),
+            CallResultModel {
+                server_name: server_name.clone(),
+                tool_name: tool_name.clone(),
+                success: true,
                 result: Some(tool_result),
                 error: None,
-                metadata: ExecutionMetadata {
-                    timestamp: timestamp.clone(),
-                    retry_count: Some(0),
-                },
-            };
-            print_json(&output);
-            Ok(())
+                execution_time_ms: Some(execution_time_ms),
+                retries: 0, // Retry count not tracked by current retry implementation
+            }
         }
         Err(McpError::MaxRetriesExceeded { attempts }) => {
-            let output = ToolResult {
-                server: server_name.clone(),
-                tool: tool_name.clone(),
-                status: "error".to_string(),
+            CallResultModel {
+                server_name: server_name.clone(),
+                tool_name: tool_name.clone(),
+                success: false,
                 result: None,
-                error: Some(ToolError {
-                    message: format!("Tool execution failed after {} retry attempts", attempts),
-                    code: Some(503),
-                }),
-                metadata: ExecutionMetadata {
-                    timestamp: timestamp.clone(),
-                    retry_count: Some(attempts),
-                },
-            };
-            print_json(&output);
-            Err(McpError::MaxRetriesExceeded { attempts })
+                error: Some(format!(
+                    "Tool execution failed after {} retry attempts",
+                    attempts
+                )),
+                execution_time_ms: Some(execution_time_ms),
+                retries: attempts,
+            }
         }
         Err(McpError::OperationCancelled { timeout }) => {
-            let output = ToolResult {
-                server: server_name.clone(),
-                tool: tool_name.clone(),
-                status: "error".to_string(),
+            CallResultModel {
+                server_name: server_name.clone(),
+                tool_name: tool_name.clone(),
+                success: false,
                 result: None,
-                error: Some(ToolError {
-                    message: format!("Tool execution cancelled after {}s timeout", timeout),
-                    code: Some(408),
-                }),
-                metadata: ExecutionMetadata {
-                    timestamp: timestamp.clone(),
-                    retry_count: Some(0),
-                },
-            };
-            print_json(&output);
-            Err(McpError::OperationCancelled { timeout })
+                error: Some(format!(
+                    "Tool execution cancelled after {}s timeout",
+                    timeout
+                )),
+                execution_time_ms: Some(execution_time_ms),
+                retries: 0,
+            }
         }
         Err(e) => {
-            let output = ToolResult {
-                server: server_name.clone(),
-                tool: tool_name.clone(),
-                status: "error".to_string(),
+            CallResultModel {
+                server_name: server_name.clone(),
+                tool_name: tool_name.clone(),
+                success: false,
                 result: None,
-                error: Some(ToolError {
-                    message: format!("Tool execution failed: {}", e),
-                    code: None,
-                }),
-                metadata: ExecutionMetadata {
-                    timestamp: timestamp.clone(),
-                    retry_count: Some(0),
-                },
-            };
-            print_json(&output);
-            Err(e)
+                error: Some(format!("Tool execution failed: {}", e)),
+                execution_time_ms: Some(execution_time_ms),
+                retries: 0,
+            }
+        }
+    };
+
+    formatters::format_call_result(&model, output_mode);
+
+    // Return appropriate error if execution failed
+    if !model.success {
+        if model.error.as_ref().unwrap().contains("retry attempts") {
+            return Err(McpError::MaxRetriesExceeded { attempts: model.retries });
+        } else if model.error.as_ref().unwrap().contains("timeout") {
+            // Extract timeout value from error message
+            return Err(McpError::OperationCancelled { timeout: 30 }); // Default timeout
         }
     }
+
+    Ok(())
+}
+
+/// Get current timestamp in seconds since epoch.
+fn get_timestamp() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let duration = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    format!("{}s", duration.as_secs())
 }
 
 /// Read JSON from stdin asynchronously.
@@ -414,78 +242,41 @@ pub fn read_stdin_async() -> Result<String> {
     Ok(input)
 }
 
-/// Format and display tool execution result.
-///
-/// Implements EXEC-03: formatting tool results as readable text.
-///
-/// # Arguments
-/// * `result` - The tool result to format
-/// * `server_name` - Server name for context
-pub fn format_and_display_result(result: &serde_json::Value, server_name: &str) {
-    if result.is_object() {
-        let result_obj = result.as_object().unwrap();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-        // Check if result indicates an error
-        if let Some(error) = result_obj.get("error") {
-            println!("Error from server '{}':", server_name);
-            if let Some(msg) = error.get("message").and_then(|m| m.as_str()) {
-                println!("  {}", msg);
-            }
-            if let Some(code) = error.get("code").and_then(|c| c.as_u64()) {
-                println!("  Code: {}", code);
-            }
-            return;
-        }
+    #[test]
+    fn test_call_result_model_building() {
+        let model = CallResultModel {
+            server_name: "test-server".to_string(),
+            tool_name: "test-tool".to_string(),
+            success: true,
+            result: Some(serde_json::json!({"data": "value"})),
+            error: None,
+            execution_time_ms: Some(150),
+            retries: 0,
+        };
 
-        // Extract text content from result
-        let content = result_obj.get("result");
+        assert!(model.success);
+        assert_eq!(model.server_name, "test-server");
+        assert!(model.result.is_some());
+    }
 
-        if let Some(content) = content {
-            if let Some(text_array) = content.get("content").and_then(|c| c.as_array()) {
-                let text_lines: Vec<String> = text_array
-                    .iter()
-                    .filter_map(|item| {
-                        let item_obj = item.as_object()?;
-                        item_obj.get("type")?.as_str().and_then(|t| match t {
-                            "text" => item_obj.get("text")?.as_str().map(|s| s.to_string()),
-                            "image" => item_obj
-                                .get("data")?
-                                .as_str()
-                                .map(|d| format!("(image data: {} bytes, type: unknown)", d.len())),
-                            "resource" => item_obj
-                                .get("uri")?
-                                .as_str()
-                                .map(|u| format!("(resource: {})", u)),
-                            _ => None,
-                        })
-                    })
-                    .collect();
+    #[test]
+    fn test_call_result_model_error() {
+        let model = CallResultModel {
+            server_name: "test-server".to_string(),
+            tool_name: "test-tool".to_string(),
+            success: false,
+            result: None,
+            error: Some("Connection failed".to_string()),
+            execution_time_ms: Some(50),
+            retries: 3,
+        };
 
-                if text_lines.is_empty() {
-                    println!(
-                        "Result: {}",
-                        serde_json::to_string_pretty(content)
-                            .unwrap_or_else(|_| result.to_string())
-                    );
-                } else {
-                    println!("Result:");
-                    for line in text_lines {
-                        println!("  {}", line);
-                    }
-                }
-            } else {
-                println!(
-                    "Result: {}",
-                    serde_json::to_string_pretty(content).unwrap_or_else(|_| result.to_string())
-                );
-            }
-        } else {
-            println!(
-                "Result: {}",
-                serde_json::to_string_pretty(result).unwrap_or_else(|_| result.to_string())
-            );
-        }
-    } else {
-        println!("Result: {}", result);
+        assert!(!model.success);
+        assert!(model.error.is_some());
+        assert_eq!(model.retries, 3);
     }
 }

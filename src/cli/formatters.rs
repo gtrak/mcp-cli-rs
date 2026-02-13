@@ -806,8 +806,8 @@ mod tests {
 
     #[test]
     fn test_output_mode_creation() {
-        assert_eq!(OutputMode::from_json_flag(true), OutputMode::Json);
-        assert_eq!(OutputMode::from_json_flag(false), OutputMode::Human);
+        assert_eq!(OutputMode::from_flags(true), OutputMode::Json);
+        assert_eq!(OutputMode::from_flags(false), OutputMode::Human);
     }
 
     #[test]
