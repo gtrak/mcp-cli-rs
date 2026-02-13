@@ -13,6 +13,7 @@ pub mod entry;
 pub mod filter;
 pub mod info;
 pub mod list;
+pub mod models;
 pub mod search;
 
 // Re-export from entry module (CLI entry point)
