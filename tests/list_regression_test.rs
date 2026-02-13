@@ -80,7 +80,7 @@ impl Drop for DaemonHandle {
     }
 }
 
-/// Test list with no-daemon flag (direct mode)
+/// Test list with no-daemon flag (direct mode) - uses mock MCP server
 #[test]
 fn test_list_no_daemon() {
     cleanup_daemon();
@@ -88,8 +88,16 @@ fn test_list_no_daemon() {
 
     println!("Testing: list command with --no-daemon");
 
+    // Create test config with mock MCP server
+    let config_content = r#"
+[[servers]]
+name = "mock-server"
+transport = { type = "stdio", command = "mock-mcp-server" }
+"#;
+    let (_temp_dir, config_path) = temp_config_file(config_content);
+
     let output = Command::new("./target/debug/mcp-cli-rs.exe")
-        .args(["list", "--no-daemon"])
+        .args(["list", "--no-daemon", "--config", config_path.to_str().unwrap()])
         .env("RUST_LOG", "")
         .env("SERENA_LOG_LEVEL", "error")
         .output();
@@ -106,7 +114,7 @@ fn test_list_no_daemon() {
                 panic!("Command failed");
             }
 
-            let has_content = combined.contains("serena")
+            let has_content = combined.contains("mock-server")
                 || combined.contains("Tools:")
                 || combined.contains("Configured servers:")
                 || combined.len() > 100;
@@ -157,7 +165,7 @@ fn test_manual_daemon_spawn() {
         eprintln!("Combined output: {}", combined);
     }
 
-    let has_content = combined.contains("serena")
+    let has_content = combined.contains("mock-server")
         || combined.contains("Tools:")
         || combined.contains("Configured servers:")
         || combined.len() > 100;
@@ -178,7 +186,7 @@ fn temp_config_file(content: &str) -> (TempDir, PathBuf) {
     (temp_dir, config_path)
 }
 
-/// Test list with daemon flag (daemon mode)
+/// Test list with daemon flag (daemon mode) - uses mock MCP server
 #[test]
 fn test_list_with_daemon() {
     cleanup_daemon();
@@ -186,9 +194,17 @@ fn test_list_with_daemon() {
 
     println!("Testing: list command with --require-daemon");
 
-    // Start daemon manually
+    // Create test config with mock MCP server
+    let config_content = r#"
+[[servers]]
+name = "mock-server"
+transport = { type = "stdio", command = "mock-mcp-server" }
+"#;
+    let (_temp_dir, config_path) = temp_config_file(config_content);
+
+    // Start daemon with test config
     let daemon = Command::new("./target/debug/mcp-cli-rs.exe")
-        .args(["daemon", "--ttl", "10"])
+        .args(["daemon", "--ttl", "10", "--config", config_path.to_str().unwrap()])
         .env("RUST_LOG", "")
         .env("SERENA_LOG_LEVEL", "error")
         .spawn()
@@ -199,9 +215,9 @@ fn test_list_with_daemon() {
     // Wait for daemon to start
     std::thread::sleep(Duration::from_secs(2));
 
-    // Test list with --require-daemon
+    // Test list with --require-daemon (must use same config as daemon)
     let output = Command::new("./target/debug/mcp-cli-rs.exe")
-        .args(["list", "--require-daemon"])
+        .args(["list", "--require-daemon", "--config", config_path.to_str().unwrap()])
         .env("RUST_LOG", "")
         .env("SERENA_LOG_LEVEL", "error")
         .output()
@@ -215,12 +231,12 @@ fn test_list_with_daemon() {
 
     // Should succeed and have content
     assert!(
-        output.status.success() || combined.contains("serena") || combined.len() > 100,
+        output.status.success() || combined.contains("mock-server") || combined.len() > 100,
         "List with daemon should succeed"
     );
 }
 
-/// Test list with JSON output flag
+/// Test list with JSON output flag - uses mock MCP server
 #[test]
 fn test_list_json_output() {
     cleanup_daemon();
@@ -228,8 +244,16 @@ fn test_list_json_output() {
 
     println!("Testing: list command with --json flag");
 
+    // Create test config with mock MCP server
+    let config_content = r#"
+[[servers]]
+name = "mock-server"
+transport = { type = "stdio", command = "mock-mcp-server" }
+"#;
+    let (_temp_dir, config_path) = temp_config_file(config_content);
+
     let output = Command::new("./target/debug/mcp-cli-rs.exe")
-        .args(["list", "--json", "--no-daemon"])
+        .args(["list", "--json", "--no-daemon", "--config", config_path.to_str().unwrap()])
         .env("RUST_LOG", "")
         .env("SERENA_LOG_LEVEL", "error")
         .output()
