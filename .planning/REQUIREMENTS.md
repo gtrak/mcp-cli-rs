@@ -1,98 +1,73 @@
-# Requirements: MCP CLI Rust Cleanup
+# Requirements: MCP CLI Rust - Test Coverage
 
-**Defined:** 2026-02-12
+**Defined:** 2026-02-13
 **Core Value:** Reliable cross-platform MCP server interaction without dependencies.
 
-## v1.3 Requirements Tech Debt Cleanup & Code Quality
+## v1.4 Requirements Test Coverage
 
-Requirements for code quality, maintainability, and duplication elimination.
+Requirements for verifying tool execution through integration tests.
 
-### Test Infrastructure
+### Tool Call Integration Tests
 
-- [x] **TEST-01**: Create test setup helpers module (`tests/helpers.rs`) with TestEnvironment struct for temp directory management
-- [x] **TEST-02**: Create platform-specific socket/pipe path generators with unified interface in helpers module
-- [x] **TEST-03**: Create IPC test helpers (server/client roundtrip patterns) in helpers module
-- [x] **TEST-04**: Create test config factories for common server/tool configurations
-- [x] **TEST-05**: Refactor ipc_tests.rs, cross_platform_daemon_tests.rs, lifecycle_tests.rs, windows_process_spawn_tests.rs, orphan_cleanup_tests.rs to use helpers
-- [x] **TEST-06**: Split cross_platform_daemon_tests.rs (785 lines) into tests/unix/*.rs, tests/windows/*.rs, tests/common/*.rs
-- [x] **TEST-07**: Organize test files by platform and common patterns, maintain test coverage
-- [x] **TEST-08**: All tests use helpers instead of inline setup (eliminate ~200-300 lines of duplication)
+- [ ] **TEST-01**: Create mock MCP server for testing tool execution (mock server that responds to JSON-RPC requests)
+- [ ] **TEST-02**: Add end-to-end test for stdio transport tool call (spawn mock server, connect, call tool, verify result)
+- [ ] **TEST-03**: Add end-to-end test for HTTP transport tool call (start HTTP mock, call tool via reqwest, verify result)
+- [ ] **TEST-04**: Add test for tool call with arguments (verify JSON args are passed correctly)
+- [ ] **TEST-05**: Add test for tool call error handling (server returns error, verify error propagation)
 
-### Code Organization
+### Retry Logic Tests
 
-- [x] **ORG-01**: Split src/cli/commands.rs (1850 lines) into src/cli/list_commands.rs (list, grep), src/cli/info_commands.rs (info), src/cli/call_commands.rs (call), src/cli/commands.rs (orchestration)
-- [x] **ORG-02**: Extract daemon lifecycle from src/main.rs (809 lines) to src/cli/daemon_lifecycle.rs
-- [x] **ORG-03**: Extract command routing from src/main.rs to src/cli/command_routing.rs
-- [x] **ORG-04**: Extract config loading/merging from src/main.rs to src/cli/config_setup.rs
-- [x] **ORG-05**: Extract CLI entry point from src/main.rs to src/cli/entry.rs, leaving main.rs as thin entry wrapper
-- [x] **ORG-06**: Split src/config/mod.rs (432 lines) into src/config/types.rs (Config structs), src/config/parser.rs (TOML parsing), src/config/validator.rs (validation)
-- [x] **ORG-07**: All module re-exports updated to reflect new structure
-- [x] **ORG-08**: Module structure is clear with separation of concerns, no file >600 lines
+- [ ] **TEST-06**: Add test for exponential backoff retry on transient failure (mock server fails first N times, then succeeds)
+- [ ] **TEST-07**: Add test for max retry limit (mock server always fails, verify max retries then error)
+- [ ] **TEST-08**: Add test for different retry delays (verify backoff timing)
 
-### Duplication Elimination
+### IPC and Daemon Tests
 
-- [ ] **DUP-01**: Consolidate 16 JSON command functions (cmd_xxx, cmd_xxx_json pairs) into 8 multi-mode commands with OutputMode parameter
-- [ ] **DUP-02**: Create format_for_json() and format_for_human() helper methods to eliminate duplicate formatting logic (~200-300 lines)
-- [ ] **DUP-03**: Unify duplicate connection interfaces (daemon/pool.rs, client/mod.rs, ipc/mod.rs) into single McpClient trait
-- [ ] **DUP-04**: Remove duplicate list_tools() and call_tool() implementations across pool, client, ipc
-- [ ] **DUP-05**: Merge src/transport.rs (81 lines) and src/client/transport.rs (68 lines) into single transport abstraction or eliminate duplicate
-- [ ] **DUP-06**: All duplicate interfaces eliminated, single source of truth for MCP client operations
+- [ ] **TEST-09**: Add test for daemon protocol request/response (full roundtrip through IPC)
+- [ ] **TEST-10**: Add test for concurrent tool calls through daemon (multiple parallel requests)
+- [ ] **TEST-11**: Add test for daemon connection cleanup (verify resources released)
 
-### Documentation & API
+### Error Path Tests
 
-- [ ] **DOC-01**: Fix all 9 cargo doc warnings (unclosed HTML tags, URL formatting)
-- [ ] **DOC-02**: Audit 106 public functions and 34 public structs, mark unnecessary exports as private
-- [ ] **DOC-03**: Reduce public API surface by removing 50-100 lines of unnecessary exports
-- [ ] **DOC-04**: Improve module-level documentation with clear scope and usage examples
-- [ ] **DOC-05**: All public APIs have rustdoc comments with examples
-- [ ] **DOC-06**: cargo doc generates zero warnings
+- [ ] **TEST-12**: Add test for invalid JSON arguments (verify helpful error message)
+- [ ] **TEST-13**: Add test for server timeout handling (slow server, verify timeout works)
+- [ ] **TEST-14**: Add test for server disconnection during tool call (verify graceful error)
 
-### Code Quality
+### Regression Prevention
 
-- [ ] **QUAL-01**: Review 72 unwrap() usages for safety, replace with ok_or_else() or expect() with context where appropriate
-- [ ] **QUAL-02**: Review and remove unnecessary #[allow(dead_code)] attributes
-- [ ] **QUAL-03**: Ensure consistent error handling patterns across codebase
-- [ ] **QUAL-04**: Consistent use of Result<> return types, no bare unwrap() in production code
-- [ ] **QUAL-05**: All clippy warnings addressed (currently zero, maintain)
+- [ ] **TEST-15**: Add regression test for list command (ensure existing tests still pass)
+- [ ] **TEST-16**: Add test for config loading with various server configurations
+- [ ] **TEST-17**: Add integration test for tool filtering combined with tool call
 
-### Codebase Size Target
-
-- [ ] **SIZE-01**: Overall codebase reduced to 10,800-11,500 lines (from 12,408 lines = 8-13% reduction)
-- [x] **SIZE-02**: No single file >600 lines (commands.rs was 1850)
-- [x] **SIZE-03**: Test duplication reduced by ~200-300 lines (actually reduced by ~683 lines cross_platform_daemon_tests.rs split: 785→102)
-- [ ] **SIZE-04**: Command duplication reduced by ~200-300 lines
-- [ ] **SIZE-05**: API surface reduced by ~50-100 lines
-
-## Out of Scope
-
-| Feature | Reason |
-|---------|--------|
-| Test fixtures and assertion helpers | Low priority, test helpers sufficient for now |
-| Comprehensive rewrite of modules | Refactor only, no behavior changes |
-| New features or functionality | This is cleanup only |
-| Performance optimization | Code organization focus, not performance |
+---
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TEST-01 through TEST-08 | Phase 12 | Complete |
-| ORG-01 through ORG-08 | Phase 13 | Complete |
-| DUP-01 through DUP-06 | Phase 14 | Pending |
-| DOC-01 through DOC-06 | Phase 15 | Pending |
-| QUAL-01 through QUAL-05 | Phase 16 | Pending |
-| SIZE-01 | Phase 16 | Pending |
-| SIZE-02 | Phase 13 | Complete |
-| SIZE-03 | Phase 12 | Complete |
-| SIZE-04 | Phase 14 | Pending |
-| SIZE-05 | Phase 15 | Pending |
+| TEST-01 | Phase 17 | Pending |
+| TEST-02 | Phase 17 | Pending |
+| TEST-03 | Phase 17 | Pending |
+| TEST-04 | Phase 17 | Pending |
+| TEST-05 | Phase 17 | Pending |
+| TEST-06 | Phase 18 | Pending |
+| TEST-07 | Phase 18 | Pending |
+| TEST-08 | Phase 18 | Pending |
+| TEST-09 | Phase 18 | Pending |
+| TEST-10 | Phase 18 | Pending |
+| TEST-11 | Phase 18 | Pending |
+| TEST-12 | Phase 19 | Pending |
+| TEST-13 | Phase 19 | Pending |
+| TEST-14 | Phase 19 | Pending |
+| TEST-15 | Phase 19 | Pending |
+| TEST-16 | Phase 19 | Pending |
+| TEST-17 | Phase 19 | Pending |
 
 **Coverage:**
-- v1.3 requirements: 37 total
-- Complete: 17 (all TEST + all ORG + SIZE-02 + SIZE-03)
-- Mapped to phases: 37
+- v1.4 requirements: 17 total
+- Mapped to phases: 17
 - Unmapped: 0 ✓
 
 ---
-*Requirements defined: 2026-02-12*
-*Last updated: 2026-02-12 after Phase 13 completion (ORG + SIZE-02 complete)*
+*Requirements defined: 2026-02-13*
+*Last updated: 2026-02-13*

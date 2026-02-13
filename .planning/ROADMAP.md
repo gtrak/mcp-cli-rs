@@ -129,13 +129,82 @@ Project follows a solo developer + Claude workflow with no team coordination art
 
 ---
 
-## Next Milestone
+## 🚧 v1.4 Test Coverage (In Progress)
 
-*No milestones currently planned. Use `/gsd-new-milestone` to start planning.*
+**Milestone Goal:** Add integration tests for tool execution to verify full MCP server communication flow
+
+### Phase 17: Tool Call Integration Tests
+**Goal**: Create end-to-end tests for tool execution
+**Depends on**: v1.3 completion
+**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, TEST-05
+**Success Criteria** (what must be TRUE):
+  1. Mock MCP server exists and can respond to JSON-RPC requests
+  2. Stdio transport tool call test passes (full roundtrip)
+  3. HTTP transport tool call test passes (full roundtrip)
+  4. Tool call with arguments test passes
+  5. Tool call error handling test passes
+**Plans**: 3 plans in 2 waves
+
+### Phase 18: Retry and IPC Tests
+**Goal**: Verify retry logic and daemon IPC work correctly
+**Depends on**: Phase 17
+**Requirements**: TEST-06, TEST-07, TEST-08, TEST-09, TEST-10, TEST-11
+**Success Criteria** (what must be TRUE):
+  1. Exponential backoff retry test passes
+  2. Max retry limit test passes
+  3. Daemon protocol roundtrip test passes
+  4. Concurrent tool calls through daemon test passes
+  5. Connection cleanup test passes
+**Plans**: 2 plans in 2 waves
+
+### Phase 19: Error Paths and Regression Tests
+**Goal**: Add error handling tests and prevent regressions
+**Depends on**: Phase 18
+**Requirements**: TEST-12, TEST-13, TEST-14, TEST-15, TEST-16, TEST-17
+**Success Criteria** (what must be TRUE):
+  1. Invalid JSON args test passes with helpful error
+  2. Server timeout test passes
+  3. Server disconnection test passes
+  4. List regression test still passes
+  5. Config loading test passes
+  6. Tool filtering + call integration test passes
+**Plans**: 2 plans in 1 wave
 
 ---
 
-**Last updated:** 2026-02-13 (v1.3 milestone complete: 23% codebase reduction, zero doc warnings, all phases shipped)
+## Progress
+
+| Phase | Name | Status | Completion |
+|-------|------|--------|------------|
+| 1 | Core Protocol & Configuration | Complete | 100% |
+| 2 | Connection Daemon & Cross-Platform IPC | Complete | 100% |
+| 3 | Performance & Reliability | Complete | 100% |
+| 4 | Tool Filtering & Cross-Platform Validation | Complete | 100% |
+| 5 | Unified Daemon Architecture | Complete | 100% |
+| 6 | Output Formatting & Visual Hierarchy | Complete | 100% |
+| 7 | JSON Output & Machine-Readable Modes | Complete | 100% |
+| 8 | Fix Phase 4 Windows Tests (XP-01) | Complete | 100% |
+| 9 | Cross-Platform Verification (XP-02, XP-04) | Complete | 100% |
+| 10 | Phase 6 Verification Documentation | Complete | 100% |
+| 11 | Code Quality Cleanup | Complete | 100% |
+| 12 | Test Infrastructure | Complete | 100% |
+| 13 | Code Organization | Complete | 100% |
+| 14 | Duplication Elimination | Complete | 100% |
+| 15 | Documentation & API | Complete | 100% |
+| 16 | Code Quality Sweep | Complete | 100% |
+
+**Progress Summary:**
+- **Phases completed:** 16/19
+- **Total plans:** 65 plans executed
+- **v1 Coverage:** 42/42 requirements satisfied ✅
+- **v1.2 Coverage:** 18/18 requirements satisfied ✅
+- **v1.3 Coverage:** 46/47 requirements satisfied ✅
+- **v1.4 Coverage:** 0/17 requirements satisfied (in progress)
+- **Total Coverage:** 97/97 requirements satisfied ✅
+
+---
+
+**Last updated:** 2026-02-13 (v1.4 started: Test Coverage for Tool Execution)
 
 ### Phase 12: Test Infrastructure
 **Goal**: Eliminate test duplication and create reusable test helpers foundation

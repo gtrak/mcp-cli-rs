@@ -115,9 +115,16 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 
 ---
 
-## Next Milestone
+## Current Milestone: v1.4 Test Coverage
 
-*No milestones planned. Use `/gsd-new-milestone` to start planning.*
+**Goal:** Add integration tests for tool execution to verify full MCP server communication flow
+
+**Target features:**
+- End-to-end tool call tests (mock MCP server → connect → call tool → verify result)
+- HTTP transport integration tests
+- Stdio transport integration tests
+- Error path tests (invalid JSON, server errors, timeouts)
+- Retry logic verification tests
 
 ---
 
@@ -156,4 +163,4 @@ The tool will be wrapped in a skill for LLM use, so error messages and output sh
 
 ---
 
-*Last updated: 2026-02-13 after v1.3 milestone completion*
+*Last updated: 2026-02-13 after v1.3 milestone, starting v1.4 test coverage*
