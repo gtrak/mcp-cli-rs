@@ -3,6 +3,7 @@
 //! This module provides the command definitions and handler functions
 //! for the MCP CLI application.
 
+// Module declarations - keep these public for tests and binary
 pub mod call;
 pub mod command_router;
 pub mod commands;
@@ -17,26 +18,13 @@ pub mod list;
 pub mod models;
 pub mod search;
 
-// Re-export from entry module (CLI entry point)
-pub use entry::{Cli, init_tracing, main as entry_main};
-
-// Re-export from command_router
-pub use command_router::{Commands, RunMode, dispatch_command, execute_command, get_run_mode};
-
-// Re-export DetailLevel from format module
+// DetailLevel is used internally for output formatting
 pub use crate::format::DetailLevel;
 
-// Re-export command functions from specialized modules
-pub use call::cmd_call_tool;
-pub use commands::{
-    cmd_call_tool as old_cmd_call_tool, cmd_list_servers as old_cmd_list_servers,
-    cmd_search_tools as old_cmd_search_tools, cmd_server_info as old_cmd_server_info,
-    cmd_tool_info as old_cmd_tool_info, parse_tool_id,
-};
-pub use daemon_lifecycle::{
-    DirectProtocolClient, connect_or_spawn_daemon, connect_to_daemon, create_auto_daemon_client,
-    create_direct_client, create_require_daemon_client,
-};
-pub use info::{cmd_server_info, cmd_tool_info};
-pub use list::cmd_list_servers;
-pub use search::cmd_search_tools;
+// Internal re-exports removed - modules are accessed directly:
+// - entry module accessed as cli::entry::main from main.rs
+// - formatters accessed as cli::formatters from tests
+// - models accessed as cli::models from tests
+// - filter accessed as cli::filter from tests
+// - command_router accessed as cli::command_router from entry.rs
+// - daemon_lifecycle accessed as cli::daemon_lifecycle from command_router.rs

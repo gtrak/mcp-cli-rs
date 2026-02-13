@@ -132,7 +132,7 @@ pub async fn run_daemon(
 }
 
 /// Handle client requests
-pub async fn handle_client(stream: impl crate::ipc::IpcStream, state: DaemonState) {
+async fn handle_client(stream: impl crate::ipc::IpcStream, state: DaemonState) {
     use tokio::io::BufReader;
     tracing::debug!("Daemon: New client connected");
 
@@ -174,7 +174,7 @@ pub async fn handle_client(stream: impl crate::ipc::IpcStream, state: DaemonStat
 }
 
 /// Handle daemon request and return response
-pub async fn handle_request(
+async fn handle_request(
     request: crate::daemon::protocol::DaemonRequest,
     state: &DaemonState,
 ) -> crate::daemon::protocol::DaemonResponse {
@@ -268,7 +268,7 @@ fn config_fingerprint(config: &Config) -> String {
 }
 
 /// Clean up socket file on daemon exit
-pub async fn cleanup_socket(socket_path: PathBuf) -> Result<()> {
+async fn cleanup_socket(socket_path: PathBuf) -> Result<()> {
     // Try to remove socket file
     let result = std::fs::remove_file(&socket_path);
     match result {

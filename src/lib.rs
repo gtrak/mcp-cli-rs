@@ -27,16 +27,12 @@ pub use daemon::{DaemonState, run_daemon};
 pub mod ipc;
 pub use ipc::{create_ipc_server, get_socket_path};
 
-// Connection pool (stub, full impl in 02-04)
+// Parallel discovery module - used by tests
 pub mod parallel;
-pub use parallel::{ParallelExecutor, list_tools_parallel};
 
-// Retry logic (Phase 3)
+// Retry logic - used internally
 pub mod retry;
-pub use retry::{RetryConfig, retry_with_backoff, timeout_wrapper};
 
-// Graceful shutdown (Phase 3)
-pub mod shutdown;
-
-pub mod pool;
-pub use pool::{ConnectionPoolInterface, DummyConnectionPool};
+// Internal modules - not needed by external users
+mod shutdown;
+mod pool;
