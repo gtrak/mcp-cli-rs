@@ -6,6 +6,109 @@ Milestone tracking for MCP CLI Rust Rewrite project.
 
 ---
 
+## Milestone v1.4: Test Coverage
+
+**Started:** 2026-02-13
+**Completed:** 2026-02-13
+**Status:** ✅ Complete
+
+### Phase Structure
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 17 | Tool Call Integration Tests | ✅ Complete |
+| 18 | Retry and IPC Tests | ✅ Complete |
+| 19 | Error Paths and Regression Tests | ✅ Complete |
+
+### What Shipped
+
+**Test Coverage:**
+- Mock MCP server for stdio transport testing (465 lines)
+- Mock HTTP server for HTTP transport testing (637 lines)
+- Tool call integration tests (stdio + HTTP)
+- Retry logic verification tests (exponential backoff, max retry, delay timing)
+- Daemon IPC tests (roundtrip, concurrent calls, cleanup)
+- Error path tests (invalid JSON, timeouts, disconnection)
+- Regression prevention tests (list, config loading, tool filtering)
+
+**Tests Added:** 81 integration tests
+
+**Requirements Delivered:** 17/17 (100%)
+
+---
+
+*Last updated: 2026-02-13*
+
+---
+
+## Milestone v1.3: Tech Debt Cleanup & Code Quality
+
+**Started:** 2026-02-12
+**Completed:** 2026-02-13
+**Status:** ✅ Complete
+
+### Phase Structure
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 12 | Test Infrastructure | ✅ Complete |
+| 13 | Code Organization | ✅ Complete |
+| 14 | Duplication Elimination | ✅ Complete |
+| 15 | Documentation & API | ✅ Complete |
+| 16 | Code Quality Sweep | ✅ Complete |
+
+### What Shipped
+
+**Code Quality Improvements:**
+- Test setup helpers module (tests/helpers.rs, 194 lines)
+- commands.rs refactored from 1850 lines into focused modules
+- Documentation warnings fixed (cargo doc zero warnings)
+- Public API surface reduced by 16 lines
+- main.rs cleanup with extracted daemon lifecycle functions
+- Codebase size reduced: 12,408 → 9,568 lines (23% reduction)
+
+**Requirements Delivered:** 46/47 (98%)
+
+---
+
+*Last updated: 2026-02-13*
+
+---
+
+## Milestone v1.2: Ergonomic CLI Output
+
+**Started:** 2026-02-10
+**Completed:** 2026-02-12
+**Status:** ✅ Complete
+
+### Phase Structure
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 6 | Output Formatting & Visual Hierarchy | ✅ Complete |
+| 7 | JSON Output & Machine-Readable Modes | ✅ Complete |
+| 8 | Fix Phase 4 Windows Tests (XP-01) | ✅ Complete |
+| 9 | Cross-Platform Verification (XP-02, XP-04) | ✅ Complete |
+| 10 | Phase 6 Verification Documentation | ✅ Complete |
+| 11 | Code Quality Cleanup | ✅ Complete |
+
+### What Shipped
+
+**Output Improvements:**
+- Tool listing shows parameter overview (names, types, required/optional)
+- Progressive detail levels via flags (-d, -v)
+- Multi-server listings with visual hierarchy
+- JSON output mode for programmatic use
+- Colored terminal output with NO_COLOR support
+
+**Requirements Delivered:** 18/18 (100%)
+
+---
+
+*Last updated: 2026-02-12*
+
+---
+
 ## Milestone v1.0: Core CLI with Connection Daemon
 
 **Started:** 2025-02-06
@@ -20,6 +123,7 @@ Milestone tracking for MCP CLI Rust Rewrite project.
 | 2 | Connection Daemon & Cross-Platform IPC | ✅ Complete |
 | 3 | Performance & Reliability | ✅ Complete |
 | 4 | Tool Filtering & Cross-Platform Validation | ✅ Complete |
+| 5 | Unified Daemon Architecture | ✅ Complete |
 
 ### What Shipped
 
@@ -32,9 +136,8 @@ Milestone tracking for MCP CLI Rust Rewrite project.
 - Connection daemon with cross-platform IPC (Unix sockets, named pipes)
 - Parallel server operations with configurable concurrency
 - Exponential backoff retry with timeout handling
-- Colored terminal output with NO_COLOR support
-- Graceful signal handling for resource cleanup
-- Cross-platform validation (Windows process spawning, daemon IPC)
+- Unified daemon architecture (single binary, three operational modes)
+- Cross-platform support (Windows, Linux, macOS)
 
 **Requirements Delivered:** 42/42 (100%)
 
@@ -47,57 +150,5 @@ Milestone tracking for MCP CLI Rust Rewrite project.
 5. **Signal handling** — needs careful coordination between daemon and CLI processes
 
 ---
-*Last updated: 2026-02-09*
 
----
-
-## Milestone v1.1: Unified Daemon Architecture
-
-**Started:** 2026-02-09
-**Status:** 🚧 In Progress
-
-### Goal
-
-Refactor daemon architecture to unify CLI and daemon into a single binary with three operational modes, removing the need for a separate daemon executable.
-
-### What We're Building
-
-**Architecture Changes:**
-- Remove separate daemon.exe binary - integrate daemon logic into main CLI
-- Three operational modes for the unified binary:
-  1. **Standalone Daemon Mode**: Run as persistent daemon only
-  2. **Auto-spawn Mode**: One-shot CLI that spawns daemon with TTL, then daemon auto-shuts down
-  3. **Require Daemon Mode**: One-shot CLI that fails if daemon is not running
-
-**Key Features:**
-- Configurable TTL (time-to-live) for auto-shutdown daemon
-- Clean daemon lifecycle management
-- Single binary distribution (no separate daemon.exe)
-- Backward compatible with existing config and behavior
-
-### Phase Structure
-
-| Phase | Name | Status |
-|-------|------|--------|
-| 5 | Unified Daemon Architecture | 🚧 In Progress |
-
-### Requirements
-
-- [ ] Remove daemon binary (src/bin/daemon.rs)
-- [ ] Add daemon command to main CLI
-- [ ] Implement 3 operational modes
-- [ ] Configurable TTL for auto-shutdown
-- [ ] Update Cargo.toml (single binary)
-- [ ] Test all 3 modes on Windows
-- [ ] Test all 3 modes on Unix
-
-### Acceptance Criteria
-
-1. `mcp daemon` starts standalone daemon
-2. `mcp --auto-daemon list` spawns daemon, executes command, daemon shuts down after TTL
-3. `mcp --require-daemon list` fails with clear error if daemon not running
-4. All existing functionality works unchanged
-5. No separate daemon.exe binary exists
-
----
 *Last updated: 2026-02-09*

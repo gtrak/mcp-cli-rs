@@ -83,7 +83,24 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 
 </details>
 
-### Out of Scope
+<details>
+<summary>v1.4: Test Coverage (17/17 requirements) — Shipped 2026-02-13</summary>
+
+- ✅ Mock MCP server for stdio transport testing
+- ✅ Mock HTTP server for HTTP transport testing
+- ✅ Stdio transport tool call tests (4 tests)
+- ✅ HTTP transport tool call tests (13 tests)
+- ✅ Error handling tests (7 tests)
+- ✅ Retry logic tests (11 tests)
+- ✅ Daemon IPC tests (4 tests)
+- ✅ Error path tests: invalid JSON, timeout, disconnection (12 tests)
+- ✅ Regression tests: list, config loading, tool filtering (30 tests)
+
+**Total:** 81 integration tests added
+
+**Archive:** `.planning/milestones/v1.4-REQUIREMENTS.md`
+
+</details>
 
 - Public distribution/crates.io publishing — local compilation only
 - MCP server implementation — this tool is a client only
@@ -95,36 +112,31 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 
 ---
 
-## Current State: v1.3 Complete
+## Current State: v1.4 Complete
 
 **Status:** Milestone shipped ✅
 
-**Codebase After v1.3:**
+**Codebase After v1.4:**
 - **9,568** lines of Rust code (23% reduction from 12,408)
 - **0** documentation warnings (cargo doc)
 - **All files** under 600 lines (max: 491)
 - **98** library tests pass
 - **7** doc tests pass
+- **81** new integration tests (v1.4)
 
 **Milestones Shipped:**
 - **v1.0:** Core implementation with daemon connection pooling (Phases 1-5, 42 requirements)
 - **v1.2:** Ergonomic CLI output with JSON mode and visual hierarchy (Phases 6-11, 18 requirements)
 - **v1.3:** Tech Debt Cleanup & Code Quality (Phases 12-16, 46/47 requirements)
+- **v1.4:** Test Coverage (Phases 17-19, 17 requirements)
 
-**Total Requirements Satisfied:** 97/97 ✅
+**Total Requirements Satisfied:** 117/117 ✅
 
 ---
 
-## Current Milestone: v1.4 Test Coverage
+## Next Milestone
 
-**Goal:** Add integration tests for tool execution to verify full MCP server communication flow
-
-**Target features:**
-- End-to-end tool call tests (mock MCP server → connect → call tool → verify result)
-- HTTP transport integration tests
-- Stdio transport integration tests
-- Error path tests (invalid JSON, server errors, timeouts)
-- Retry logic verification tests
+**Goal:** [To be defined]
 
 ---
 
@@ -163,4 +175,4 @@ The tool will be wrapped in a skill for LLM use, so error messages and output sh
 
 ---
 
-*Last updated: 2026-02-13 after v1.3 milestone, starting v1.4 test coverage*
+*Last updated: 2026-02-13 after v1.4 milestone complete*
