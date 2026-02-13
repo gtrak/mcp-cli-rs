@@ -48,19 +48,19 @@ Audit and improve CLI user experience by comparing to original Bun implementatio
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UX-01 | Phase 20 | Pending |
-| UX-02 | Phase 20 | Pending |
-| UX-03 | Phase 20 | Pending |
-| UX-04 | Phase 20 | Pending |
-| UX-05 | Phase 21 | Pending |
-| UX-06 | Phase 21 | Pending |
-| UX-07 | Phase 21 | Pending |
-| UX-08 | Phase 21 | Pending |
-| UX-09 | Phase 20 | Pending |
-| UX-10 | Phase 20 | Pending |
-| UX-11 | Phase 21 | Pending |
-| UX-12 | Phase 21 | Pending |
-| UX-13 | Phase 21 | Pending |
+| UX-01 | Phase 20 | Complete |
+| UX-02 | Phase 20 | Complete |
+| UX-03 | Phase 20 | Complete |
+| UX-04 | Phase 20 | Complete |
+| UX-05 | Phase 21 | Complete |
+| UX-06 | Phase 21 | Complete |
+| UX-07 | Phase 21 | Complete |
+| UX-08 | Phase 21 | Complete |
+| UX-09 | Phase 20 | Complete |
+| UX-10 | Phase 20 | Complete |
+| UX-11 | Phase 21 | Complete |
+| UX-12 | Phase 21 | Complete |
+| UX-13 | Phase 21 | Complete |
 
 **Coverage:**
 - v1.5 requirements: 13 total

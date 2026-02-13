@@ -192,7 +192,7 @@ Project follows a solo developer + Claude workflow with no team coordination art
 
 ---
 
-## 🚧 v1.5 UX Audit & Improvements
+## ✅ v1.5 UX Audit & Improvements (COMPLETE)
 
 **Milestone Goal:** Audit help text, error messages, and CLI interface — compare to original Bun implementation for intuitive behavior
 
@@ -230,7 +230,10 @@ Project follows a solo developer + Claude workflow with no team coordination art
 **Plans**: 1 plan
 
 **Plan Details:**
-- [x] 21-01-PLAN.md — Fix identified UX issues from audit (PLANNED)
+- [x] 21-01-PLAN.md — Fix identified UX issues from audit (COMPLETE)
+
+**Completed:** 2026-02-13
+**Results:** All 10 UX fixes implemented: --version flag, help examples, env var docs, no warnings, "Did you mean?", server list in errors, JSON format hints, grep alias, stdin support (pre-existing), format explanation
 
 ---
 
@@ -258,19 +261,21 @@ Project follows a solo developer + Claude workflow with no team coordination art
 | 18 | Retry and IPC Tests | Complete | 100% |
 | 19 | Error Paths and Regression Tests | Complete | 100% |
 | 20 | UX Audit | Complete | 100% |
+| 21 | UX Improvements | Complete | 100% |
 
 **Progress Summary:**
-- **Phases completed:** 20/21
-- **Total plans:** 72 plans executed
+- **Phases completed:** 21/21
+- **Total plans:** 73 plans executed
 - **v1 Coverage:** 42/42 requirements satisfied ✅
 - **v1.2 Coverage:** 18/18 requirements satisfied ✅
 - **v1.3 Coverage:** 46/47 requirements satisfied ✅
 - **v1.4 Coverage:** 17/17 requirements satisfied ✅ (TEST-01 through TEST-17)
-- **Total Coverage:** 117/117 requirements satisfied ✅
+- **v1.5 Coverage:** 13/13 requirements satisfied ✅ (UX-01 through UX-17)
+- **Total Coverage:** 130/130 requirements satisfied ✅
 
 ---
 
-**Last updated:** 2026-02-13 (Phase 18 complete: Retry and IPC Tests — 2 plans executed, 15 tests passing)
+**Last updated:** 2026-02-13 (Phase 21 complete: UX Improvements — 10 UX fixes verified, all 7 must-haves passed)
 
 ### Phase 12: Test Infrastructure
 **Goal**: Eliminate test duplication and create reusable test helpers foundation
