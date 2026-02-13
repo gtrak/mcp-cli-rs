@@ -153,7 +153,18 @@ impl McpClient {
         // Send request via transport
         let response = self.transport.send(request).await?;
 
-        // Parse response
+        // Check for JSON-RPC error
+        if let Some(error) = response.get("error") {
+            let error_msg = error
+                .get("message")
+                .and_then(|m| m.as_str())
+                .unwrap_or("Unknown error");
+            return Err(McpError::InvalidProtocol {
+                message: format!("Tool call failed: {}", error_msg),
+            });
+        }
+
+        // Parse result
         let result = response["result"]
             .as_object()
             .ok_or_else(|| McpError::InvalidProtocol {
