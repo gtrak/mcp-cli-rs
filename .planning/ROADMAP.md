@@ -166,10 +166,10 @@ Project follows a solo developer + Claude workflow with no team coordination art
 **Plans**: 2 plans in 2 waves
 
 **Plan Details:**
-- [ ] 18-01-PLAN.md — Add retry logic tests (exponential backoff, max limit, delay timing) (Wave 1)
-- [ ] 18-02-PLAN.md — Add daemon IPC tests (roundtrip, concurrent calls, cleanup) (Wave 2)
+- [x] 18-01-PLAN.md — Add retry logic tests (exponential backoff, max limit, delay timing) (Wave 1)
+- [x] 18-02-PLAN.md — Add daemon IPC tests (roundtrip, concurrent calls, cleanup) (Wave 2)
 
-**Status**: Planned — 2/2 plans ready for execution
+**Status**: ✅ COMPLETE — 2/2 plans executed, 5/5 must-haves verified, all 15 tests passing
 
 ### Phase 19: Error Paths and Regression Tests
 **Goal**: Add error handling tests and prevent regressions
@@ -207,20 +207,20 @@ Project follows a solo developer + Claude workflow with no team coordination art
 | 15 | Documentation & API | Complete | 100% |
 | 16 | Code Quality Sweep | Complete | 100% |
 | 17 | Tool Call Integration Tests | Complete | 100% |
-| 18 | Retry and IPC Tests | Planned | 0% |
+| 18 | Retry and IPC Tests | Complete | 100% |
 
 **Progress Summary:**
-- **Phases completed:** 17/19
-- **Total plans:** 68 plans executed
+- **Phases completed:** 18/19
+- **Total plans:** 70 plans executed
 - **v1 Coverage:** 42/42 requirements satisfied ✅
 - **v1.2 Coverage:** 18/18 requirements satisfied ✅
 - **v1.3 Coverage:** 46/47 requirements satisfied ✅
-- **v1.4 Coverage:** 5/17 requirements satisfied (TEST-01 through TEST-05) ✅
-- **Total Coverage:** 102/102 requirements satisfied ✅
+- **v1.4 Coverage:** 11/17 requirements satisfied (TEST-01 through TEST-11) ✅
+- **Total Coverage:** 108/108 requirements satisfied ✅
 
 ---
 
-**Last updated:** 2026-02-13 (Phase 18 planned: Retry and IPC Tests — 2 plans ready for execution)
+**Last updated:** 2026-02-13 (Phase 18 complete: Retry and IPC Tests — 2 plans executed, 15 tests passing)
 
 ### Phase 12: Test Infrastructure
 **Goal**: Eliminate test duplication and create reusable test helpers foundation
