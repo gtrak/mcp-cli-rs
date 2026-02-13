@@ -184,6 +184,12 @@ Project follows a solo developer + Claude workflow with no team coordination art
   6. Tool filtering + call integration test passes
 **Plans**: 2 plans in 1 wave
 
+**Plan Details:**
+- [ ] 19-01-PLAN.md — Error path tests: invalid JSON args (TEST-12), server timeout (TEST-13), server disconnection (TEST-14) (Wave 1)
+- [ ] 19-02-PLAN.md — Regression tests: list command (TEST-15), config loading (TEST-16), tool filter+call (TEST-17) (Wave 1)
+
+**Status**: 🚧 READY FOR EXECUTION — Plans created, awaiting execution
+
 ---
 
 ## Progress
