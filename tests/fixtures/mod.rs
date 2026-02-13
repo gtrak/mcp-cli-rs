@@ -4,18 +4,19 @@
 //! for both stdio and HTTP mock MCP servers.
 //!
 //! # Re-exports
-//! - `MockHttpServer` - In-process HTTP mock server
+//! - `MockHttpServer` - In-process HTTP mock server (use `MockHttpServer::start(config)`)
+//! - `MockServerConfig` - Configuration for HTTP mock server (from mock_http_server module)
 //! - `ToolDefinition` - Tool definition structure
 //! - `MockResponse` - Tool response structure
 //! - `start_mock_stdio` - Spawn stdio mock server process
-//! - `start_mock_http` - Start HTTP mock server
 //!
 //! # Usage
 //! ```rust
-//! use tests::fixtures::{MockHttpServer, start_mock_stdio};
+//! use tests::fixtures::{MockHttpServer, MockServerConfig, start_mock_stdio};
 //!
-//! // HTTP server
-//! let (server, url) = MockHttpServer::start().await;
+//! // HTTP server (pass config directly to avoid race conditions)
+//! let config = MockServerConfig::from_parts(tools, responses, errors);
+//! let (server, url) = MockHttpServer::start(config).await;
 //!
 //! // Stdio server
 //! let (child, stdin, stdout) = start_mock_stdio().await;
@@ -36,6 +37,9 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 
 /// Mock server configuration for tests
+/// 
+/// This version is for stdio tests that need to convert to environment variables.
+/// HTTP tests should use `mock_http_server::MockServerConfig` directly.
 #[derive(Debug, Clone)]
 pub struct MockServerConfig {
     /// Tools to make available
@@ -238,21 +242,6 @@ pub async fn start_mock_stdio_with_config(
         .ok_or_else(|| anyhow::anyhow!("Failed to get stdout"))?;
 
     Ok((child, stdin, BufReader::new(stdout)))
-}
-
-/// Start HTTP mock server (convenience wrapper)
-///
-/// # Returns
-/// * `(MockHttpServer, String)` - Server handle and URL
-///
-/// # Example
-/// ```rust
-/// let (server, url) = start_mock_http().await;
-/// // Use url in HTTP transport config
-/// server.shutdown().await;
-/// ```
-pub async fn start_mock_http() -> (MockHttpServer, String) {
-    MockHttpServer::start().await
 }
 
 /// Get the path to a fixture file

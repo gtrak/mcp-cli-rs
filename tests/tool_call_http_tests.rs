@@ -14,35 +14,28 @@ use std::future::Future;
 
 // Import mock server from fixtures
 use fixtures::{MockHttpServer, MockResponse, ToolDefinition};
+use fixtures::mock_http_server::MockServerConfig;
 
 mod fixtures;
+use fixtures::mock_http_server;
 
 /// Helper to run tests with a mock HTTP server.
-/// Environment variables must be set BEFORE calling this function.
-async fn with_mock_server<F, Fut>(test: F)
+/// Configuration is passed directly to avoid race conditions in parallel tests.
+async fn with_mock_server<F, Fut>(config: mock_http_server::MockServerConfig, test: F)
 where
     F: FnOnce(String) -> Fut,
     Fut: Future<Output = ()>,
 {
-    let (server, url) = MockHttpServer::start().await;
+    let (server, url) = MockHttpServer::start(config).await;
     test(url).await;
     server.shutdown().await;
-}
-
-/// Clear mock configuration after tests
-fn clear_mock_config() {
-    unsafe {
-        std::env::remove_var("MOCK_TOOLS");
-        std::env::remove_var("MOCK_RESPONSES");
-        std::env::remove_var("MOCK_ERRORS");
-    }
 }
 
 /// TEST-03: Basic tool call via HTTP transport
 /// Verifies full roundtrip from client to mock HTTP server and back
 #[tokio::test]
 async fn test_http_basic_tool_call() {
-    // Configure mock server with echo tool BEFORE starting server
+    // Configure mock server with echo tool - passed directly to avoid race conditions
     let tools = vec![ToolDefinition {
         name: "echo".to_string(),
         description: "Echo back the input message".to_string(),
@@ -67,15 +60,10 @@ async fn test_http_basic_tool_call() {
         },
     );
 
-    // Set environment variables BEFORE starting server
-    let tools_json = serde_json::to_string(&tools).expect("Failed to serialize tools");
-    let responses_json = serde_json::to_string(&responses).expect("Failed to serialize responses");
-    unsafe {
-        std::env::set_var("MOCK_TOOLS", tools_json);
-        std::env::set_var("MOCK_RESPONSES", responses_json);
-    }
+    // Create config and pass directly to server (no env vars - avoids race conditions)
+    let config = MockServerConfig::from_parts(tools, responses, HashMap::new());
 
-    with_mock_server(|url| async move {
+    with_mock_server(config, |url| async move {
         // Create HTTP transport and client
         let transport = HttpTransport::new(&url, HashMap::new());
         let mut client = McpClient::new("test-http-server".to_string(), Box::new(transport));
@@ -108,8 +96,6 @@ async fn test_http_basic_tool_call() {
             result.get("isError").and_then(|e| e.as_bool()),
             Some(false)
         );
-
-        clear_mock_config();
     }).await;
 }
 
@@ -117,7 +103,7 @@ async fn test_http_basic_tool_call() {
 /// Verifies JSON arguments are serialized correctly over HTTP POST
 #[tokio::test]
 async fn test_http_tool_call_with_args() {
-    // Configure mock server with add and multiply tools BEFORE starting server
+    // Configure mock server with add and multiply tools - passed directly to avoid race conditions
     let tools = vec![
         ToolDefinition {
             name: "add".to_string(),
@@ -166,15 +152,10 @@ async fn test_http_tool_call_with_args() {
         },
     );
 
-    // Set environment variables BEFORE starting server
-    let tools_json = serde_json::to_string(&tools).expect("Failed to serialize tools");
-    let responses_json = serde_json::to_string(&responses).expect("Failed to serialize responses");
-    unsafe {
-        std::env::set_var("MOCK_TOOLS", tools_json);
-        std::env::set_var("MOCK_RESPONSES", responses_json);
-    }
+    // Create config and pass directly to server (no env vars - avoids race conditions)
+    let config = MockServerConfig::from_parts(tools, responses, HashMap::new());
 
-    with_mock_server(|url| async move {
+    with_mock_server(config, |url| async move {
         // Create HTTP transport and client
         let transport = HttpTransport::new(&url, HashMap::new());
         let mut client = McpClient::new("test-http-server".to_string(), Box::new(transport));
@@ -221,8 +202,6 @@ async fn test_http_tool_call_with_args() {
             .expect("Expected text");
         assert!(text.contains("3"), "Expected response to contain '3', got: {}", text);
         assert!(text.contains("5"), "Expected response to contain '5', got: {}", text);
-
-        clear_mock_config();
     }).await;
 }
 
@@ -230,7 +209,7 @@ async fn test_http_tool_call_with_args() {
 /// Verifies tools/list works correctly over HTTP
 #[tokio::test]
 async fn test_http_tools_list() {
-    // Configure mock server with multiple tools BEFORE starting server
+    // Configure mock server with multiple tools - passed directly to avoid race conditions
     let tools = vec![
         ToolDefinition {
             name: "echo".to_string(),
@@ -268,13 +247,10 @@ async fn test_http_tools_list() {
         },
     ];
 
-    // Set environment variables BEFORE starting server
-    let tools_json = serde_json::to_string(&tools).expect("Failed to serialize tools");
-    unsafe {
-        std::env::set_var("MOCK_TOOLS", tools_json);
-    }
+    // Create config and pass directly to server (no env vars - avoids race conditions)
+    let config = MockServerConfig::from_parts(tools, HashMap::new(), HashMap::new());
 
-    with_mock_server(|url| async move {
+    with_mock_server(config, |url| async move {
         // Create HTTP transport and client
         let transport = HttpTransport::new(&url, HashMap::new());
         let mut client = McpClient::new("test-http-server".to_string(), Box::new(transport));
@@ -297,8 +273,6 @@ async fn test_http_tools_list() {
         let echo_tool = tools_list.iter().find(|t| t.name == "echo").unwrap();
         assert!(echo_tool.description.is_some());
         assert!(!echo_tool.input_schema.as_object().unwrap().is_empty());
-
-        clear_mock_config();
     }).await;
 }
 
@@ -306,12 +280,10 @@ async fn test_http_tools_list() {
 /// Verifies MCP protocol initialization works over HTTP
 #[tokio::test]
 async fn test_http_initialize_handshake() {
-    // Clear any previous config and set minimal config
-    unsafe {
-        std::env::set_var("MOCK_TOOLS", "[]");
-    }
+    // Create config with empty tools and pass directly to server
+    let config = MockServerConfig::from_parts(vec![], HashMap::new(), HashMap::new());
 
-    with_mock_server(|url| async move {
+    with_mock_server(config, |url| async move {
         // Create HTTP transport
         let transport = HttpTransport::new(&url, HashMap::new());
         let mut client = McpClient::new("test-http-server".to_string(), Box::new(transport));
@@ -328,8 +300,6 @@ async fn test_http_initialize_handshake() {
             .list_tools()
             .await
             .expect("Should be able to list tools after initialization");
-
-        clear_mock_config();
     }).await;
 }
 
@@ -348,12 +318,10 @@ async fn test_http_transport_error_handling() {
         "Expected connection error for bad URL"
     );
 
-    // Test tool not found error via mock
-    unsafe {
-        std::env::set_var("MOCK_TOOLS", "[]");
-    }
+    // Test tool not found error via mock - create config with empty tools
+    let config = MockServerConfig::from_parts(vec![], HashMap::new(), HashMap::new());
 
-    with_mock_server(|url| async move {
+    with_mock_server(config, |url| async move {
         let transport = HttpTransport::new(&url, HashMap::new());
         let mut client = McpClient::new("test-http-server".to_string(), Box::new(transport));
 
@@ -371,8 +339,6 @@ async fn test_http_transport_error_handling() {
             result.is_err(),
             "Expected error for non-existent tool"
         );
-
-        clear_mock_config();
     }).await;
 }
 
@@ -380,11 +346,10 @@ async fn test_http_transport_error_handling() {
 /// Verifies custom HTTP headers are sent with requests
 #[tokio::test]
 async fn test_http_headers_passthrough() {
-    unsafe {
-        std::env::set_var("MOCK_TOOLS", "[]");
-    }
+    // Create config with empty tools
+    let config = MockServerConfig::from_parts(vec![], HashMap::new(), HashMap::new());
 
-    with_mock_server(|url| async move {
+    with_mock_server(config, |url| async move {
         // Create transport with custom headers
         let mut headers = HashMap::new();
         headers.insert("X-Custom-Header".to_string(), "test-value".to_string());
@@ -406,8 +371,6 @@ async fn test_http_headers_passthrough() {
             .list_tools()
             .await
             .expect("Should list tools with custom headers");
-
-        clear_mock_config();
     }).await;
 }
 
@@ -415,7 +378,7 @@ async fn test_http_headers_passthrough() {
 /// Verifies complex JSON arguments work correctly over HTTP
 #[tokio::test]
 async fn test_http_complex_nested_arguments() {
-    // Configure mock server with complex tool BEFORE starting server
+    // Configure mock server with complex tool - passed directly to avoid race conditions
     let tools = vec![ToolDefinition {
         name: "process".to_string(),
         description: "Process complex data".to_string(),
@@ -451,15 +414,10 @@ async fn test_http_complex_nested_arguments() {
         },
     );
 
-    // Set environment variables BEFORE starting server
-    let tools_json = serde_json::to_string(&tools).expect("Failed to serialize tools");
-    let responses_json = serde_json::to_string(&responses).expect("Failed to serialize responses");
-    unsafe {
-        std::env::set_var("MOCK_TOOLS", tools_json);
-        std::env::set_var("MOCK_RESPONSES", responses_json);
-    }
+    // Create config and pass directly to server (no env vars - avoids race conditions)
+    let config = MockServerConfig::from_parts(tools, responses, HashMap::new());
 
-    with_mock_server(|url| async move {
+    with_mock_server(config, |url| async move {
         // Create HTTP transport and client
         let transport = HttpTransport::new(&url, HashMap::new());
         let mut client = McpClient::new("test-http-server".to_string(), Box::new(transport));
@@ -494,7 +452,5 @@ async fn test_http_complex_nested_arguments() {
             result.get("isError").and_then(|e| e.as_bool()),
             Some(false)
         );
-
-        clear_mock_config();
     }).await;
 }
