@@ -8,14 +8,14 @@
 **Last session:** 2026-02-13
 **Stopped at:** v1.4 started - Test Coverage for Tool Execution
 **Resume file:** None
-**Plans completed:** 01-01 through 17-01 (66 plans complete)
+**Plans completed:** 01-01 through 17-03 (67 plans complete)
 **Plans ready:** Phase 17-02 through 17-05
 
 ## Current Position
 
 Phase: 17 of 19 (Tool Call Integration Tests)
-Plan: 17-02 complete (2/5 plans in phase)
-Status: Stdio transport tool call integration tests complete
+Plan: 17-03 complete (3/5 plans in phase)
+Status: HTTP transport tool call integration tests complete
 
 Progress: [█████████████░░░░░░░] 86% (67/78 planned, 3 milestones shipped)
 
@@ -44,6 +44,7 @@ Progress: [█████████████░░░░░░░] 86% (67
 - [2026-02-13] Phase 17-01 complete - Mock MCP servers created with stdio binary and HTTP helper
 - [2026-02-13] Phase 17-02 complete - Stdio transport tool call tests with 4 happy path and 7 error handling tests
 - [2026-02-13] Fixed JSON-RPC error handling in McpClient::call_tool() - now properly propagates server errors
+- [2026-02-13] Phase 17-03 complete - HTTP transport tool call tests (7 tests) with in-process mock server, fixed port binding issue
 
 **Issues:**
 - None
@@ -60,6 +61,10 @@ Progress: [█████████████░░░░░░░] 86% (67
   - tests/tool_call_stdio_tests.rs: 4 tests, 510 lines
   - tests/tool_call_error_tests.rs: 7 tests, 621 lines
   - Fixed JSON-RPC error handling in client
+- Phase 17-03: HTTP transport tool call integration tests
+  - tests/tool_call_http_tests.rs: 7 tests, 500 lines
+  - Fixed MockHttpServer port binding (use TcpListener directly)
+  - Added hyper 0.14 as dev-dependency
 - v1.4: Requirements defined - Test Coverage for Tool Execution (17 tests)
 
 ## Current Position
@@ -318,7 +323,7 @@ Progress: [██████████████████] 100% (65/65 p
 | Phase 14: Duplication Elimination | ✅ Complete | 100% (5/5 plans) | Transport consolidated (DUP-05), Model+Formatter architecture (DUP-01/02), connection interfaces deduplicated (DUP-03/04), 918 lines removed, all tests pass |
 | Phase 15: Documentation & API | ✅ Complete | 100% (4/4 plans) | DOC-01 complete: cargo doc warnings fixed, DOC-02 complete: public API surface reduced (16 lines), DOC-04/05 complete: module docs and public API documented, final verification passed |
 | Phase 16: Code Quality Sweep | ✅ Complete | 100% (4/4 plans) | 19 unwrap() replaced, 2 dead_code attrs removed, thiserror/anyhow verified, 9,568 lines, zero clippy warnings |
-| Phase 17: Tool Call Integration Tests | 🚧 IN PROGRESS | 40% (2/5 plans) | Mock servers complete, stdio transport tests complete (11 tests), HTTP tests pending |
+| Phase 17: Tool Call Integration Tests | 🚧 IN PROGRESS | 60% (3/5 plans) | Mock servers complete, stdio tests (11), HTTP tests (7) complete, 18 total tests passing |
 
 ## Milestone Readiness
 
