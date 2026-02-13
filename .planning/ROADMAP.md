@@ -165,6 +165,12 @@ Project follows a solo developer + Claude workflow with no team coordination art
   5. Connection cleanup test passes
 **Plans**: 2 plans in 2 waves
 
+**Plan Details:**
+- [ ] 18-01-PLAN.md — Add retry logic tests (exponential backoff, max limit, delay timing) (Wave 1)
+- [ ] 18-02-PLAN.md — Add daemon IPC tests (roundtrip, concurrent calls, cleanup) (Wave 2)
+
+**Status**: Planned — 2/2 plans ready for execution
+
 ### Phase 19: Error Paths and Regression Tests
 **Goal**: Add error handling tests and prevent regressions
 **Depends on**: Phase 18
@@ -201,6 +207,7 @@ Project follows a solo developer + Claude workflow with no team coordination art
 | 15 | Documentation & API | Complete | 100% |
 | 16 | Code Quality Sweep | Complete | 100% |
 | 17 | Tool Call Integration Tests | Complete | 100% |
+| 18 | Retry and IPC Tests | Planned | 0% |
 
 **Progress Summary:**
 - **Phases completed:** 17/19
@@ -213,7 +220,7 @@ Project follows a solo developer + Claude workflow with no team coordination art
 
 ---
 
-**Last updated:** 2026-02-13 (Phase 17 complete: Tool Call Integration Tests — 24 tests passing, HTTP flakiness fixed)
+**Last updated:** 2026-02-13 (Phase 18 planned: Retry and IPC Tests — 2 plans ready for execution)
 
 ### Phase 12: Test Infrastructure
 **Goal**: Eliminate test duplication and create reusable test helpers foundation
