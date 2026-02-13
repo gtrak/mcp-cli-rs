@@ -144,7 +144,8 @@ impl<T: Clone + IpcClient> IpcClientWrapper<T> {
 
 /// Trait for protocol-specific client methods
 ///
-/// This trait wraps the IpcClient trait to provide protocol methods as a trait object
+/// This trait wraps the IpcClient trait to provide protocol methods as a trait object.
+/// Implementation delegates to IpcClientWrapper inherent methods to avoid duplication.
 #[async_trait]
 pub trait ProtocolClient: Send + Sync {
     fn config(&self) -> Arc<Config>;
@@ -180,37 +181,16 @@ impl<T: IpcClient + Send + Sync + Clone> ProtocolClient for IpcClientWrapper<T> 
     }
 
     async fn list_servers(&mut self) -> Result<Vec<String>, McpError> {
-        let response = self
-            .client
-            .send_request(&crate::daemon::protocol::DaemonRequest::ListServers)
-            .await?;
-        match response {
-            crate::daemon::protocol::DaemonResponse::ServerList(servers) => Ok(servers),
-            _ => Err(crate::error::McpError::InvalidProtocol {
-                message: format!("Expected ServerList response, got {:?}", response),
-            }),
-        }
+        // Delegate to inherent method to avoid duplication
+        IpcClientWrapper::list_servers(self).await
     }
 
     async fn list_tools(
         &mut self,
         server_name: &str,
     ) -> Result<Vec<crate::daemon::protocol::ToolInfo>, McpError> {
-        let response = self
-            .client
-            .send_request(&crate::daemon::protocol::DaemonRequest::ListTools {
-                server_name: server_name.to_string(),
-            })
-            .await?;
-        match response {
-            crate::daemon::protocol::DaemonResponse::ToolList(tools) => Ok(tools),
-            _ => Err(crate::error::McpError::InvalidProtocol {
-                message: format!(
-                    "Expected ToolList response for '{}', got {:?}",
-                    server_name, response
-                ),
-            }),
-        }
+        // Delegate to inherent method to avoid duplication
+        IpcClientWrapper::list_tools(self, server_name).await
     }
 
     async fn execute_tool(
@@ -219,23 +199,8 @@ impl<T: IpcClient + Send + Sync + Clone> ProtocolClient for IpcClientWrapper<T> 
         tool_name: &str,
         arguments: serde_json::Value,
     ) -> Result<serde_json::Value, McpError> {
-        let response = self
-            .client
-            .send_request(&crate::daemon::protocol::DaemonRequest::ExecuteTool {
-                server_name: server_name.to_string(),
-                tool_name: tool_name.to_string(),
-                arguments,
-            })
-            .await?;
-        match response {
-            crate::daemon::protocol::DaemonResponse::ToolResult(result) => Ok(result),
-            _ => Err(crate::error::McpError::InvalidProtocol {
-                message: format!(
-                    "Expected ToolResult for '{}.{}', got {:?}",
-                    server_name, tool_name, response
-                ),
-            }),
-        }
+        // Delegate to inherent method to avoid duplication
+        IpcClientWrapper::execute_tool(self, server_name, tool_name, arguments).await
     }
 
     async fn shutdown(&mut self) -> Result<(), McpError> {
@@ -317,7 +282,7 @@ pub fn get_socket_path() -> PathBuf {
     cwd.hash(&mut hasher);
     let hash = hasher.finish();
 
-    PathBuf::from(format!(r"\\.\pipe\mcp-cli-daemon-{:x}", hash))
+    PathBuf::from(format!(r"\.\pipe\mcp-cli-daemon-{:x}", hash))
 }
 /// Re-export platform-specific implementations
 #[cfg(unix)]
