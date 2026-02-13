@@ -106,7 +106,9 @@ impl MockServerConfig {
     pub fn apply(&self) {
         let env = self.to_env();
         for (key, value) in env {
-            std::env::set_var(key, value);
+            unsafe {
+                std::env::set_var(key, value);
+            }
         }
     }
 }

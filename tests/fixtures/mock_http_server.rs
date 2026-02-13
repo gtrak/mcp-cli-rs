@@ -207,8 +207,10 @@ impl MockHttpServer {
             }
         });
 
-        // Create server with shutdown signal
-        let server = Server::bind(&bound_addr).serve(make_svc);
+        // Create server from existing TcpListener
+        let server = Server::from_tcp(listener.into_std().expect("Failed to convert listener"))
+            .expect("Failed to create server from listener")
+            .serve(make_svc);
         let graceful = server.with_graceful_shutdown(async {
             let _ = shutdown_rx.await;
         });
@@ -219,6 +221,9 @@ impl MockHttpServer {
                 eprintln!("Server error: {}", e);
             }
         });
+
+        // Give the server a moment to start
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
         let url = format!("http://{}", bound_addr);
 
