@@ -11,7 +11,7 @@
 //! independently of data collection.
 
 use crate::cli::models::*;
-use crate::format::{extract_params_from_schema, format_param_list, DetailLevel};
+use crate::format::{extract_params_from_schema, format_param_list, DetailLevel, OutputMode};
 use crate::output::print_json;
 use colored::Colorize;
 
@@ -798,25 +798,7 @@ fn format_search_results_human(model: &SearchResultModel, detail_level: DetailLe
     }
 }
 
-/// Output mode for formatters.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OutputMode {
-    /// Human-readable output with colors
-    Human,
-    /// Machine-readable JSON output
-    Json,
-}
 
-impl OutputMode {
-    /// Create output mode from boolean JSON flag.
-    pub fn from_json_flag(json: bool) -> Self {
-        if json {
-            OutputMode::Json
-        } else {
-            OutputMode::Human
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

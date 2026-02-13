@@ -38,5 +38,5 @@ pub use daemon_lifecycle::{
     create_direct_client, create_auto_daemon_client, create_require_daemon_client,
 };
 pub use info::{cmd_server_info, cmd_tool_info};
-pub use list::{cmd_list_servers, cmd_list_servers_json};
+pub use list::cmd_list_servers;
 pub use search::cmd_search_tools;

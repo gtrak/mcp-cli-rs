@@ -7,7 +7,7 @@
 // Re-export all command functions from specialized modules
 pub use crate::cli::call::cmd_call_tool;
 pub use crate::cli::info::{cmd_server_info, cmd_tool_info, parse_tool_id};
-pub use crate::cli::list::{cmd_list_servers, cmd_list_servers_json};
+pub use crate::cli::list::cmd_list_servers;
 pub use crate::cli::search::cmd_search_tools;
 
 // Re-export DetailLevel for convenience
