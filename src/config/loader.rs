@@ -2,9 +2,9 @@
 //!
 //! This module provides functions for loading and discovering MCP configuration files.
 
+use crate::config::Config;
 use crate::config::parser::parse_toml;
 use crate::config::validator::validate_config;
-use crate::config::Config;
 use crate::error::McpError;
 use std::path::Path;
 use tokio::fs;

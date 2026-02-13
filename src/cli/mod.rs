@@ -4,8 +4,8 @@
 //! for the MCP CLI application.
 
 pub mod call;
-pub mod commands;
 pub mod command_router;
+pub mod commands;
 pub mod config_setup;
 pub mod daemon;
 pub mod daemon_lifecycle;
@@ -21,7 +21,7 @@ pub mod search;
 pub use entry::{Cli, init_tracing, main as entry_main};
 
 // Re-export from command_router
-pub use command_router::{Commands, dispatch_command, execute_command, get_run_mode, RunMode};
+pub use command_router::{Commands, RunMode, dispatch_command, execute_command, get_run_mode};
 
 // Re-export DetailLevel from format module
 pub use crate::format::DetailLevel;
@@ -34,8 +34,8 @@ pub use commands::{
     cmd_tool_info as old_cmd_tool_info, parse_tool_id,
 };
 pub use daemon_lifecycle::{
-    connect_or_spawn_daemon, connect_to_daemon, DirectProtocolClient,
-    create_direct_client, create_auto_daemon_client, create_require_daemon_client,
+    DirectProtocolClient, connect_or_spawn_daemon, connect_to_daemon, create_auto_daemon_client,
+    create_direct_client, create_require_daemon_client,
 };
 pub use info::{cmd_server_info, cmd_tool_info};
 pub use list::cmd_list_servers;

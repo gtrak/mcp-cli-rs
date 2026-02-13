@@ -1,11 +1,11 @@
 //! Show server and tool information command implementation.
 
-use crate::cli::models::{ParameterModel, ServerInfoModel, ToolInfoModel};
 use crate::cli::DetailLevel;
+use crate::cli::formatters;
+use crate::cli::models::{ParameterModel, ServerInfoModel, ToolInfoModel};
 use crate::config::ServerTransport;
 use crate::error::{McpError, Result};
-use crate::format::{extract_params_from_schema, OutputMode};
-use crate::cli::formatters;
+use crate::format::{OutputMode, extract_params_from_schema};
 use crate::ipc::ProtocolClient;
 use crate::output::print_error;
 

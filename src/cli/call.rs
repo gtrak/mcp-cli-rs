@@ -1,12 +1,12 @@
 //! Execute tool command implementation.
 
+use crate::cli::formatters;
 use crate::cli::models::CallResultModel;
 use crate::error::{McpError, Result};
 use crate::format::OutputMode;
-use crate::cli::formatters;
 use crate::ipc::ProtocolClient;
 use crate::output::print_error;
-use crate::retry::{retry_with_backoff, RetryConfig};
+use crate::retry::{RetryConfig, retry_with_backoff};
 use futures_util::FutureExt;
 use std::io::{self, IsTerminal, Read};
 use std::sync::Arc;
@@ -156,53 +156,51 @@ pub async fn cmd_call_tool(
                 retries: 0, // Retry count not tracked by current retry implementation
             }
         }
-        Err(McpError::MaxRetriesExceeded { attempts }) => {
-            CallResultModel {
-                server_name: server_name.clone(),
-                tool_name: tool_name.clone(),
-                success: false,
-                result: None,
-                error: Some(format!(
-                    "Tool execution failed after {} retry attempts",
-                    attempts
-                )),
-                execution_time_ms: Some(execution_time_ms),
-                retries: attempts,
-            }
-        }
-        Err(McpError::OperationCancelled { timeout }) => {
-            CallResultModel {
-                server_name: server_name.clone(),
-                tool_name: tool_name.clone(),
-                success: false,
-                result: None,
-                error: Some(format!(
-                    "Tool execution cancelled after {}s timeout",
-                    timeout
-                )),
-                execution_time_ms: Some(execution_time_ms),
-                retries: 0,
-            }
-        }
-        Err(e) => {
-            CallResultModel {
-                server_name: server_name.clone(),
-                tool_name: tool_name.clone(),
-                success: false,
-                result: None,
-                error: Some(format!("Tool execution failed: {}", e)),
-                execution_time_ms: Some(execution_time_ms),
-                retries: 0,
-            }
-        }
+        Err(McpError::MaxRetriesExceeded { attempts }) => CallResultModel {
+            server_name: server_name.clone(),
+            tool_name: tool_name.clone(),
+            success: false,
+            result: None,
+            error: Some(format!(
+                "Tool execution failed after {} retry attempts",
+                attempts
+            )),
+            execution_time_ms: Some(execution_time_ms),
+            retries: attempts,
+        },
+        Err(McpError::OperationCancelled { timeout }) => CallResultModel {
+            server_name: server_name.clone(),
+            tool_name: tool_name.clone(),
+            success: false,
+            result: None,
+            error: Some(format!(
+                "Tool execution cancelled after {}s timeout",
+                timeout
+            )),
+            execution_time_ms: Some(execution_time_ms),
+            retries: 0,
+        },
+        Err(e) => CallResultModel {
+            server_name: server_name.clone(),
+            tool_name: tool_name.clone(),
+            success: false,
+            result: None,
+            error: Some(format!("Tool execution failed: {}", e)),
+            execution_time_ms: Some(execution_time_ms),
+            retries: 0,
+        },
     };
 
     formatters::format_call_result(&model, output_mode);
 
     // Return appropriate error if execution failed
-    if !model.success && let Some(ref err) = model.error {
+    if !model.success
+        && let Some(ref err) = model.error
+    {
         if err.contains("retry attempts") {
-            return Err(McpError::MaxRetriesExceeded { attempts: model.retries });
+            return Err(McpError::MaxRetriesExceeded {
+                attempts: model.retries,
+            });
         } else if err.contains("timeout") {
             // Extract timeout value from error message
             return Err(McpError::OperationCancelled { timeout: 30 }); // Default timeout

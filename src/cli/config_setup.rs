@@ -3,8 +3,8 @@
 //! Provides functions for loading and validating configuration
 //! at application startup.
 
-use crate::config::loader::{find_and_load, load_config};
 use crate::config::Config;
+use crate::config::loader::{find_and_load, load_config};
 use crate::error::Result;
 use std::path::PathBuf;
 
@@ -94,7 +94,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_setup_config_for_daemon_returns_result() {
-        // Verify the function returns a Result type  
+        // Verify the function returns a Result type
         let result = setup_config_for_daemon(None).await;
         // Should always succeed since it returns default on failure
         assert!(result.is_ok());

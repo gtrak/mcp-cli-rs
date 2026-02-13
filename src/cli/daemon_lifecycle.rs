@@ -5,7 +5,7 @@
 
 use crate::config::Config;
 use crate::error::{McpError, Result};
-use crate::ipc::{create_ipc_client, ProtocolClient};
+use crate::ipc::{ProtocolClient, create_ipc_client};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -20,11 +20,8 @@ use std::time::Duration;
 /// # Returns
 /// * `Ok(Box<dyn ProtocolClient>)` - Direct client
 /// * `Err(McpError)` - Error
-pub async fn create_direct_client(
-    config: Arc<Config>,
-) -> Result<Box<dyn ProtocolClient>> {
-    let direct_client =
-        Box::new(DirectProtocolClient::new(config)) as Box<dyn ProtocolClient>;
+pub async fn create_direct_client(config: Arc<Config>) -> Result<Box<dyn ProtocolClient>> {
+    let direct_client = Box::new(DirectProtocolClient::new(config)) as Box<dyn ProtocolClient>;
     Ok(direct_client)
 }
 
@@ -38,9 +35,7 @@ pub async fn create_direct_client(
 /// # Returns
 /// * `Ok(Box<dyn ProtocolClient>)` - Connected client
 /// * `Err(McpError)` - Daemon connection or spawning error
-pub async fn create_auto_daemon_client(
-    config: &Config,
-) -> Result<Box<dyn ProtocolClient>> {
+pub async fn create_auto_daemon_client(config: &Config) -> Result<Box<dyn ProtocolClient>> {
     connect_or_spawn_daemon(config).await
 }
 
@@ -54,9 +49,7 @@ pub async fn create_auto_daemon_client(
 /// # Returns
 /// * `Ok(Box<dyn ProtocolClient>)` - Connected client
 /// * `Err(McpError)` - Daemon not running error
-pub async fn create_require_daemon_client(
-    config: &Config,
-) -> Result<Box<dyn ProtocolClient>> {
+pub async fn create_require_daemon_client(config: &Config) -> Result<Box<dyn ProtocolClient>> {
     connect_to_daemon(config).await
 }
 
@@ -173,9 +166,7 @@ pub async fn connect_to_daemon(config: &Config) -> Result<Box<dyn ProtocolClient
     }
 }
 
-async fn try_connect_to_daemon(
-    config: &Config,
-) -> Result<Box<dyn ProtocolClient>> {
+async fn try_connect_to_daemon(config: &Config) -> Result<Box<dyn ProtocolClient>> {
     let client = create_ipc_client(config)?;
 
     // Actually verify the connection works by sending a ping
@@ -186,19 +177,15 @@ async fn try_connect_to_daemon(
     }
 }
 
-async fn spawn_background_daemon(
-    ttl: u64,
-    socket_path: &Path,
-) -> Result<()> {
+async fn spawn_background_daemon(ttl: u64, socket_path: &Path) -> Result<()> {
     // Spawn the daemon as a separate process using the binary itself
     // This is necessary because the daemon runs an IPC server that needs
     // to be independent of the client process
 
     // Get the current executable path
-    let current_exe =
-        std::env::current_exe().map_err(|e| McpError::IOError {
-            source: std::io::Error::other(format!("Failed to get executable path: {}", e)),
-        })?;
+    let current_exe = std::env::current_exe().map_err(|e| McpError::IOError {
+        source: std::io::Error::other(format!("Failed to get executable path: {}", e)),
+    })?;
 
     // Build arguments for daemon subcommand - pass socket path explicitly
     // to ensure daemon uses the same IPC endpoint as the client expects
@@ -220,10 +207,9 @@ async fn spawn_background_daemon(
     tracing::debug!("Spawning daemon: {:?} with args: {:?}", current_exe, args);
 
     // Get current working directory so daemon can find config
-    let current_dir =
-        std::env::current_dir().map_err(|e| McpError::IOError {
-            source: std::io::Error::other(format!("Failed to get current directory: {}", e)),
-        })?;
+    let current_dir = std::env::current_dir().map_err(|e| McpError::IOError {
+        source: std::io::Error::other(format!("Failed to get current directory: {}", e)),
+    })?;
 
     // On Windows, we need to use a different approach to spawn a truly independent process
     // Using CREATE_NEW_PROCESS_GROUP and CREATE_NO_WINDOW flags
@@ -242,11 +228,9 @@ async fn spawn_background_daemon(
             .stderr(std::process::Stdio::null())
             .creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW);
 
-        let _child = cmd
-            .spawn()
-            .map_err(|e| McpError::IOError {
-                source: std::io::Error::other(format!("Failed to spawn daemon: {}", e)),
-            })?;
+        let _child = cmd.spawn().map_err(|e| McpError::IOError {
+            source: std::io::Error::other(format!("Failed to spawn daemon: {}", e)),
+        })?;
 
         tracing::debug!("Daemon spawned with PID: {:?}", _child.id());
     }
@@ -317,11 +301,12 @@ impl ProtocolClient for DirectProtocolClient {
         server_name: &str,
     ) -> Result<Vec<crate::daemon::protocol::ToolInfo>> {
         // Get server config and create transport directly
-        let server_config = self.config.get_server(server_name).ok_or_else(|| {
-            McpError::ServerNotFound {
-                server: server_name.to_string(),
-            }
-        })?;
+        let server_config =
+            self.config
+                .get_server(server_name)
+                .ok_or_else(|| McpError::ServerNotFound {
+                    server: server_name.to_string(),
+                })?;
 
         let mut transport = server_config.create_transport(server_name)?;
 
@@ -361,11 +346,12 @@ impl ProtocolClient for DirectProtocolClient {
         });
 
         // Send request and get response
-        let response = transport.send(mcp_request).await.map_err(|e| {
-            McpError::IOError {
+        let response = transport
+            .send(mcp_request)
+            .await
+            .map_err(|e| McpError::IOError {
                 source: std::io::Error::other(e),
-            }
-        })?;
+            })?;
 
         // Parse response
         if let Some(result) = response.get("result") {
@@ -404,11 +390,12 @@ impl ProtocolClient for DirectProtocolClient {
         arguments: serde_json::Value,
     ) -> Result<serde_json::Value> {
         // Get server config and create transport directly
-        let server_config = self.config.get_server(server_name).ok_or_else(|| {
-            McpError::ServerNotFound {
-                server: server_name.to_string(),
-            }
-        })?;
+        let server_config =
+            self.config
+                .get_server(server_name)
+                .ok_or_else(|| McpError::ServerNotFound {
+                    server: server_name.to_string(),
+                })?;
 
         let mut transport = server_config.create_transport(server_name)?;
 
@@ -452,11 +439,12 @@ impl ProtocolClient for DirectProtocolClient {
         });
 
         // Send request and get response
-        let response = transport.send(mcp_request).await.map_err(|e| {
-            McpError::IOError {
+        let response = transport
+            .send(mcp_request)
+            .await
+            .map_err(|e| McpError::IOError {
                 source: std::io::Error::other(e),
-            }
-        })?;
+            })?;
 
         // Parse response
         if let Some(result) = response.get("result") {

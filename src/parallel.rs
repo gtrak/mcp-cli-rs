@@ -153,7 +153,10 @@ where
 
             async move {
                 // Acquire permit before starting operation (prevents resource exhaustion)
-                let _permit = semaphore.acquire().await.expect("Failed to acquire semaphore permit - semaphore should not be closed");
+                let _permit = semaphore
+                    .acquire()
+                    .await
+                    .expect("Failed to acquire semaphore permit - semaphore should not be closed");
 
                 // Execute the list function for this server
                 match list_fn(server_name.clone()).await {

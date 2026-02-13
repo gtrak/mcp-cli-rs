@@ -1,14 +1,14 @@
 //! List servers and tools command implementation.
 
-use crate::cli::models::{ListServersModel, ServerModel, ToolModel};
 use crate::cli::DetailLevel;
+use crate::cli::formatters;
+use crate::cli::models::{ListServersModel, ServerModel, ToolModel};
 use crate::client::ToolInfo;
 use crate::error::Result;
 use crate::format::OutputMode;
-use crate::cli::formatters;
 use crate::ipc::ProtocolClient;
 use crate::output::print_error;
-use crate::parallel::{list_tools_parallel, ParallelExecutor};
+use crate::parallel::{ParallelExecutor, list_tools_parallel};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -42,9 +42,7 @@ pub async fn cmd_list_servers(
 ///
 /// This function handles all the data collection, building a model that
 /// can be formatted for either human or JSON output.
-async fn query_list_servers(
-    mut daemon: Box<dyn ProtocolClient>,
-) -> Result<ListServersModel> {
+async fn query_list_servers(mut daemon: Box<dyn ProtocolClient>) -> Result<ListServersModel> {
     let config = daemon.config();
 
     // Handle empty config - return empty model
@@ -183,24 +181,20 @@ mod tests {
     #[test]
     fn test_list_servers_model_building() {
         let model = ListServersModel {
-            servers: vec![
-                ServerModel {
-                    name: "test-server".to_string(),
-                    status: "connected".to_string(),
-                    transport_type: Some("stdio".to_string()),
-                    description: Some("Test server".to_string()),
-                    tool_count: 2,
-                    tools: vec![
-                        ToolModel {
-                            name: "tool1".to_string(),
-                            description: Some("Tool 1".to_string()),
-                            input_schema: serde_json::json!({}),
-                        },
-                    ],
-                    error: None,
-                    has_filtered_tools: false,
-                },
-            ],
+            servers: vec![ServerModel {
+                name: "test-server".to_string(),
+                status: "connected".to_string(),
+                transport_type: Some("stdio".to_string()),
+                description: Some("Test server".to_string()),
+                tool_count: 2,
+                tools: vec![ToolModel {
+                    name: "tool1".to_string(),
+                    description: Some("Tool 1".to_string()),
+                    input_schema: serde_json::json!({}),
+                }],
+                error: None,
+                has_filtered_tools: false,
+            }],
             total_servers: 1,
             connected_servers: 1,
             failed_servers: 0,

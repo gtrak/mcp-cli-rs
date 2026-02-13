@@ -53,7 +53,10 @@ impl ConnectionPool {
     /// Take a connection from the pool for use
     pub async fn take(&self, server_name: &str) -> Result<Option<PooledConnection>> {
         tracing::debug!("take() called for server: {}", server_name);
-        let mut connections = self.connections.lock().expect("Failed to acquire connection pool lock");
+        let mut connections = self
+            .connections
+            .lock()
+            .expect("Failed to acquire connection pool lock");
         tracing::debug!("Got lock, checking for existing connection");
 
         if let Some(mut conn) = connections.remove(server_name) {
@@ -85,7 +88,10 @@ impl ConnectionPool {
     /// Return a connection to the pool
     pub fn put_back(&self, conn: PooledConnection) {
         let server_name = conn.server_name.clone();
-        let mut connections = self.connections.lock().expect("Failed to acquire connection pool lock");
+        let mut connections = self
+            .connections
+            .lock()
+            .expect("Failed to acquire connection pool lock");
         connections.insert(server_name, conn);
         tracing::debug!("Returned connection to pool");
     }
@@ -110,18 +116,24 @@ impl ConnectionPool {
             }
         });
 
-        transport.send(init_request).await.map_err(|e| McpError::InvalidProtocol {
-            message: format!("Initialize request failed: {}", e),
-        })?;
+        transport
+            .send(init_request)
+            .await
+            .map_err(|e| McpError::InvalidProtocol {
+                message: format!("Initialize request failed: {}", e),
+            })?;
 
         let initialized_notification = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "notifications/initialized"
         });
 
-        transport.send_notification(initialized_notification).await.map_err(|e| McpError::InvalidProtocol {
-            message: format!("Failed to send initialized notification: {}", e),
-        })?;
+        transport
+            .send_notification(initialized_notification)
+            .await
+            .map_err(|e| McpError::InvalidProtocol {
+                message: format!("Failed to send initialized notification: {}", e),
+            })?;
 
         Ok(())
     }
@@ -283,12 +295,18 @@ impl ConnectionPool {
     }
 
     pub fn clear(&self) {
-        let mut connections = self.connections.lock().expect("Failed to acquire connection pool lock");
+        let mut connections = self
+            .connections
+            .lock()
+            .expect("Failed to acquire connection pool lock");
         connections.clear();
     }
 
     pub fn count(&self) -> usize {
-        self.connections.lock().expect("Failed to acquire connection pool lock").len()
+        self.connections
+            .lock()
+            .expect("Failed to acquire connection pool lock")
+            .len()
     }
 }
 
@@ -313,7 +331,10 @@ impl ConnectionPoolInterface for ConnectionPool {
     }
 
     fn remove(&self, server_name: &str) {
-        let mut connections = self.connections.lock().expect("Failed to acquire connection pool lock");
+        let mut connections = self
+            .connections
+            .lock()
+            .expect("Failed to acquire connection pool lock");
         connections.remove(server_name);
     }
 

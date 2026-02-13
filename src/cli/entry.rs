@@ -4,9 +4,9 @@
 //! the Cli struct definition, main function, and initialization.
 
 use crate::cli::command_router::{Commands, execute_command};
-use crate::cli::config_setup::{setup_config, setup_config_optional, setup_config_for_daemon};
+use crate::cli::config_setup::{setup_config, setup_config_for_daemon, setup_config_optional};
 use crate::cli::daemon_lifecycle::{
-    create_direct_client, create_auto_daemon_client, create_require_daemon_client,
+    create_auto_daemon_client, create_direct_client, create_require_daemon_client,
 };
 use crate::config::Config;
 use crate::error::{McpError, Result};
@@ -143,11 +143,8 @@ async fn run(cli: Cli) -> Result<()> {
         .await?
     } else {
         // Auto-daemon mode (default): spawn if needed, use TTL
-        run_with_graceful_shutdown(
-            || run_auto_daemon_mode(&cli, &daemon_config),
-            shutdown_rx,
-        )
-        .await?
+        run_with_graceful_shutdown(|| run_auto_daemon_mode(&cli, &daemon_config), shutdown_rx)
+            .await?
     };
 
     Ok(())

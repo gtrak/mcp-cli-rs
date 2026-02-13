@@ -11,7 +11,7 @@
 //! independently of data collection.
 
 use crate::cli::models::*;
-use crate::format::{extract_params_from_schema, format_param_list, DetailLevel, OutputMode};
+use crate::format::{DetailLevel, OutputMode, extract_params_from_schema, format_param_list};
 use crate::output::print_json;
 use colored::Colorize;
 
@@ -493,7 +493,9 @@ fn format_call_result_human(model: &CallResultModel) {
         // Format successful result
         if let Some(ref result) = model.result {
             if result.is_object() {
-                let result_obj = result.as_object().expect("Result should be an object after is_object check");
+                let result_obj = result
+                    .as_object()
+                    .expect("Result should be an object after is_object check");
 
                 // Check if result indicates an error
                 if let Some(error) = result_obj.get("error") {
@@ -797,8 +799,6 @@ fn format_search_results_human(model: &SearchResultModel, detail_level: DetailLe
         );
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

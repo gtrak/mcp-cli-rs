@@ -3,14 +3,14 @@
 //! Handles the main command dispatch logic, routing each CLI subcommand
 //! to its appropriate handler.
 
+use crate::cli::DetailLevel;
+use crate::cli::call::cmd_call_tool;
+use crate::cli::daemon_lifecycle::{
+    create_auto_daemon_client, create_direct_client, create_require_daemon_client,
+};
 use crate::cli::info::{cmd_server_info, cmd_tool_info};
 use crate::cli::list::cmd_list_servers;
 use crate::cli::search::cmd_search_tools;
-use crate::cli::call::cmd_call_tool;
-use crate::cli::DetailLevel;
-use crate::cli::daemon_lifecycle::{
-    create_auto_daemon_client, create_require_daemon_client, create_direct_client,
-};
 use crate::config::Config;
 use crate::error::Result;
 use crate::format::OutputMode;
@@ -185,15 +185,12 @@ pub async fn execute_command(
 /// Run command in direct mode (no daemon).
 ///
 /// Creates a direct client and executes the command.
-pub async fn run_command_direct(
-    command: Option<Commands>,
-    config: Arc<Config>,
-) -> Result<()> {
+pub async fn run_command_direct(command: Option<Commands>, config: Arc<Config>) -> Result<()> {
     let output_mode = OutputMode::Human;
-    
+
     // Create direct client
     let client = create_direct_client(config).await?;
-    
+
     // Execute command
     execute_command(command, client, output_mode).await
 }
@@ -201,15 +198,12 @@ pub async fn run_command_direct(
 /// Run command in auto-daemon mode (spawn if needed).
 ///
 /// Creates or connects to a daemon and executes the command.
-pub async fn run_command_auto_daemon(
-    command: Option<Commands>,
-    config: &Config,
-) -> Result<()> {
+pub async fn run_command_auto_daemon(command: Option<Commands>, config: &Config) -> Result<()> {
     let output_mode = OutputMode::Human;
-    
+
     // Get or spawn daemon client
     let client = create_auto_daemon_client(config).await?;
-    
+
     // Execute command
     execute_command(command, client, output_mode).await
 }
@@ -217,15 +211,12 @@ pub async fn run_command_auto_daemon(
 /// Run command in require-daemon mode (fail if not running).
 ///
 /// Connects to an existing daemon and executes the command.
-pub async fn run_command_require_daemon(
-    command: Option<Commands>,
-    config: &Config,
-) -> Result<()> {
+pub async fn run_command_require_daemon(command: Option<Commands>, config: &Config) -> Result<()> {
     let output_mode = OutputMode::Human;
-    
+
     // Try to connect to daemon
     let client = create_require_daemon_client(config).await?;
-    
+
     // Execute command
     execute_command(command, client, output_mode).await
 }
@@ -292,7 +283,9 @@ mod tests {
             describe: false,
             verbose: false,
         };
-        let _ = Commands::Info { name: "test".to_string() };
+        let _ = Commands::Info {
+            name: "test".to_string(),
+        };
         let _ = Commands::Tool {
             tool: "test".to_string(),
             describe: false,

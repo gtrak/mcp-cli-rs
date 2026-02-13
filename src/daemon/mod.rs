@@ -257,7 +257,8 @@ fn config_fingerprint(config: &Config) -> String {
     use sha2::{Digest, Sha256};
 
     // Serialize config to JSON
-    let json = serde_json::to_string(config).expect("Failed to serialize config for fingerprinting");
+    let json =
+        serde_json::to_string(config).expect("Failed to serialize config for fingerprinting");
     let mut hasher = Sha256::new();
     hasher.update(json.as_bytes());
     let result = hasher.finalize();

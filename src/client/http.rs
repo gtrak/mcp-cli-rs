@@ -117,8 +117,11 @@ impl Transport for HttpTransport {
         let mut headers = HeaderMap::new();
         for (key, value) in &self.headers {
             headers.insert(
-                key.parse::<HeaderName>().expect("Invalid header name - should be validated on construction"),
-                value.parse::<HeaderValue>().expect("Invalid header value - should be validated on construction"),
+                key.parse::<HeaderName>()
+                    .expect("Invalid header name - should be validated on construction"),
+                value
+                    .parse::<HeaderValue>()
+                    .expect("Invalid header value - should be validated on construction"),
             );
         }
 
@@ -169,8 +172,11 @@ impl Transport for HttpTransport {
         let mut headers = HeaderMap::new();
         for (key, value) in &self.headers {
             headers.insert(
-                key.parse::<HeaderName>().expect("Invalid header name - should be validated on construction"),
-                value.parse::<HeaderValue>().expect("Invalid header value - should be validated on construction"),
+                key.parse::<HeaderName>()
+                    .expect("Invalid header name - should be validated on construction"),
+                value
+                    .parse::<HeaderValue>()
+                    .expect("Invalid header value - should be validated on construction"),
             );
         }
 

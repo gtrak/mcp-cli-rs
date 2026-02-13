@@ -1,14 +1,14 @@
 //! Search tools by name pattern command implementation.
 
-use crate::cli::models::{SearchMatchModel, SearchResultModel};
 use crate::cli::DetailLevel;
+use crate::cli::formatters;
+use crate::cli::models::{SearchMatchModel, SearchResultModel};
 use crate::client::ToolInfo;
 use crate::error::Result;
 use crate::format::OutputMode;
-use crate::cli::formatters;
 use crate::ipc::ProtocolClient;
 use crate::output::{print_error, print_warning};
-use crate::parallel::{list_tools_parallel, ParallelExecutor};
+use crate::parallel::{ParallelExecutor, list_tools_parallel};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -150,14 +150,12 @@ mod tests {
     fn test_search_result_model_building() {
         let model = SearchResultModel {
             pattern: "read*".to_string(),
-            matches: vec![
-                SearchMatchModel {
-                    server_name: "filesystem".to_string(),
-                    tool_name: "read_file".to_string(),
-                    description: Some("Read a file".to_string()),
-                    input_schema: serde_json::json!({}),
-                },
-            ],
+            matches: vec![SearchMatchModel {
+                server_name: "filesystem".to_string(),
+                tool_name: "read_file".to_string(),
+                description: Some("Read a file".to_string()),
+                input_schema: serde_json::json!({}),
+            }],
             total_matches: 1,
             servers_searched: 2,
             failed_servers: vec![],
