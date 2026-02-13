@@ -6,9 +6,9 @@
 **Depth:** standard
 
 **Last session:** 2026-02-13
-**Stopped at:** Completed Phase 15-01 - Fix cargo doc warnings complete
+**Stopped at:** Completed Phase 15-02 - Reduce public API surface complete
 **Resume file:** None
-**Plans completed:** 01-01 through 01-04 (Phase 1), 02-01 through 02-11 (Phase 2), 03-01 through 03-06 (Phase 3), 04-01 through 04-03 (Phase 4), 05-01 through 05-03 (Phase 5), 06-01 through 06-04 (Phase 6), 07-01 through 07-04 (Phase 7), 08-01 (Phase 8), 09-01 (Phase 9), 10-01 (Phase 10), 11-01 (Phase 11), 12-01 through 12-05 (Phase 12), 13-01 through 13-07 (Phase 13), 14-01 through 14-05 (Phase 14), 15-01 (Phase 15), 16-01 through 16-04 (Phase 16)
+**Plans completed:** 01-01 through 01-04 (Phase 1), 02-01 through 02-11 (Phase 2), 03-01 through 03-06 (Phase 3), 04-01 through 04-03 (Phase 4), 05-01 through 05-03 (Phase 5), 06-01 through 06-04 (Phase 6), 07-01 through 07-04 (Phase 7), 08-01 (Phase 8), 09-01 (Phase 9), 10-01 (Phase 10), 11-01 (Phase 11), 12-01 through 12-05 (Phase 12), 13-01 through 13-07 (Phase 13), 14-01 through 14-05 (Phase 14), 15-01 through 15-02 (Phase 15), 16-01 through 16-04 (Phase 16)
 **Plans ready:** None (All phases through 16 complete, v1.3 milestone ready)
 
 **Phase 1 progress:** 100% (4/4 plans complete)
@@ -26,23 +26,23 @@
 **Phase 12 progress:** 100% (5/5 plans - ALL COMPLETE)
 **Phase 13 progress:** 100% (6/6 plans - ALL COMPLETE)
 **Phase 14 progress:** 100% (5/5 plans - ALL COMPLETE)
-**Phase 15 progress:** 25% (1/4 plans - DOC-01 complete)
+**Phase 15 progress:** 50% (2/4 plans - DOC-01, DOC-02 complete)
 **Phase 16 progress:** 100% (4/4 plans - ALL COMPLETE)
 
 **Milestone Status:** v1.3 IN PROGRESS
 - Focus: Tech debt cleanup, code quality, documentation
 - Previous milestones: v1.0 (42/42), v1.2 (18/18)
-- Current: Phase 15 (Documentation & API) - 25% complete
+- Current: Phase 15 (Documentation & API) - 50% complete
 - v1.3 requirements: 38/38 mapped (Phase 15 has 4, Phase 16 had 5)
 
 ## Current Position
 
 Phase: 15 of 16 (Documentation & API)
-Plan: 15-01 complete (of 4 in phase)
-Status: DOC-01 complete - zero cargo doc warnings
-Last activity: 2026-02-13 - Phase 15-01 complete: Fixed 8 cargo doc warnings
+Plan: 15-02 complete (of 4 in phase)
+Status: DOC-02 complete - public API surface reduced by 16 lines
+Last activity: 2026-02-13 - Phase 15-02 complete: Reduced public API exports
 
-Progress: [██████████████░░░░] 75% (61/65 plans executed)
+Progress: [████████████████░] 75% (62/65 plans executed)
 
 ## Accumulated Context
 
@@ -111,14 +111,15 @@ Progress: [██████████████░░░░] 75% (61/65 pl
   - Phase 12: Test Infrastructure - 100%
   - Phase 13: Code Organization - 100%
   - Phase 14: Duplication Elimination - 100%
-  - Phase 15: Documentation & API - 25% (1/4 complete)
+  - Phase 15: Documentation & API - 50% (2/4 complete)
   - Phase 16: Code Quality Sweep - 100%
 - All tests pass (98 lib tests)
-- Ready for remaining Phase 15 plans (DOC-02, DOC-03, DOC-04)
+- Ready for remaining Phase 15 plans (DOC-03, DOC-04)
 
 **Completed:**
 - Phase 15 IN PROGRESS:
   - 15-01 complete: Fixed 8 cargo doc warnings (DOC-01 complete)
+  - 15-02 complete: Reduced public API surface (DOC-02 complete)
 - Phase 14 COMPLETE:
   - 14-01 complete: Transport trait consolidated (DUP-05)
   - 14-02 complete: Model + Formatter architecture (9 models, 5 formatters)
@@ -144,6 +145,7 @@ Progress: [██████████████░░░░] 75% (61/65 pl
 
 | Date | Decision |
 |------|----------|
+| 2026-02-13 | Phase 15-02 complete - Reduced public API surface by 16 lines: removed re-exports from cli/mod.rs, made daemon internal functions private (handle_client, handle_request, cleanup_socket), removed unnecessary re-exports from lib.rs, all 98 library tests pass |
 | 2026-02-13 | Phase 15-01 complete - Fixed 8 cargo doc warnings: unclosed HTML tags for Arc<Mutex>, dyn, ToolInfo, String (using backticks \`code\`), bare URLs (using angle brackets <https://...>), cargo doc now produces zero warnings |
 | 2026-02-13 | Phase 16-04 complete - Final verification of all QUAL requirements: zero unwrap in production (all 18 matches are test code), zero dead_code attrs, cargo clippy --lib zero warnings, cargo fmt passes, 9,568 lines (below 10,800-11,500 target), 98 tests pass |
 | 2026-02-13 | Phase 16-03 complete - Verified thiserror/anyhow error handling already implemented: src/error.rs uses thiserror with 20+ rich error variants, CLI uses library errors with exit_code mapping, src/cli/daemon.rs uses anyhow for specific cases, cargo check passes, cargo clippy --lib zero warnings |
@@ -219,7 +221,7 @@ Progress: [██████████████░░░░] 75% (61/65 pl
 | Phase 12: Test Infrastructure | ✅ Complete | 100% (5/5 plans) | Test helpers module created, 4 test files refactored, tests organized by platform, ~219 lines removed |
 | Phase 13: Code Organization | ✅ Complete | 100% (7/7 plans) | Config split, config_setup.rs, daemon_lifecycle.rs, command_router.rs, entry.rs created, main.rs thin wrapper (16 lines), final verification passed |
 | Phase 14: Duplication Elimination | ✅ Complete | 100% (5/5 plans) | Transport consolidated (DUP-05), Model+Formatter architecture (DUP-01/02), connection interfaces deduplicated (DUP-03/04), 918 lines removed, all tests pass |
-| Phase 15: Documentation & API | 📋 In Progress | 25% (1/4 plans) | DOC-01 complete: 8 cargo doc warnings fixed, zero warnings now |
+| Phase 15: Documentation & API | 📋 In Progress | 50% (2/4 plans) | DOC-01 complete: cargo doc warnings fixed, DOC-02 complete: public API surface reduced |
 | Phase 16: Code Quality Sweep | ✅ Complete | 100% (4/4 plans) | 19 unwrap() replaced, 2 dead_code attrs removed, thiserror/anyhow verified, 9,568 lines, zero clippy warnings |
 
 ## Milestone Readiness
