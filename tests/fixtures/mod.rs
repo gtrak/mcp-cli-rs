@@ -25,8 +25,12 @@
 // Re-export mock HTTP server
 pub mod mock_http_server;
 
+// Re-export mock failing server for retry tests
+pub mod mock_failing_server;
+
 // Re-export types from HTTP server for convenience
 pub use mock_http_server::{MockHttpServer, MockResponse, ToolDefinition};
+pub use mock_failing_server::{MockFailingServer, spawn_failing_server};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
