@@ -13,11 +13,11 @@
 
 ## Current Position
 
-Phase: 17 of 19 (Tool Call Integration Tests) ✅ COMPLETE
-Plan: All 4 plans executed (17-01 through 17-04)
-Status: Phase verified — 5/5 must-haves, 24/24 tests passing
+Phase: 18 of 19 (Retry and IPC Tests) IN PROGRESS
+Plan: 1 of 3 in current phase
+Status: Plan 18-01 complete - retry logic tests implemented
 
-Progress: [██████████████░░░░░░] 88% (68/77 planned, 3 milestones shipped)
+Progress: [██████████████░░░░░░] 89% (69/77 planned, 3 milestones shipped)
 
 ## Milestone Status
 
@@ -39,6 +39,7 @@ Progress: [██████████████░░░░░░] 88% (68
 ## Accumulated Context
 
 **Decisions:**
+- [2026-02-13] Phase 18-01 complete - Retry logic integration tests (3 tests) with exponential backoff timing verification, max retry limit enforcement, and delay increase measurement
 - [2026-02-13] Phase 17-04 complete - Fixed HTTP test flakiness: refactored MockHttpServer to accept parameterized config instead of env vars, all 13 HTTP tests now pass consistently in parallel execution
 - [2026-02-13] v1.3 milestone COMPLETE - Tech debt cleanup shipped: 23% codebase reduction, zero doc warnings, all files under 600 lines
 - [2026-02-13] v1.4 started - Test Coverage for Tool Execution to add integration tests for call command
@@ -51,6 +52,11 @@ Progress: [██████████████░░░░░░] 88% (68
 - None
 
 **Completed:**
+- Phase 18-01: Retry logic integration tests with 3 passing tests
+  - Mock failing server with fail_first_n parameter
+  - TEST-06: Exponential backoff timing verification
+  - TEST-07: Max retry limit enforcement
+  - TEST-08: Delay increase measurement with exponential growth
 - All phases through v1.3 complete
 - v1.3: Tech Debt Cleanup & Code Quality (46/47 requirements)
 - Phase 17-01: Mock MCP servers for integration tests
@@ -329,7 +335,8 @@ Progress: [██████████████████] 100% (65/65 p
 | Phase 14: Duplication Elimination | ✅ Complete | 100% (5/5 plans) | Transport consolidated (DUP-05), Model+Formatter architecture (DUP-01/02), connection interfaces deduplicated (DUP-03/04), 918 lines removed, all tests pass |
 | Phase 15: Documentation & API | ✅ Complete | 100% (4/4 plans) | DOC-01 complete: cargo doc warnings fixed, DOC-02 complete: public API surface reduced (16 lines), DOC-04/05 complete: module docs and public API documented, final verification passed |
 | Phase 16: Code Quality Sweep | ✅ Complete | 100% (4/4 plans) | 19 unwrap() replaced, 2 dead_code attrs removed, thiserror/anyhow verified, 9,568 lines, zero clippy warnings |
-| Phase 17: Tool Call Integration Tests | 🚧 IN PROGRESS | 80% (4/5 plans) | Mock servers complete, stdio tests (11), HTTP tests (13) complete with parallel stability, 18 total tests passing |
+| Phase 17: Tool Call Integration Tests | ✅ COMPLETE | 100% (5/5 plans) | Mock servers complete, stdio tests (11), HTTP tests (13), error handling tests (7), 24 total tests passing |
+| Phase 18: Retry and IPC Tests | 🚧 IN PROGRESS | 33% (1/3 plans) | Retry logic tests complete (3 tests), mock failing server created, exponential backoff verified |
 
 ## Milestone Readiness
 
