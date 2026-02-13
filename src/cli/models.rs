@@ -184,13 +184,11 @@ pub struct SearchMatchModel {
 }
 
 /// Helper function for serde skip_serializing_if
-#[allow(dead_code)]
 fn is_false(b: &bool) -> bool {
     !b
 }
 
 /// Helper function for serde skip_serializing_if
-#[allow(dead_code)]
 fn is_zero(n: &u32) -> bool {
     *n == 0
 }
