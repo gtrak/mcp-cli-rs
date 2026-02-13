@@ -134,9 +134,15 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 
 ---
 
-## Next Milestone
+## Next Milestone: v1.5 UX Audit
 
-**Goal:** [To be defined]
+**Goal:** Audit help text, error messages, and CLI interface — compare to original Bun implementation for intuitive behavior
+
+**Target features:**
+- Help text audit: --help output, flag names, command structure
+- Error message audit: error text, suggestions, recovery guidance
+- Compare to original (../mcp-cli) for intuitive behavior
+- Fix identified UX issues
 
 ---
 
@@ -175,4 +181,4 @@ The tool will be wrapped in a skill for LLM use, so error messages and output sh
 
 ---
 
-*Last updated: 2026-02-13 after v1.4 milestone complete*
+*Last updated: 2026-02-13 after v1.4 milestone, starting v1.5 UX audit*

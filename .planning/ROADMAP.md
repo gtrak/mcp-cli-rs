@@ -192,6 +192,45 @@ Project follows a solo developer + Claude workflow with no team coordination art
 
 ---
 
+## 🚧 v1.5 UX Audit & Improvements
+
+**Milestone Goal:** Audit help text, error messages, and CLI interface — compare to original Bun implementation for intuitive behavior
+
+### Phase 20: UX Audit
+**Goal**: Comprehensive audit of help text, CLI interface, and error messages
+**Depends on**: v1.4 completion
+**Requirements**: UX-01, UX-02, UX-03, UX-04, UX-09, UX-10
+**Success Criteria** (what must be TRUE):
+  1. --help output reviewed for completeness and clarity
+  2. Flag names and command structure reviewed for intuitiveness
+  3. Comparison to original Bun CLI completed
+  4. Missing help examples or usage hints identified
+  5. Public API docstrings reviewed
+  6. Module documentation accuracy verified
+**Plans**: 1 plan
+
+**Plan Details:**
+- [ ] 20-01-PLAN.md — Audit help text, CLI interface, and compare to original Bun implementation
+
+### Phase 21: UX Improvements
+**Goal**: Fix identified UX issues from audit
+**Depends on**: Phase 20
+**Requirements**: UX-05, UX-06, UX-07, UX-08, UX-11, UX-12, UX-13
+**Success Criteria** (what must be TRUE):
+  1. Error messages audited for helpfulness
+  2. Error comparison to original CLI completed
+  3. Error suggestions verified accurate
+  4. Error formatting consistency checked
+  5. Help text issues fixed
+  6. Error message issues fixed
+  7. Original CLI patterns applied where intuitive
+**Plans**: 1 plan
+
+**Plan Details:**
+- [ ] 21-01-PLAN.md — Fix identified UX issues from audit
+
+---
+
 ## Progress
 
 | Phase | Name | Status | Completion |
