@@ -153,8 +153,10 @@ impl ConnectionPool {
         let mut conn = match self.take(server_name).await? {
             Some(c) => c,
             None => {
+                let servers: Vec<String> = self.config.servers.iter().map(|s| s.name.clone()).collect();
                 return Err(McpError::ServerNotFound {
                     server: server_name.to_string(),
+                    servers,
                 });
             }
         };
@@ -204,8 +206,10 @@ impl ConnectionPool {
         let mut conn = match self.take(server_name).await? {
             Some(c) => c,
             None => {
+                let servers: Vec<String> = self.config.servers.iter().map(|s| s.name.clone()).collect();
                 return Err(McpError::ServerNotFound {
                     server: server_name.to_string(),
+                    servers,
                 });
             }
         };
@@ -278,8 +282,12 @@ impl ConnectionPool {
             .servers
             .iter()
             .find(|s| s.name.as_str() == server_name)
-            .ok_or_else(|| McpError::ServerNotFound {
-                server: server_name.to_string(),
+            .ok_or_else(|| {
+                let servers: Vec<String> = self.config.servers.iter().map(|s| s.name.clone()).collect();
+                McpError::ServerNotFound {
+                    server: server_name.to_string(),
+                    servers,
+                }
             })?;
 
         tracing::debug!("Found server config: name={}", server_config.name);
@@ -324,8 +332,10 @@ impl ConnectionPoolInterface for ConnectionPool {
         if let Some(conn) = self.take(server_name).await? {
             Ok(conn.transport)
         } else {
+            let servers: Vec<String> = self.config.servers.iter().map(|s| s.name.clone()).collect();
             Err(McpError::ServerNotFound {
                 server: server_name.to_string(),
+                servers,
             })
         }
     }

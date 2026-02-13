@@ -22,6 +22,10 @@ use std::sync::Arc;
 #[derive(Clone, Subcommand)]
 pub enum Commands {
     /// Start the connection daemon
+    ///
+    /// Examples:
+    ///   mcp daemon                    # Start daemon with default TTL
+    ///   mcp daemon --ttl 300          # Start with 5-minute TTL
     Daemon {
         /// Daemon idle timeout in seconds (overrides config and env)
         #[arg(short, long)]
@@ -33,9 +37,17 @@ pub enum Commands {
     },
 
     /// Shutdown the running daemon
+    ///
+    /// Examples:
+    ///   mcp shutdown                  # Shutdown the daemon
     Shutdown,
 
     /// List all servers and their available tools (CLI-01, DISC-01)
+    ///
+    /// Examples:
+    ///   mcp list                     # List all servers
+    ///   mcp list -d                  # List with tool descriptions
+    ///   mcp list -v                  # List with full schema
     List {
         /// Show detailed descriptions and parameters
         #[arg(short = 'd', long)]
@@ -47,12 +59,20 @@ pub enum Commands {
     },
 
     /// Show details for a specific server (DISC-02)
+    ///
+    /// Examples:
+    ///   mcp info filesystem          # Show server info
+    ///   mcp info filesystem read_file # Show tool schema
     Info {
         /// Server name
         name: String,
     },
 
     /// Show details for a specific tool (DISC-03)
+    ///
+    /// Examples:
+    ///   mcp tool filesystem/read_file      # Show tool details
+    ///   mcp tool -d filesystem/read_file   # Show with description
     Tool {
         /// Tool identifier (server/tool or server tool)
         #[arg(value_name = "TOOL")]
@@ -68,6 +88,10 @@ pub enum Commands {
     },
 
     /// Execute a tool (EXEC-01, EXEC-02)
+    ///
+    /// Examples:
+    ///   mcp call filesystem/read_file '{}'           # Call with args
+    ///   echo '{"path": "/tmp"}' | mcp call filesystem/read_file  # From stdin
     Call {
         /// Tool identifier (server/tool or server tool)
         #[arg(value_name = "TOOL")]
@@ -79,6 +103,12 @@ pub enum Commands {
     },
 
     /// Search for tools by name pattern (DISC-04)
+    ///
+    /// Examples:
+    ///   mcp search "*file*"           # Find file-related tools
+    ///   mcp search "read*"           # Find tools starting with 'read'
+    ///   mcp grep "*file*"            # Same as above (alias)
+    #[command(alias("grep"))]
     Search {
         /// Glob pattern to match tool names
         #[arg(value_name = "PATTERN")]

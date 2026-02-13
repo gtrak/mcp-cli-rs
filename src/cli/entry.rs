@@ -21,17 +21,17 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 /// CLI argument structure for the MCP CLI client.
 #[derive(Parser, Clone)]
 #[command(name = "mcp")]
-#[command(about = "MCP CLI client for tool discovery and execution", long_about = None)]
+#[command(version, about = "MCP CLI client for tool discovery and execution", long_about = LONG_ABOUT)]
 pub struct Cli {
     /// Path to configuration file (mcp_servers.toml)
     #[arg(short, long, global = true)]
     config: Option<std::path::PathBuf>,
 
-    /// Run without daemon (direct mode) - **currently recommended for daemon-mode issues**
+    /// Run without daemon (direct mode)
     #[arg(long, global = true)]
     no_daemon: bool,
 
-    /// Auto-spawn daemon if not running (default behavior - **has known issues on Windows**)
+    /// Auto-spawn daemon if not running (default behavior)
     #[arg(long, global = true, conflicts_with = "no_daemon")]
     auto_daemon: bool,
 
@@ -46,6 +46,26 @@ pub struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 }
+
+/// Long about text with examples and environment variables
+const LONG_ABOUT: &str = r#"MCP CLI client for tool discovery and execution
+
+Formats:
+  server/tool   Slash-separated (e.g., filesystem/read_file)
+  server tool   Space-separated (e.g., filesystem read_file)
+
+Examples:
+  mcp                          # List all servers
+  mcp list                     # List all servers
+  mcp list -d                  # List with tool descriptions
+  mcp info filesystem          # Show server details
+  mcp info filesystem read_file # Show tool schema
+  mcp search "*file*"          # Search for tools by pattern
+  mcp call filesystem read_file '{}'  # Call tool with args
+
+Environment Variables:
+  MCP_NO_DAEMON=1     Disable connection caching (direct mode)
+  MCP_DAEMON_TTL=N    Set daemon idle timeout in seconds (default: 60)"#;
 
 /// Initialize tracing subscriber with appropriate output
 /// - Daemon mode: logs to file (~/.cache/mcp-cli/daemon.log)

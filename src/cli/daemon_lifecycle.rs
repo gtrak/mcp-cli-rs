@@ -304,8 +304,12 @@ impl ProtocolClient for DirectProtocolClient {
         let server_config =
             self.config
                 .get_server(server_name)
-                .ok_or_else(|| McpError::ServerNotFound {
-                    server: server_name.to_string(),
+                .ok_or_else(|| {
+                    let servers: Vec<String> = self.config.servers.iter().map(|s| s.name.clone()).collect();
+                    McpError::ServerNotFound {
+                        server: server_name.to_string(),
+                        servers,
+                    }
                 })?;
 
         let mut transport = server_config.create_transport(server_name)?;
@@ -393,8 +397,12 @@ impl ProtocolClient for DirectProtocolClient {
         let server_config =
             self.config
                 .get_server(server_name)
-                .ok_or_else(|| McpError::ServerNotFound {
-                    server: server_name.to_string(),
+                .ok_or_else(|| {
+                    let servers: Vec<String> = self.config.servers.iter().map(|s| s.name.clone()).collect();
+                    McpError::ServerNotFound {
+                        server: server_name.to_string(),
+                        servers,
+                    }
                 })?;
 
         let mut transport = server_config.create_transport(server_name)?;

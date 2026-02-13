@@ -62,8 +62,11 @@ pub enum McpError {
         source: std::io::Error,
     },
 
-    #[error("Server '{}' not found", server)]
-    ServerNotFound { server: String },
+    #[error("Server '{}' not found. Available servers: {}", server, servers.join(", "))]
+    ServerNotFound {
+        server: String,
+        servers: Vec<String>,
+    },
 
     // Tool errors (EXEC-04, DISC-03)
     #[error("Tool '{}' not found in server '{}'", tool, server)]
@@ -73,7 +76,10 @@ pub enum McpError {
     #[error("Daemon not running: {}", message)]
     DaemonNotRunning { message: String },
 
-    #[error("Invalid JSON arguments: {}", source)]
+    #[error(
+        "Invalid JSON arguments: {}. Expected format: {{'\"key\"': \"value\"}}",
+        source
+    )]
     InvalidJson {
         #[from]
         source: serde_json::Error,
@@ -224,6 +230,14 @@ impl McpError {
     pub fn daemon_not_running(message: impl Into<String>) -> Self {
         Self::DaemonNotRunning {
             message: message.into(),
+        }
+    }
+
+    /// Create a [`ServerNotFound`](McpError::ServerNotFound) error with available servers.
+    pub fn server_not_found(server: &str, servers: Vec<String>) -> Self {
+        Self::ServerNotFound {
+            server: server.to_string(),
+            servers,
         }
     }
 

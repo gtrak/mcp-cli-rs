@@ -44,8 +44,10 @@ pub async fn cmd_call_tool(
     let config = daemon.config();
     let _server = config.get_server(&server_name).ok_or_else(|| {
         print_error(&format!("Server '{}' not found", server_name));
+        let servers: Vec<String> = config.servers.iter().map(|s| s.name.clone()).collect();
         McpError::ServerNotFound {
             server: server_name.clone(),
+            servers,
         }
     })?;
 
