@@ -200,10 +200,10 @@ pub async fn cmd_call_tool(
     formatters::format_call_result(&model, output_mode);
 
     // Return appropriate error if execution failed
-    if !model.success {
-        if model.error.as_ref().unwrap().contains("retry attempts") {
+    if !model.success && let Some(ref err) = model.error {
+        if err.contains("retry attempts") {
             return Err(McpError::MaxRetriesExceeded { attempts: model.retries });
-        } else if model.error.as_ref().unwrap().contains("timeout") {
+        } else if err.contains("timeout") {
             // Extract timeout value from error message
             return Err(McpError::OperationCancelled { timeout: 30 }); // Default timeout
         }

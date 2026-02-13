@@ -162,7 +162,7 @@ pub async fn find_and_load(cli_path: Option<&str>) -> Result<Config, McpError> {
         });
     }
 
-    let config_path_str = config_path.unwrap();
+    let config_path_str = config_path.expect("config_path should be Some after is_none check");
     let config_path = Path::new(&config_path_str);
 
     // Load and parse the config

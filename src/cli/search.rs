@@ -114,7 +114,7 @@ async fn query_search_results(
                 "Invalid glob pattern '{}' - using substring matching",
                 pattern
             ));
-            glob::Pattern::new("*").unwrap()
+            glob::Pattern::new("*").expect("* is always a valid glob pattern")
         }
     };
 

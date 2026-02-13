@@ -53,7 +53,7 @@ impl ConnectionPool {
     /// Take a connection from the pool for use
     pub async fn take(&self, server_name: &str) -> Result<Option<PooledConnection>> {
         tracing::debug!("take() called for server: {}", server_name);
-        let mut connections = self.connections.lock().unwrap();
+        let mut connections = self.connections.lock().expect("Failed to acquire connection pool lock");
         tracing::debug!("Got lock, checking for existing connection");
 
         if let Some(mut conn) = connections.remove(server_name) {
@@ -85,7 +85,7 @@ impl ConnectionPool {
     /// Return a connection to the pool
     pub fn put_back(&self, conn: PooledConnection) {
         let server_name = conn.server_name.clone();
-        let mut connections = self.connections.lock().unwrap();
+        let mut connections = self.connections.lock().expect("Failed to acquire connection pool lock");
         connections.insert(server_name, conn);
         tracing::debug!("Returned connection to pool");
     }
@@ -283,12 +283,12 @@ impl ConnectionPool {
     }
 
     pub fn clear(&self) {
-        let mut connections = self.connections.lock().unwrap();
+        let mut connections = self.connections.lock().expect("Failed to acquire connection pool lock");
         connections.clear();
     }
 
     pub fn count(&self) -> usize {
-        self.connections.lock().unwrap().len()
+        self.connections.lock().expect("Failed to acquire connection pool lock").len()
     }
 }
 
@@ -313,7 +313,7 @@ impl ConnectionPoolInterface for ConnectionPool {
     }
 
     fn remove(&self, server_name: &str) {
-        let mut connections = self.connections.lock().unwrap();
+        let mut connections = self.connections.lock().expect("Failed to acquire connection pool lock");
         connections.remove(server_name);
     }
 

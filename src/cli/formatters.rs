@@ -493,7 +493,7 @@ fn format_call_result_human(model: &CallResultModel) {
         // Format successful result
         if let Some(ref result) = model.result {
             if result.is_object() {
-                let result_obj = result.as_object().unwrap();
+                let result_obj = result.as_object().expect("Result should be an object after is_object check");
 
                 // Check if result indicates an error
                 if let Some(error) = result_obj.get("error") {
