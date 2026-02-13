@@ -1,0 +1,9 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "The sum is: 42"
+    }
+  ],
+  "isError": false
+}
