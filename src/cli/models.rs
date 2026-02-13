@@ -119,6 +119,17 @@ pub struct ParameterModel {
     pub description: Option<String>,
 }
 
+impl From<&ParameterModel> for crate::format::ParameterInfo {
+    fn from(model: &ParameterModel) -> Self {
+        Self {
+            name: model.name.clone(),
+            param_type: model.param_type.clone(),
+            description: model.description.clone(),
+            required: model.required,
+        }
+    }
+}
+
 /// Model for tool call result output.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CallResultModel {
