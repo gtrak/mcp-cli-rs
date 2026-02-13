@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+use tokio::time::{sleep, Duration};
 
 /// Tool definition matching MCP protocol
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,6 +69,7 @@ struct MockServerState {
     tools: Vec<ToolDefinition>,
     responses: HashMap<String, MockResponse>,
     errors: HashMap<String, String>,
+    delay_ms: u64,
     initialized: bool,
 }
 
@@ -76,12 +78,22 @@ impl MockServerState {
         let tools = Self::load_tools_from_env();
         let responses = Self::load_responses_from_env();
         let errors = Self::load_errors_from_env();
+        let delay_ms = Self::load_delay_from_env();
 
         Self {
             tools,
             responses,
             errors,
+            delay_ms,
             initialized: false,
+        }
+    }
+
+    fn load_delay_from_env() -> u64 {
+        if let Ok(delay_str) = std::env::var("MOCK_DELAY_MS") {
+            delay_str.parse().unwrap_or(0)
+        } else {
+            0
         }
     }
 
@@ -380,6 +392,11 @@ async fn handle_tools_call(request: &JsonRpcRequest, state: &MockServerState) ->
         .unwrap_or("");
 
     let arguments = request.params.get("arguments").cloned().unwrap_or_default();
+
+    // Apply configured delay if any (for testing timeout scenarios)
+    if state.delay_ms > 0 {
+        sleep(Duration::from_millis(state.delay_ms)).await;
+    }
 
     // Check for configured error
     if let Some(error_msg) = state.errors.get(tool_name) {
