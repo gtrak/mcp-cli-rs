@@ -131,7 +131,14 @@ Project follows a solo developer + Claude workflow with no team coordination art
   2. Single connection interface (McpClient trait) used by pool, client, and IPC modules
   3. No duplicate list_tools(), call_tool(), or formatting helper implementations exist
   4. All tests pass with identical behavior (consolidation maintains functionality)
-**Plans**: TBD
+**Plans**: 5 plans in 3 waves
+
+Plans:
+- [ ] 14-01-PLAN.md — Consolidate duplicate transport traits into single source of truth (DUP-05)
+- [ ] 14-02-PLAN.md — Create model types and formatter functions for Model + Formatter architecture (DUP-01/02 foundation)
+- [ ] 14-03-PLAN.md — Migrate all command pairs to model+formatter, eliminate _json duplicates (DUP-01, DUP-02, SIZE-04)
+- [ ] 14-04-PLAN.md — Deduplicate connection interface implementations in ipc/mod.rs and pool.rs (DUP-03, DUP-04)
+- [ ] 14-05-PLAN.md — Add model/formatter tests and final phase verification (DUP-06)
 
 ### Phase 15: Documentation & API
 **Goal**: Fix documentation warnings, audit public API, improve module docs
