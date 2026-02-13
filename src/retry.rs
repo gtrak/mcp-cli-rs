@@ -187,6 +187,10 @@ where
     }
 }
 
+/// Wrap an async operation with a timeout.
+///
+/// Returns [`McpError::Timeout`] if the operation does not complete
+/// within the specified duration.
 pub async fn timeout_wrapper<F, T, Fut>(
     operation: F,
     timeout_secs: u64,

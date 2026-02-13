@@ -1,6 +1,35 @@
+//! Error types for MCP CLI operations.
+//!
+//! This module defines [`McpError`], a comprehensive error enum covering
+//! configuration, connection, protocol, IPC, and CLI usage errors.
+//! Each variant includes structured context for actionable error messages.
+//!
+//! The [`exit_code`] function maps errors to process exit codes (1=client,
+//! 2=server, 3=network/IO) for scripting compatibility.
+//!
+//! # Usage
+//!
+//! ```rust
+//! use mcp_cli_rs::error::{McpError, Result};
+//!
+//! fn find_server(name: &str) -> Result<String> {
+//!     if name.is_empty() {
+//!         return Err(McpError::usage_error("server name required"));
+//!     }
+//!     Ok(name.to_string())
+//! }
+//!
+//! assert!(find_server("").is_err());
+//! assert!(find_server("my-server").is_ok());
+//! ```
+
 use thiserror::Error;
 
-/// Main error type for MCP CLI
+/// Main error type for MCP CLI.
+///
+/// Covers all error categories: configuration, connection, protocol,
+/// tool execution, daemon, IPC, and CLI usage errors. Uses `thiserror`
+/// for `Display` and `Error` trait implementations.
 #[derive(Error, Debug)]
 pub enum McpError {
     // Configuration errors (CONFIG-01, CONFIG-04)
@@ -112,7 +141,12 @@ pub enum McpError {
     MaxRetriesExceeded { attempts: u32 },
 }
 
-/// Exit codes (ERR-03)
+/// Exit codes for CLI process (ERR-03).
+///
+/// Maps error types to numeric exit codes:
+/// - `1` — Client/usage errors (bad input, missing resources)
+/// - `2` — Server/protocol errors
+/// - `3` — Network or IO errors
 #[cfg(unix)]
 pub fn exit_code(error: &McpError) -> i32 {
     match error {
@@ -139,6 +173,9 @@ pub fn exit_code(error: &McpError) -> i32 {
     }
 }
 
+/// Exit codes for CLI process (ERR-03, Windows variant).
+///
+/// Same mapping as Unix but includes Windows-specific IPC errors.
 #[cfg(windows)]
 pub fn exit_code(error: &McpError) -> i32 {
     match error {
@@ -165,8 +202,9 @@ pub fn exit_code(error: &McpError) -> i32 {
     }
 }
 
-/// Context helper for missing fields (CONFIG-04)
+/// Context helper for missing fields (CONFIG-04).
 impl McpError {
+    /// Create a [`MissingRequiredField`](McpError::MissingRequiredField) error.
     pub fn missing_field(server: &str, field: &'static str) -> Self {
         Self::MissingRequiredField {
             server: server.to_string(),
@@ -174,6 +212,7 @@ impl McpError {
         }
     }
 
+    /// Create a [`ConfigReadError`](McpError::ConfigReadError) from a path and IO error.
     pub fn config_read(path: &std::path::Path, source: std::io::Error) -> Self {
         Self::ConfigReadError {
             path: path.to_path_buf(),
@@ -188,6 +227,7 @@ impl McpError {
         }
     }
 
+    /// Create a [`ConnectionError`](McpError::ConnectionError) for a server.
     pub fn connection_error(server: &str, source: std::io::Error) -> Self {
         Self::ConnectionError {
             server: server.to_string(),
@@ -195,6 +235,7 @@ impl McpError {
         }
     }
 
+    /// Create a [`ToolNotFound`](McpError::ToolNotFound) error.
     pub fn tool_not_found(tool: &str, server: &str) -> Self {
         Self::ToolNotFound {
             tool: tool.to_string(),
@@ -202,22 +243,26 @@ impl McpError {
         }
     }
 
+    /// Create an [`IOError`](McpError::IOError) from a `std::io::Error`.
     pub fn io_error(source: std::io::Error) -> Self {
         Self::IOError { source }
     }
 
+    /// Create a [`UsageError`](McpError::UsageError) for CLI misuse.
     pub fn usage_error(message: impl Into<String>) -> Self {
         Self::UsageError {
             message: message.into(),
         }
     }
 
+    /// Create an [`IpcError`](McpError::IpcError).
     pub fn ipc_error(message: impl Into<String>) -> Self {
         Self::IpcError {
             message: message.into(),
         }
     }
 
+    /// Create a [`SocketBindError`](McpError::SocketBindError) (Unix only).
     #[cfg(unix)]
     pub fn socket_bind_error(path: impl Into<String>, source: std::io::Error) -> Self {
         Self::SocketBindError {
@@ -226,16 +271,19 @@ impl McpError {
         }
     }
 
+    /// Create a [`ConnectionRefused`](McpError::ConnectionRefused) error (Unix only).
     #[cfg(unix)]
     pub fn connection_refused(path: impl Into<String>) -> Self {
         Self::ConnectionRefused { path: path.into() }
     }
 
+    /// Create a [`StaleSocket`](McpError::StaleSocket) error (Unix only).
     #[cfg(unix)]
     pub fn stale_socket(path: impl Into<String>) -> Self {
         Self::StaleSocket { path: path.into() }
     }
 
+    /// Create a [`PipeCreationError`](McpError::PipeCreationError) (Windows only).
     #[cfg(windows)]
     pub fn pipe_creation_error(name: impl Into<String>, source: std::io::Error) -> Self {
         Self::PipeCreationError {
@@ -244,15 +292,18 @@ impl McpError {
         }
     }
 
+    /// Create a [`PipeBusy`](McpError::PipeBusy) error (Windows only).
     #[cfg(windows)]
     pub fn pipe_busy(path: impl Into<String>) -> Self {
         Self::PipeBusy { path: path.into() }
     }
 
+    /// Create an [`OperationCancelled`](McpError::OperationCancelled) error.
     pub fn operation_cancelled(timeout: u64) -> Self {
         Self::OperationCancelled { timeout }
     }
 
+    /// Create a [`MaxRetriesExceeded`](McpError::MaxRetriesExceeded) error.
     pub fn max_retries_exceeded(attempts: u32) -> Self {
         Self::MaxRetriesExceeded { attempts }
     }
@@ -265,5 +316,5 @@ impl From<std::io::Error> for McpError {
     }
 }
 
-// Result type alias (anyhow style)
+/// Result type alias using [`McpError`] as the error type.
 pub type Result<T> = std::result::Result<T, McpError>;
