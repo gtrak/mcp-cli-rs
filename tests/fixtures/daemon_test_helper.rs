@@ -14,7 +14,7 @@ use tempfile::TempDir;
 use tokio::sync::oneshot;
 use tokio::time::timeout;
 
-use mcp_cli_rs::config::{Config, ServerConfig, TransportConfig};
+use mcp_cli_rs::config::{Config, ServerConfig, ServerTransport};
 use mcp_cli_rs::daemon::lifecycle::DaemonLifecycle;
 use mcp_cli_rs::daemon::protocol::{DaemonRequest, DaemonResponse};
 use mcp_cli_rs::ipc::{self, ProtocolClient};
@@ -41,7 +41,7 @@ impl TestDaemon {
     ///
     /// Returns a boxed ProtocolClient ready for communication
     pub fn client(&self) -> Result<Box<dyn ProtocolClient>> {
-        ipc::create_ipc_client(&self.config)
+        Ok(ipc::create_ipc_client(&self.config)?)
     }
 
     /// Shutdown the daemon gracefully
@@ -116,7 +116,7 @@ pub async fn spawn_test_daemon(config: Config) -> Result<TestDaemon> {
 
     // Update config with socket path
     let mut config = config;
-    config.daemon.socket_path = socket_path.clone();
+    config.socket_path = socket_path.clone();
 
     let config = Arc::new(config);
 
@@ -159,6 +159,53 @@ pub async fn spawn_test_daemon(config: Config) -> Result<TestDaemon> {
     })
 }
 
+/// Default tools configuration for mock server
+fn default_mock_tools() -> Vec<serde_json::Value> {
+    vec![
+        serde_json::json!({
+            "name": "echo",
+            "description": "Echo back the input message",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string", "description": "Message to echo"}
+                },
+                "required": ["message"]
+            }
+        }),
+        serde_json::json!({
+            "name": "add",
+            "description": "Add two numbers",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "a": {"type": "number", "description": "First number"},
+                    "b": {"type": "number", "description": "Second number"}
+                },
+                "required": ["a", "b"]
+            }
+        }),
+    ]
+}
+
+/// Default responses configuration for mock server
+fn default_mock_responses() -> std::collections::HashMap<String, serde_json::Value> {
+    let mut responses = std::collections::HashMap::new();
+    responses.insert(
+        "echo".to_string(),
+        serde_json::json!({
+            "content": [{"type": "text", "text": "Echo: {message}"}]
+        }),
+    );
+    responses.insert(
+        "add".to_string(),
+        serde_json::json!({
+            "content": [{"type": "text", "text": "Result: {result}"}]
+        }),
+    );
+    responses
+}
+
 /// Create a test configuration with a mock stdio server
 ///
 /// Returns a Config with one mock MCP server configured
@@ -168,26 +215,35 @@ pub async fn create_test_config() -> Result<Config> {
     // Get path to mock MCP server binary
     let mock_server_path = find_mock_server_binary()?;
 
+    // Configure mock server with default tools
+    let tools = default_mock_tools();
+    let responses = default_mock_responses();
+
+    let mut env = std::collections::HashMap::new();
+    env.insert("MOCK_TOOLS".to_string(), serde_json::to_string(&tools)?);
+    env.insert("MOCK_RESPONSES".to_string(), serde_json::to_string(&responses)?);
+
     let server_config = ServerConfig {
         name: "mock-server".to_string(),
-        transport: TransportConfig::Stdio {
+        transport: ServerTransport::Stdio {
             command: mock_server_path.to_string_lossy().to_string(),
             args: vec![],
-            env: std::collections::HashMap::new(),
+            env,
+            cwd: None,
         },
+        description: None,
+        allowed_tools: None,
+        disabled_tools: None,
     };
 
     let config = Config {
         servers: vec![server_config],
-        daemon: mcp_cli_rs::config::DaemonConfig {
-            enabled: true,
-            socket_path: temp_dir.path().join("daemon.sock"),
-            idle_timeout: 60,
-            auto_restart: true,
-        },
-        log: mcp_cli_rs::config::LogConfig {
-            level: "info".to_string(),
-        },
+        concurrency_limit: 5,
+        retry_max: 3,
+        retry_delay_ms: 1000,
+        timeout_secs: 1800,
+        daemon_ttl: 60,
+        socket_path: temp_dir.path().join("daemon.sock"),
     };
 
     Ok(config)
@@ -236,24 +292,25 @@ pub async fn create_test_config_with_tools(tool_count: usize) -> Result<Config> 
 
     let server_config = ServerConfig {
         name: "mock-server-multi".to_string(),
-        transport: TransportConfig::Stdio {
+        transport: ServerTransport::Stdio {
             command: mock_server_path.to_string_lossy().to_string(),
             args: vec![],
             env,
+            cwd: None,
         },
+        description: None,
+        allowed_tools: None,
+        disabled_tools: None,
     };
 
     let config = Config {
         servers: vec![server_config],
-        daemon: mcp_cli_rs::config::DaemonConfig {
-            enabled: true,
-            socket_path: temp_dir.path().join("daemon.sock"),
-            idle_timeout: 60,
-            auto_restart: true,
-        },
-        log: mcp_cli_rs::config::LogConfig {
-            level: "info".to_string(),
-        },
+        concurrency_limit: 5,
+        retry_max: 3,
+        retry_delay_ms: 1000,
+        timeout_secs: 1800,
+        daemon_ttl: 60,
+        socket_path: temp_dir.path().join("daemon.sock"),
     };
 
     Ok(config)
@@ -280,24 +337,25 @@ pub fn create_test_config_with_mock_data(
 
     let server_config = ServerConfig {
         name: "mock-server-custom".to_string(),
-        transport: TransportConfig::Stdio {
+        transport: ServerTransport::Stdio {
             command: mock_server_path.to_string_lossy().to_string(),
             args: vec![],
             env,
+            cwd: None,
         },
+        description: None,
+        allowed_tools: None,
+        disabled_tools: None,
     };
 
     let config = Config {
         servers: vec![server_config],
-        daemon: mcp_cli_rs::config::DaemonConfig {
-            enabled: true,
-            socket_path: temp_dir.path().join("daemon.sock"),
-            idle_timeout: 60,
-            auto_restart: true,
-        },
-        log: mcp_cli_rs::config::LogConfig {
-            level: "info".to_string(),
-        },
+        concurrency_limit: 5,
+        retry_max: 3,
+        retry_delay_ms: 1000,
+        timeout_secs: 1800,
+        daemon_ttl: 60,
+        socket_path: temp_dir.path().join("daemon.sock"),
     };
 
     Ok(config)
