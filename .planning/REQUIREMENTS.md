@@ -7,19 +7,19 @@
 
 Add bash-style calling conventions and fix JSON help text.
 
-### Bash-Style Arguments
+### Dynamic Flag Parsing
 
-- [ ] **ARGS-01**: Add `--args` flag to `call` command for key=value syntax
-- [ ] **ARGS-02**: Support multiple `--args` flags for multiple parameters
-- [ ] **ARGS-03**: Support `--args key=value` where value is unquoted for simple values
-- [ ] **ARGS-04**: Support `--args key="quoted value"` for values with spaces
-- [ ] **ARGS-05**: Fall back to JSON if `--args` not provided (backward compatibility)
+- [ ] **ARGS-01**: Parse `--key value` as JSON field `{"key": "value"}`
+- [ ] **ARGS-02**: Parse `--key=value` as JSON field `{"key": "value"}`
+- [ ] **ARGS-03**: Support one level nesting: `--user.name "value"` → `{"user": {"name": "value"}}`
+- [ ] **ARGS-04**: Fall back to JSON argument if no flags provided (backward compatibility)
+- [ ] **ARGS-05**: Complex values (arrays, deep nesting) must use JSON argument
 
 ### Help Text Improvements
 
 - [ ] **HELP-01**: Fix error message to show valid JSON format `{"key": "value"}`
-- [ ] **HELP-02**: Document both JSON and `--args` formats in call help
-- [ ] **HELP-03**: Show example for `--args` usage in call command help
+- [ ] **HELP-02**: Document both JSON and `--key value` formats in call help
+- [ ] **HELP-03**: Show example for flag usage in call command help
 - [ ] **HELP-04**: Update list command to show calling hint for tools
 
 ---
@@ -28,9 +28,9 @@ Add bash-style calling conventions and fix JSON help text.
 
 | Feature | Reason |
 |---------|--------|
-| Positional arguments | Only --args flag this milestone |
-| Auto-detection of argument types | Keep simple - always string unless quoted |
-| JSON5 or relaxed JSON | Stick to standard JSON for --args |
+| Multi-level nesting | Only one level deep |
+| Auto-detection of types | Keep simple - always string |
+| Positional arguments | Only flags |
 
 ---
 

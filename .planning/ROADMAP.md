@@ -172,16 +172,16 @@ Project follows a solo developer + Claude workflow with no team coordination art
 
 ## 🚧 v1.6 CLI Calling Conventions (Phase 22-23)
 
-**Milestone Goal:** Add bash-style `--args` flag for tool calls and fix JSON help text
+**Milestone Goal:** Parse `--key value` as JSON fields and fix JSON help text
 
-### Phase 22: Bash-Style Arguments
-**Goal**: Add `--args` flag for key=value syntax
+### Phase 22: Dynamic Flag Parsing
+**Goal**: Parse `--key value` as JSON fields
 **Depends on**: v1.5 completion
 **Requirements**: ARGS-01, ARGS-02, ARGS-03, ARGS-04, ARGS-05
 **Success Criteria**:
-  1. `--args key=value` syntax works
-  2. Multiple `--args` flags supported
-  3. Backward compatible with JSON syntax
+  1. `--key value` becomes `{"key": "value"}`
+  2. One level nesting works: `--user.name value` → `{"user": {"name": "value"}}`
+  3. Backward compatible with JSON argument
 **Plans**: 1-2 plans
 
 ### Phase 23: Help Text Improvements

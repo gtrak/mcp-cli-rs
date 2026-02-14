@@ -155,12 +155,13 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 
 ## Current Milestone: v1.6 CLI Calling Conventions
 
-**Goal:** Add bash-style `--args` flag for tool calls and fix JSON help text
+**Goal:** Parse `--key value` as JSON fields and fix JSON help text
 
 **Target features:**
-- `--args` flag: `mcp call server/tool --args key=value --args key2=value2`
+- Dynamic flags: `mcp call server/tool --command ls --cwd /tmp` → `{"command": "ls", "cwd": "/tmp"}`
+- One level nesting: `--user.name Gary` → `{"user": {"name": "Gary"}}`
 - Fix error message format: show `{"key": "value"}` not `{'"key"': "value"}`
-- Update help text to document both JSON and `--args` formats
+- Update help text to document both JSON and `--key value` formats
 
 ---
 
