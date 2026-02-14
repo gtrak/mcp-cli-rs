@@ -160,7 +160,6 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 **Target features:**
 - Dynamic flags: `mcp call server/tool --command ls --cwd /tmp` → `{"command": "ls", "cwd": "/tmp"}`
 - JSON values: `mcp call server/tool --user {"name":"Gary"}` → `{"user": {"name": "Gary"}}`
-- One level nesting: `--user.name Gary` → `{"user": {"name": "Gary"}}`
 - Fix error message format: show `{"key": "value"}` not `{'"key"': "value"}`
 - Update help text to document both JSON and `--key value` formats
 

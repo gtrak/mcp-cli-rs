@@ -12,8 +12,7 @@ Add bash-style calling conventions and fix JSON help text.
 - [ ] **ARGS-01**: Parse `--key value` as JSON field `{"key": "value"}`
 - [ ] **ARGS-02**: Parse `--key=value` as JSON field `{"key": "value"}`
 - [ ] **ARGS-03**: Parse JSON values directly: `--key {"a":1}` → `{"key": {"a": 1}}`
-- [ ] **ARGS-04**: Support one level nesting: `--user.name value` → `{"user": {"name": "value"}}`
-- [ ] **ARGS-05**: Fall back to JSON argument if no flags provided (backward compatibility)
+- [ ] **ARGS-04**: Fall back to JSON argument if no flags provided (backward compatibility)
 
 ### Help Text Improvements
 
