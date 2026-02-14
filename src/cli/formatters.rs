@@ -125,6 +125,10 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
                         "{}",
                         "Use 'mcp info <server>/<tool>' for full schema".dimmed()
                     );
+                    println!(
+                        "{}",
+                        "Call with: 'mcp call <server>/<tool> --key value'".dimmed()
+                    );
                 }
                 DetailLevel::WithDescriptions => {
                     // Detailed view: full descriptions and parameter details
