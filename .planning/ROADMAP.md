@@ -129,111 +129,56 @@ Project follows a solo developer + Claude workflow with no team coordination art
 
 ---
 
-## ✅ v1.4 Test Coverage (COMPLETE)
+<details>
+<summary>✅ v1.4 Test Coverage (Phases 17-19) — SHIPPED 2026-02-13</summary>
 
-**Milestone Goal:** Add integration tests for tool execution to verify full MCP server communication flow
+**Milestone v1.4: Test Coverage**
 
-### Phase 17: Tool Call Integration Tests
-**Goal**: Create end-to-end tests for tool execution
-**Depends on**: v1.3 completion
-**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, TEST-05
-**Success Criteria** (what must be TRUE):
-  1. Mock MCP server exists and can respond to JSON-RPC requests
-  2. Stdio transport tool call test passes (full roundtrip)
-  3. HTTP transport tool call test passes (full roundtrip)
-  4. Tool call with arguments test passes
-  5. Tool call error handling test passes
-**Plans**: 3 plans in 2 waves
+- [x] Phase 17: Tool Call Integration Tests (4/4 plans) — Completed 2026-02-13
+- [x] Phase 18: Retry and IPC Tests (2/2 plans) — Completed 2026-02-13
+- [x] Phase 19: Error Paths and Regression Tests (2/2 plans) — Completed 2026-02-13
 
-**Plan Details:**
-- [x] 17-01-PLAN.md — Create mock MCP servers (stdio binary + HTTP helper) with fixture types (Wave 1)
-- [x] 17-02-PLAN.md — Add stdio transport tool call tests (happy path + error handling) (Wave 2)
-- [x] 17-03-PLAN.md — Add HTTP transport tool call tests (mirrors stdio scenarios) (Wave 2)
-- [x] 17-04-PLAN.md — Fix HTTP test flakiness via parameterized config (gap closure) (Wave 1)
+**Results:**
+- 81 integration tests added
+- All tests passing
 
-**Status**: ✅ COMPLETE — 4/4 plans executed, 5/5 must-haves verified, all 24 tests passing
+**Archived to:** `.planning/milestones/v1.4-ROADMAP.md`
+**Requirements archived to:** `.planning/milestones/v1.4-REQUIREMENTS.md`
 
-### Phase 18: Retry and IPC Tests
-**Goal**: Verify retry logic and daemon IPC work correctly
-**Depends on**: Phase 17
-**Requirements**: TEST-06, TEST-07, TEST-08, TEST-09, TEST-10, TEST-11
-**Success Criteria** (what must be TRUE):
-  1. Exponential backoff retry test passes
-  2. Max retry limit test passes
-  3. Daemon protocol roundtrip test passes
-  4. Concurrent tool calls through daemon test passes
-  5. Connection cleanup test passes
-**Plans**: 2 plans in 2 waves
-
-**Plan Details:**
-- [x] 18-01-PLAN.md — Add retry logic tests (exponential backoff, max limit, delay timing) (Wave 1)
-- [x] 18-02-PLAN.md — Add daemon IPC tests (roundtrip, concurrent calls, cleanup) (Wave 2)
-
-**Status**: ✅ COMPLETE — 2/2 plans executed, 5/5 must-haves verified, all 15 tests passing
-
-### Phase 19: Error Paths and Regression Tests
-**Goal**: Add error handling tests and prevent regressions
-**Depends on**: Phase 18
-**Requirements**: TEST-12, TEST-13, TEST-14, TEST-15, TEST-16, TEST-17
-**Success Criteria** (what must be TRUE):
-   1. Invalid JSON args test passes with helpful error
-   2. Server timeout test passes
-   3. Server disconnection test passes
-   4. List regression test still passes
-   5. Config loading test passes
-   6. Tool filtering + call integration test passes
-**Plans**: 2 plans in 1 wave
-
-**Plan Details:**
-- [x] 19-01-PLAN.md — Error path tests: invalid JSON args (TEST-12), server timeout (TEST-13), server disconnection (TEST-14) (Wave 1)
-- [x] 19-02-PLAN.md — Regression tests: list command (TEST-15), config loading (TEST-16), tool filter+call (TEST-17) (Wave 1)
-
-**Status**: ✅ COMPLETE — 2/2 plans executed, 6/6 must-haves verified, 42 tests passing
+</details>
 
 ---
 
-## ✅ v1.5 UX Audit & Improvements (COMPLETE)
+<details>
+<summary>✅ v1.5 UX Audit & Improvements (Phases 20-21) — SHIPPED 2026-02-13</summary>
 
-**Milestone Goal:** Audit help text, error messages, and CLI interface — compare to original Bun implementation for intuitive behavior
+**Milestone v1.5: UX Audit & Improvements**
 
-### Phase 20: UX Audit
-**Goal**: Comprehensive audit of help text, CLI interface, and error messages
-**Depends on**: v1.4 completion
-**Requirements**: UX-01, UX-02, UX-03, UX-04, UX-09, UX-10
-**Success Criteria** (what must be TRUE):
-  1. --help output reviewed for completeness and clarity
-  2. Flag names and command structure reviewed for intuitiveness
-  3. Comparison to original Bun CLI completed
-  4. Missing help examples or usage hints identified
-  5. Public API docstrings reviewed
-  6. Module documentation accuracy verified
-**Plans**: 1 plan
+- [x] Phase 20: UX Audit (1/1 plans) — Completed 2026-02-13
+- [x] Phase 21: UX Improvements (1/1 plans) — Completed 2026-02-13
 
-**Plan Details:**
-- [x] 20-01-PLAN.md — Audit help text, CLI interface, and compare to original Bun implementation (COMPLETE)
+**Results:**
+- 10 UX fixes implemented
+- Help text improved with examples
+- Error messages enhanced with suggestions
+- --version flag added
 
-**Completed:** 2026-02-13
-**Results:** 10 UX gaps identified (FIX-01 through FIX-10), Phase 21 implementation guide created with P1/P2/P3 prioritized fixes
+**Archived to:** `.planning/milestones/v1.5-ROADMAP.md`
+**Requirements archived to:** `.planning/milestones/v1.5-REQUIREMENTS.md`
 
-### Phase 21: UX Improvements
-**Goal**: Fix identified UX issues from audit
-**Depends on**: Phase 20
-**Requirements**: UX-05, UX-06, UX-07, UX-08, UX-11, UX-12, UX-13
-**Success Criteria** (what must be TRUE):
-  1. Error messages audited for helpfulness
-  2. Error comparison to original CLI completed
-  3. Error suggestions verified accurate
-  4. Error formatting consistency checked
-  5. Help text issues fixed
-  6. Error message issues fixed
-  7. Original CLI patterns applied where intuitive
-**Plans**: 1 plan
+</details>
 
-**Plan Details:**
-- [x] 21-01-PLAN.md — Fix identified UX issues from audit (COMPLETE)
+---
 
-**Completed:** 2026-02-13
-**Results:** All 10 UX fixes implemented: --version flag, help examples, env var docs, no warnings, "Did you mean?", server list in errors, JSON format hints, grep alias, stdin support (pre-existing), format explanation
+## Project Complete
+
+All milestones shipped! The MCP CLI Rust rewrite is feature-complete with:
+
+- Core MCP protocol support (stdio + HTTP transports)
+- Connection daemon with cross-platform IPC
+- Ergonomic CLI output with JSON mode
+- Comprehensive test coverage (81 integration tests)
+- UX improvements aligned with original Bun implementation
 
 ---
 
@@ -275,146 +220,12 @@ Project follows a solo developer + Claude workflow with no team coordination art
 
 ---
 
-**Last updated:** 2026-02-13 (Phase 21 complete: UX Improvements — 10 UX fixes verified, all 7 must-haves passed)
+**Last updated:** 2026-02-13 (v1.5 milestone complete: UX Audit & Improvements shipped)
 
-### Phase 12: Test Infrastructure
-**Goal**: Eliminate test duplication and create reusable test helpers foundation
-**Depends on**: v1.2 completion
-**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, TEST-05, TEST-06, TEST-07, TEST-08, SIZE-03
-**Success Criteria** (what must be TRUE):
-  1. All test files use helpers from `tests/helpers.rs` instead of inline setup code
-  2. Test suite organized by platform (tests/unix/*.rs, tests/windows/*.rs, tests/common/*.rs)
-  3. Running all tests produces identical results before and after refactoring
-  4. Test setup code reduced by ~200-300 lines through helper reuse
-**Plans**: 5 plans in 5 waves
+### Phase 12-16: Tech Debt & Code Quality
 
-**Plan Details:**
-- [x] 12-01-PLAN.md — Create comprehensive test helpers module (TestEnvironment, path generators, IPC helpers, config factories)
-- [x] 12-02-PLAN.md — Refactor ipc_tests.rs and orphan_cleanup_tests.rs to use helpers
-- [x] 12-03-PLAN.md — Refactor cross_platform_daemon_tests.rs (786->613 lines) to use helpers
-- [x] 12-04-PLAN.md — Refactor lifecycle_tests.rs and windows_process_spawn_tests.rs to use helpers (mod helpers added, no code lines removed - files test specialized patterns)
-- [x] 12-05-PLAN.md — Split cross_platform_daemon_tests.rs into platform modules (tests/unix/, tests/windows/, tests/common/)
-
-**Completed:** 2026-02-12
-**Results:** Test helpers module created (194 lines), 4 test files refactored, cross_platform_daemon_tests split into platform modules, ~216 net lines reduced (785→102 main file + 194 helpers), 5 bugs fixed, all tests pass
-
-### Phase 13: Code Organization
-**Goal**: Restructure large files into focused modules with clear separation of concerns
-**Depends on**: Phase 12 (stable test infrastructure to verify after refactoring)
-**Requirements**: ORG-01, ORG-02, ORG-03, ORG-04, ORG-05, ORG-06, ORG-07, ORG-08, SIZE-02
-**Success Criteria** (what must be TRUE):
-  1. All source files under 600 lines (commands.rs was 1850, main.rs was 809)
-  2. Module structure clearly separates concerns based on functionality area
-  3. All module re-exports compile without errors
-  4. Full test suite passes after restructuring (verifies no behavior changes)
-**Plans**: 7 plans in 4 waves
-
-**Plan Details:**
-- [x] 13-01-PLAN.md — Split config/mod.rs into types.rs, parser.rs, validator.rs (Wave 1)
-- [x] 13-02-PLAN.md — Extract config loading from main.rs to config_setup.rs (Wave 1)
-- [x] 13-03-PLAN.md — Split commands.rs into list.rs, info.rs, call.rs, search.rs (Wave 1)
-- [x] 13-04-PLAN.md — Extract daemon lifecycle from main.rs to daemon_lifecycle.rs (Wave 2)
-- [x] 13-05-PLAN.md — Extract command routing from main.rs to command_router.rs (Wave 2)
-- [x] 13-06-PLAN.md — Extract CLI entry point from main.rs to entry.rs (Wave 3)
-- [x] 13-07-PLAN.md — Verify module re-exports and run comprehensive tests (Wave 4)
-
-**Completed:** 2026-02-12
-**Results:** All files restructured: main.rs 809→16 lines (98% reduction), commands.rs 1850→47 lines, config split into 4 modules, CLI split into 8 focused modules, all files under 600 lines, 110 tests pass
-
-### Phase 14: Duplication Elimination
-**Goal**: Remove duplicate code across command functions and connection interfaces
-**Depends on**: Phase 13 (clear structure reveals duplication opportunities)
-**Requirements**: DUP-01, DUP-02, DUP-03, DUP-04, DUP-05, DUP-06, SIZE-04
-**Success Criteria** (what must be TRUE):
-  1. 16 JSON command functions consolidated into 8 multi-mode commands with OutputMode parameter
-  2. Single connection interface (McpClient trait) used by pool, client, and IPC modules
-  3. No duplicate list_tools(), call_tool(), or formatting helper implementations exist
-  4. All tests pass with identical behavior (consolidation maintains functionality)
-**Plans**: 5 plans in 3 waves
-
-Plans:
-- [ ] 14-01-PLAN.md — Consolidate duplicate transport traits into single source of truth (DUP-05)
-- [ ] 14-02-PLAN.md — Create model types and formatter functions for Model + Formatter architecture (DUP-01/02 foundation)
-- [ ] 14-03-PLAN.md — Migrate all command pairs to model+formatter, eliminate _json duplicates (DUP-01, DUP-02, SIZE-04)
-- [ ] 14-04-PLAN.md — Deduplicate connection interface implementations in ipc/mod.rs and pool.rs (DUP-03, DUP-04)
-- [ ] 14-05-PLAN.md — Add model/formatter tests and final phase verification (DUP-06)
-
-### Phase 15: Documentation & API
-**Goal**: Fix documentation warnings, audit public API, improve module docs
-**Depends on**: Phase 14 (stable structure for accurate documentation)
-**Requirements**: DOC-01, DOC-02, DOC-03, DOC-04, DOC-05, DOC-06, SIZE-05
-**Success Criteria** (what must be TRUE):
-  1. Running `cargo doc` produces zero warnings
-  2. Public API surface reduced by 50-100 lines of unnecessary exports
-  3. All publicly exported functions and structs have rustdoc comments
-  4. Module-level documentation clearly describes scope and provides usage examples
-**Plans**: 4 plans in 2 waves
-
-**Plan Details:**
-- [x] 15-01-PLAN.md — Fix all cargo doc warnings (DOC-01, DOC-06)
-- [x] 15-02-PLAN.md — Audit and reduce public API surface (DOC-02, DOC-03, SIZE-05)
-- [x] 15-03-PLAN.md — Improve module-level documentation with examples (DOC-04, DOC-05)
-- [x] 15-04-PLAN.md — Final verification (all DOC requirements)
-
-**Completed:** 2026-02-13
-**Results:** Zero cargo doc warnings, 16 lines of public exports reduced, module documentation with examples for 5 modules, rustdoc on all public functions, 7 doc tests pass
-
-### Phase 16: Code Quality Sweep
-**Goal**: Replace unsafe unwrap() calls, remove dead code attributes, enforce consistent error handling
-**Depends on**: Phase 15 (documentation complete, API surface stable)
-**Requirements**: QUAL-01, QUAL-02, QUAL-03, QUAL-04, QUAL-05, SIZE-01
-**Success Criteria** (what must be TRUE):
-  1. No unwrap() calls exist in production code (all replaced with proper error handling)
-  2. No unnecessary #[allow(dead_code)] attributes remain
-  3. All functions returning Result<> follow consistent error handling patterns
-  4. Overall codebase reduced to 10,800-11,500 lines (8-13% reduction from 12,408)
-**Plans**: 4 plans in 2 waves
-
-**Plan Details:**
-- [x] 16-01-PLAN.md — Replace unwrap() calls with proper error handling (QUAL-01, QUAL-04)
-- [x] 16-02-PLAN.md — Remove unnecessary #[allow(dead_code)] attributes (QUAL-02)
-- [x] 16-03-PLAN.md — Establish consistent error handling patterns with thiserror/anyhow (QUAL-03)
-- [x] 16-04-PLAN.md — Final verification (all QUAL requirements)
-
-**Completed:** 2026-02-13
-**Results:** 19 unwrap() calls replaced with proper error handling, 2 dead_code attributes removed, thiserror/anyhow error patterns verified, 9,568 lines (well below target), cargo clippy zero warnings
-
-## Progress
-
-**Execution Order:**
-Phases execute in numeric order: 12 → 13 → 14 → 15 → 16
-
-| Phase | Name | Status | Completion |
-|-------|------|--------|------------|
-| 1 | Core Protocol & Configuration | Complete | 100% |
-| 2 | Connection Daemon & Cross-Platform IPC | Complete | 100% |
-| 3 | Performance & Reliability | Complete | 100% |
-| 4 | Tool Filtering & Cross-Platform Validation | Complete | 100% |
-| 5 | Unified Daemon Architecture | Complete | 100% |
-| 6 | Output Formatting & Visual Hierarchy | Complete | 100% |
-| 7 | JSON Output & Machine-Readable Modes | Complete | 100% |
-| 8 | Fix Phase 4 Windows Tests (XP-01) | Complete | 100% |
-| 9 | Cross-Platform Verification (XP-02, XP-04) | Complete | 100% |
-| 10 | Phase 6 Verification Documentation | Complete | 100% |
-| 11 | Code Quality Cleanup | Complete | 100% |
-| 12 | Test Infrastructure | Complete | 100% |
-| 13 | Code Organization | Complete | 100% |
-| 14 | Duplication Elimination | Complete | 100% |
-| 15 | Documentation & API | Complete | 100% |
-| 16 | Code Quality Sweep | Complete | 100% |
-
-**Progress Summary:**
-- **Phases completed:** 16/16
-- **Total plans:** 65 plans executed
-- **v1 Coverage:** 42/42 requirements satisfied ✅
-- **v1.2 Coverage:** 18/18 requirements satisfied ✅
-- **v1.3 Coverage:** 47/47 requirements satisfied ✅
-- **Total Coverage:** 97/97 requirements satisfied ✅
+*See archived milestone:* `.planning/milestones/v1.3-ROADMAP.md`
 
 ---
 
-**Last updated:** 2026-02-13 (Phase 15 complete: Documentation & API - zero doc warnings, 16 lines API reduced, module docs added)
-
----
-
-*For archived roadmap details, see `.planning/milestones/v1-ROADMAP.md` and `.planning/milestones/v1.2-ROADMAP.md`*
+*For archived roadmap details, see `.planning/milestones/v1-ROADMAP.md` through `.planning/milestones/v1.5-ROADMAP.md`*

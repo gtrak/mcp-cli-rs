@@ -6,6 +6,34 @@ Milestone tracking for MCP CLI Rust Rewrite project.
 
 ---
 
+## Milestone v1.5: UX Audit & Improvements
+
+**Started:** 2026-02-13
+**Completed:** 2026-02-13
+**Status:** ✅ Complete
+
+### Phase Structure
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 20 | UX Audit | ✅ Complete |
+| 21 | UX Improvements | ✅ Complete |
+
+### What Shipped
+
+**UX Improvements:**
+- --version flag added
+- Help text with comprehensive examples
+- Environment variable documentation
+- "Did you mean?" suggestions for typos
+- ServerNotFound errors show available servers
+- InvalidJson errors show format hints
+- grep alias for search command
+
+**Requirements Delivered:** 13/13 (100%)
+
+---
+
 ## Milestone v1.4: Test Coverage
 
 **Started:** 2026-02-13

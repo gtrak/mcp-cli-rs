@@ -102,6 +102,24 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 
 </details>
 
+<details>
+<summary>v1.5: UX Audit & Improvements (13/13 requirements) — Shipped 2026-02-13</summary>
+
+- ✅ --version flag (FIX-01)
+- ✅ Help examples for all commands (FIX-02)
+- ✅ Removed developer warning text from help (FIX-03)
+- ✅ Environment variable documentation in help (FIX-04)
+- ✅ "Did you mean?" suggestions for typos (FIX-05)
+- ✅ ServerNotFound shows available servers (FIX-06)
+- ✅ InvalidJson shows format hints (FIX-07)
+- ✅ grep alias for search command (FIX-08)
+- ✅ stdin support verified (FIX-09)
+- ✅ Help documents slash vs space formats (FIX-10)
+
+**Archive:** `.planning/milestones/v1.5-REQUIREMENTS.md`
+
+</details>
+
 - Public distribution/crates.io publishing — local compilation only
 - MCP server implementation — this tool is a client only
 - SSE and Streamable HTTP transports — deferred to post-MVP
@@ -112,37 +130,39 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 
 ---
 
-## Current State: v1.4 Complete
+## Current State: v1.5 Complete
 
 **Status:** Milestone shipped ✅
 
-**Codebase After v1.4:**
-- **9,568** lines of Rust code (23% reduction from 12,408)
+**Codebase After v1.5:**
+- **9,568** lines of Rust code
 - **0** documentation warnings (cargo doc)
-- **All files** under 600 lines (max: 491)
+- **All files** under 600 lines
 - **98** library tests pass
 - **7** doc tests pass
-- **81** new integration tests (v1.4)
+- **81** integration tests (v1.4)
 
 **Milestones Shipped:**
 - **v1.0:** Core implementation with daemon connection pooling (Phases 1-5, 42 requirements)
 - **v1.2:** Ergonomic CLI output with JSON mode and visual hierarchy (Phases 6-11, 18 requirements)
 - **v1.3:** Tech Debt Cleanup & Code Quality (Phases 12-16, 46/47 requirements)
 - **v1.4:** Test Coverage (Phases 17-19, 17 requirements)
+- **v1.5:** UX Audit & Improvements (Phases 20-21, 13 requirements)
 
-**Total Requirements Satisfied:** 117/117 ✅
+**Total Requirements Satisfied:** 130/130 ✅
 
 ---
 
-## Next Milestone: v1.5 UX Audit
+## Next Milestone: Planning
 
-**Goal:** Audit help text, error messages, and CLI interface — compare to original Bun implementation for intuitive behavior
+All planned milestones (v1.0 through v1.5) are complete. The project has achieved:
 
-**Target features:**
-- Help text audit: --help output, flag names, command structure
-- Error message audit: error text, suggestions, recovery guidance
-- Compare to original (../mcp-cli) for intuitive behavior
-- Fix identified UX issues
+- Core MCP CLI functionality
+- Ergonomic CLI output with JSON mode
+- Comprehensive test coverage
+- UX improvements aligned with original Bun implementation
+
+Next steps would involve new feature work or can be considered feature-complete.
 
 ---
 
@@ -181,4 +201,4 @@ The tool will be wrapped in a skill for LLM use, so error messages and output sh
 
 ---
 
-*Last updated: 2026-02-13 after v1.4 milestone, starting v1.5 UX audit*
+*Last updated: 2026-02-13 after v1.5 milestone complete*
