@@ -182,7 +182,7 @@ Project follows a solo developer + Claude workflow with no team coordination art
   1. `--key value` becomes `{"key": "value"}`
   2. `--key {"a":1}` parses JSON value directly
   3. Backward compatible with JSON argument
-**Plans**: 1-2 plans
+**Plans**: 1 plan → 22-01-PLAN.md (Dynamic flag parsing implementation)
 
 ### Phase 23: Help Text Improvements
 **Goal**: Fix JSON error message and document both formats
@@ -220,7 +220,7 @@ Project follows a solo developer + Claude workflow with no team coordination art
 | 19 | Error Paths and Regression Tests | Complete | 100% |
 | 20 | UX Audit | Complete | 100% |
 | 21 | UX Improvements | Complete | 100% |
-| 22 | Bash-Style Arguments | Not Started | 0% |
+| 22 | Bash-Style Arguments | Planned | 0% |
 | 23 | Help Text Improvements | Not Started | 0% |
 
 **Progress Summary:**
