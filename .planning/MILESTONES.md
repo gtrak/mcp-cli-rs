@@ -6,6 +6,37 @@ Milestone tracking for MCP CLI Rust Rewrite project.
 
 ---
 
+## Milestone v1.6: CLI Calling Conventions
+
+**Started:** 2026-02-14
+**Completed:** 2026-02-14
+**Status:** ✅ Complete
+
+### Phase Structure
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 22 | Dynamic Flag Parsing | ✅ Complete |
+| 23 | Help Text Improvements | ✅ Complete |
+
+### What Shipped
+
+**CLI Calling Conventions:**
+- Dynamic flag parsing: `--key value` → `{"key": "value"}`
+- Multiple syntax support: `--key value`, `--key=value`, `--key JSON`
+- Backward compatibility with JSON argument
+- Error message shows valid JSON format hint
+- Help text documents both JSON and --args formats
+- List command shows calling hint
+
+**Requirements Delivered:** 9/9 (100%)
+
+---
+
+*Last updated: 2026-02-14*
+
+---
+
 ## Milestone v1.5: UX Audit & Improvements
 
 **Started:** 2026-02-13

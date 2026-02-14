@@ -120,6 +120,22 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 
 </details>
 
+<details>
+<summary>v1.6: CLI Calling Conventions (9/9 requirements) — Shipped 2026-02-14</summary>
+
+- ✅ Dynamic flag parsing: `--key value` → `{"key": "value"}`
+- ✅ Parse `--key=value` format
+- ✅ Parse JSON values directly: `--key {"a":1}` → `{"key": {"a": 1}}`
+- ✅ Backward compatible with JSON argument
+- ✅ Error message shows valid JSON format hint
+- ✅ Help documents both JSON and --args formats
+- ✅ Flag usage example in call help
+- ✅ List command shows calling hint
+
+**Archive:** `.planning/milestones/v1.6-REQUIREMENTS.md`
+
+</details>
+
 - Public distribution/crates.io publishing — local compilation only
 - MCP server implementation — this tool is a client only
 - SSE and Streamable HTTP transports — deferred to post-MVP
@@ -130,17 +146,17 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 
 ---
 
-## Current State: v1.5 Complete
+## Current State: v1.6 Complete
 
 **Status:** Milestone shipped ✅
 
-**Codebase After v1.5:**
-- **9,568** lines of Rust code
+**Codebase After v1.6:**
+- **~9,500** lines of Rust code
 - **0** documentation warnings (cargo doc)
 - **All files** under 600 lines
 - **98** library tests pass
 - **7** doc tests pass
-- **81** integration tests (v1.4)
+- **81** integration tests
 
 **Milestones Shipped:**
 - **v1.0:** Core implementation with daemon connection pooling (Phases 1-5, 42 requirements)
@@ -148,33 +164,27 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 - **v1.3:** Tech Debt Cleanup & Code Quality (Phases 12-16, 46/47 requirements)
 - **v1.4:** Test Coverage (Phases 17-19, 17 requirements)
 - **v1.5:** UX Audit & Improvements (Phases 20-21, 13 requirements)
+- **v1.6:** CLI Calling Conventions (Phases 22-23, 9 requirements)
 
-**Total Requirements Satisfied:** 130/130 ✅
-
----
-
-## Current Milestone: v1.6 CLI Calling Conventions
-
-**Goal:** Parse `--key value` as JSON fields and fix JSON help text
-
-**Target features:**
-- Dynamic flags: `mcp call server/tool --command ls --cwd /tmp` → `{"command": "ls", "cwd": "/tmp"}`
-- JSON values: `mcp call server/tool --user {"name":"Gary"}` → `{"user": {"name": "Gary"}}`
-- Fix error message format: show `{"key": "value"}` not `{'"key"': "value"}`
-- Update help text to document both JSON and `--key value` formats
+**Total Requirements Satisfied:** 139/139 ✅
 
 ---
 
 ## Next Milestone: Planning
 
-All planned milestones (v1.0 through v1.5) are complete. The project has achieved:
+All planned milestones through v1.6 are complete. The project has achieved:
 
 - Core MCP CLI functionality
 - Ergonomic CLI output with JSON mode
 - Comprehensive test coverage
 - UX improvements aligned with original Bun implementation
+- Bash-style calling conventions (`--key value` syntax)
 
-Next steps would involve new feature work or can be considered feature-complete.
+The tool is feature-complete for the initial release. Next steps would involve new feature work or can be considered done.
+
+---
+
+## Current Milestone: Complete
 
 ---
 
@@ -213,4 +223,4 @@ The tool will be wrapped in a skill for LLM use, so error messages and output sh
 
 ---
 
-*Last updated: 2026-02-14 after v1.5 milestone, starting v1.6*
+*Last updated: 2026-02-14 after v1.6 milestone complete*

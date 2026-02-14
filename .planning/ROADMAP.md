@@ -118,14 +118,24 @@ Project follows a solo developer + Claude workflow with no team coordination art
 | 14 | Duplication Elimination | Complete | 100% |
 | 15 | Documentation & API | Complete | 100% |
 | 16 | Code Quality Sweep | Complete | 100% |
+| 17 | Tool Call Integration Tests | Complete | 100% |
+| 18 | Retry and IPC Tests | Complete | 100% |
+| 19 | Error Paths and Regression Tests | Complete | 100% |
+| 20 | UX Audit | Complete | 100% |
+| 21 | UX Improvements | Complete | 100% |
+| 22 | Dynamic Flag Parsing | Complete | 100% |
+| 23 | Help Text Improvements | Complete | 100% |
 
 **Progress Summary:**
-- **Phases completed:** 16/16
-- **Total plans:** 65 plans executed
+- **Phases completed:** 23/23
+- **Total plans:** 75 plans executed
 - **v1 Coverage:** 42/42 requirements satisfied ✅
 - **v1.2 Coverage:** 18/18 requirements satisfied ✅
-- **v1.3 Coverage:** 46/47 requirements satisfied ✅ (1 partial: SIZE-05)
-- **Total Coverage:** 97/97 requirements satisfied ✅
+- **v1.3 Coverage:** 46/47 requirements satisfied ✅
+- **v1.4 Coverage:** 17/17 requirements satisfied ✅
+- **v1.5 Coverage:** 13/13 requirements satisfied ✅
+- **v1.6 Coverage:** 9/9 requirements (100%)
+- **Total Coverage:** 139/139 requirements satisfied ✅
 
 ---
 
@@ -170,28 +180,30 @@ Project follows a solo developer + Claude workflow with no team coordination art
 
 ---
 
-## 🚧 v1.6 CLI Calling Conventions (Phase 22-23)
+<details>
+<summary>✅ v1.6 CLI Calling Conventions (Phases 22-23) — SHIPPED 2026-02-14</summary>
 
-**Milestone Goal:** Parse `--key value` as JSON fields and fix JSON help text
+**Milestone v1.6: CLI Calling Conventions**
 
-### Phase 22: Dynamic Flag Parsing
-**Goal**: Parse `--key value` as JSON fields
-**Depends on**: v1.5 completion
-**Requirements**: ARGS-01 through ARGS-04
-**Success Criteria**:
-  1. `--key value` becomes `{"key": "value"}`
-  2. `--key {"a":1}` parses JSON value directly
-  3. Backward compatible with JSON argument
-**Plans**: 1 plan → 22-01-PLAN.md (Dynamic flag parsing implementation)
+- [x] Phase 22: Dynamic Flag Parsing (1/1 plans) — Completed 2026-02-14
+- [x] Phase 23: Help Text Improvements (1/1 plans) — Completed 2026-02-14
 
-### Phase 23: Help Text Improvements
-**Goal**: Fix JSON error message and document both formats
-**Depends on**: Phase 22
-**Requirements**: HELP-01, HELP-02, HELP-03, HELP-04
-**Success Criteria**:
-  1. Error shows valid JSON format
-  2. Help documents both JSON and --args
-**Plans**: 1 plan → 23-01-PLAN.md (Help text improvements)
+**Results:**
+- `--key value`, `--key=value`, `--key JSON` syntax all supported
+- Error messages show valid JSON format hint
+- Help documents both JSON and --args formats
+- List command shows calling hint
+
+**Archived to:** `.planning/milestones/v1.6-ROADMAP.md`
+**Requirements archived to:** `.planning/milestones/v1.6-REQUIREMENTS.md`
+
+</details>
+
+---
+
+## 🚧 v1.7 [Next Milestone]
+
+*Not yet planned*
 
 ---
 
@@ -237,10 +249,6 @@ Project follows a solo developer + Claude workflow with no team coordination art
 ---
 
 **Last updated:** 2026-02-14 (v1.6 complete: CLI Calling Conventions)
-
-### Phase 12-16: Tech Debt & Code Quality
-
-*See archived milestone:* `.planning/milestones/v1.3-ROADMAP.md`
 
 ---
 
