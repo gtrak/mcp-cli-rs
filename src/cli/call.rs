@@ -38,7 +38,7 @@ fn parse_arguments(args: Vec<String>) -> Result<serde_json::Value> {
         let arg = &args[i];
         if !arg.starts_with("--") {
             return Err(McpError::usage_error(&format!(
-                "Expected --key value pair, got: {}",
+                "Invalid argument: {}. Use JSON format: {{\"key\": \"value\"}} or flags: --key value",
                 arg
             )));
         }
