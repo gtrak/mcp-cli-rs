@@ -177,11 +177,12 @@ Project follows a solo developer + Claude workflow with no team coordination art
 ### Phase 22: Dynamic Flag Parsing
 **Goal**: Parse `--key value` as JSON fields
 **Depends on**: v1.5 completion
-**Requirements**: ARGS-01, ARGS-02, ARGS-03, ARGS-04, ARGS-05
+**Requirements**: ARGS-01 through ARGS-05
 **Success Criteria**:
   1. `--key value` becomes `{"key": "value"}`
-  2. One level nesting works: `--user.name value` → `{"user": {"name": "value"}}`
-  3. Backward compatible with JSON argument
+  2. `--key {"a":1}` parses JSON value directly
+  3. One level nesting works: `--user.name value` → `{"user": {"name": "value"}}`
+  4. Backward compatible with JSON argument
 **Plans**: 1-2 plans
 
 ### Phase 23: Help Text Improvements
