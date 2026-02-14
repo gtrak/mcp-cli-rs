@@ -1,7 +1,7 @@
 # State: MCP CLI Rust Rewrite
 
 **Created:** 2025-02-06
-**Last updated:** 2026-02-13 - v1.5 milestone complete
+**Last updated:** 2026-02-14 - Starting v1.6
 **Mode:** yolo
 **Depth:** standard
 
@@ -9,7 +9,7 @@
 
 ## Current Position
 
-**Status:** All milestones complete
+**Status:** Defining requirements for v1.6
 
 ---
 
@@ -22,12 +22,13 @@
 | v1.3 | ✅ COMPLETE | 46/47 (98%) | 12-16 |
 | v1.4 | ✅ COMPLETE | 17/17 (100%) | 17-19 |
 | v1.5 | ✅ COMPLETE | 13/13 (100%) | 20-21 |
+| v1.6 | 🔄 ACTIVE | 0/0 | 22-? |
 
 **Total Requirements:** 130/130 satisfied
 
 ---
 
-## Project Complete
+## Project Complete (v1.5)
 
 All 5 milestones shipped:
 - **v1.0:** Core CLI with daemon connection pooling
@@ -35,6 +36,14 @@ All 5 milestones shipped:
 - **v1.3:** Tech debt cleanup & code quality
 - **v1.4:** Test coverage (81 integration tests)
 - **v1.5:** UX audit & improvements
+
+---
+
+## v1.6: CLI Calling Conventions
+
+**Goal:** Add --args flag for bash-style calling + fix JSON help text
+
+**Status:** Starting
 
 ---
 

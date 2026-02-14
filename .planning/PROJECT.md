@@ -153,6 +153,17 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 
 ---
 
+## Current Milestone: v1.6 CLI Calling Conventions
+
+**Goal:** Add bash-style `--args` flag for tool calls and fix JSON help text
+
+**Target features:**
+- `--args` flag: `mcp call server/tool --args key=value --args key2=value2`
+- Fix error message format: show `{"key": "value"}` not `{'"key"': "value"}`
+- Update help text to document both JSON and `--args` formats
+
+---
+
 ## Next Milestone: Planning
 
 All planned milestones (v1.0 through v1.5) are complete. The project has achieved:
@@ -201,4 +212,4 @@ The tool will be wrapped in a skill for LLM use, so error messages and output sh
 
 ---
 
-*Last updated: 2026-02-13 after v1.5 milestone complete*
+*Last updated: 2026-02-14 after v1.5 milestone, starting v1.6*

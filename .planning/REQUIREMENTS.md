@@ -1,36 +1,26 @@
-# Requirements: MCP CLI Rust - v1.5 UX Audit
+# Requirements: MCP CLI Rust - v1.6 CLI Calling Conventions
 
-**Defined:** 2026-02-13
+**Defined:** 2026-02-14
 **Core Value:** Reliable cross-platform MCP server interaction without dependencies.
 
-## v1.5 Requirements: UX Audit & Improvements
+## v1.6 Requirements: CLI Calling Conventions
 
-Audit and improve CLI user experience by comparing to original Bun implementation.
+Add bash-style calling conventions and fix JSON help text.
 
-### Help Text & CLI Interface
+### Bash-Style Arguments
 
-- [ ] **UX-01**: Audit --help output for completeness and clarity
-- [ ] **UX-02**: Audit flag names and command structure for intuitiveness
-- [ ] **UX-03**: Compare help text to original Bun CLI (../mcp-cli)
-- [ ] **UX-04**: Identify missing help examples or usage hints
+- [ ] **ARGS-01**: Add `--args` flag to `call` command for key=value syntax
+- [ ] **ARGS-02**: Support multiple `--args` flags for multiple parameters
+- [ ] **ARGS-03**: Support `--args key=value` where value is unquoted for simple values
+- [ ] **ARGS-04**: Support `--args key="quoted value"` for values with spaces
+- [ ] **ARGS-05**: Fall back to JSON if `--args` not provided (backward compatibility)
 
-### Error Messages
+### Help Text Improvements
 
-- [ ] **UX-05**: Audit error messages for helpfulness and actionability
-- [ ] **UX-06**: Compare error messages to original Bun CLI
-- [ ] **UX-07**: Verify error suggestions are accurate and useful
-- [ ] **UX-08**: Check error formatting consistency
-
-### Docstrings & Internal Documentation
-
-- [ ] **UX-09**: Audit public API docstrings for completeness
-- [ ] **UX-10**: Verify module-level documentation is accurate
-
-### UX Improvements
-
-- [ ] **UX-11**: Fix identified help text issues
-- [ ] **UX-12**: Fix identified error message issues
-- [ ] **UX-13**: Apply patterns from original CLI where intuitive
+- [ ] **HELP-01**: Fix error message to show valid JSON format `{"key": "value"}`
+- [ ] **HELP-02**: Document both JSON and `--args` formats in call help
+- [ ] **HELP-03**: Show example for `--args` usage in call command help
+- [ ] **HELP-04**: Update list command to show calling hint for tools
 
 ---
 
@@ -38,9 +28,9 @@ Audit and improve CLI user experience by comparing to original Bun implementatio
 
 | Feature | Reason |
 |---------|--------|
-| New command features | This is audit/fix only |
-| Architecture changes | Keep focused on UX |
-| Performance changes | Not in scope |
+| Positional arguments | Only --args flag this milestone |
+| Auto-detection of argument types | Keep simple - always string unless quoted |
+| JSON5 or relaxed JSON | Stick to standard JSON for --args |
 
 ---
 
@@ -48,24 +38,20 @@ Audit and improve CLI user experience by comparing to original Bun implementatio
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UX-01 | Phase 20 | Complete |
-| UX-02 | Phase 20 | Complete |
-| UX-03 | Phase 20 | Complete |
-| UX-04 | Phase 20 | Complete |
-| UX-05 | Phase 21 | Complete |
-| UX-06 | Phase 21 | Complete |
-| UX-07 | Phase 21 | Complete |
-| UX-08 | Phase 21 | Complete |
-| UX-09 | Phase 20 | Complete |
-| UX-10 | Phase 20 | Complete |
-| UX-11 | Phase 21 | Complete |
-| UX-12 | Phase 21 | Complete |
-| UX-13 | Phase 21 | Complete |
+| ARGS-01 | Phase 22 | Pending |
+| ARGS-02 | Phase 22 | Pending |
+| ARGS-03 | Phase 22 | Pending |
+| ARGS-04 | Phase 22 | Pending |
+| ARGS-05 | Phase 22 | Pending |
+| HELP-01 | Phase 23 | Pending |
+| HELP-02 | Phase 23 | Pending |
+| HELP-03 | Phase 23 | Pending |
+| HELP-04 | Phase 23 | Pending |
 
 **Coverage:**
-- v1.5 requirements: 13 total
-- Mapped to phases: 13
+- v1.6 requirements: 9 total
+- Mapped to phases: 0
 - Unmapped: 0 ✓
 
 ---
-*Requirements defined: 2026-02-13*
+*Requirements defined: 2026-02-14*

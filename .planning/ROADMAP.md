@@ -170,15 +170,28 @@ Project follows a solo developer + Claude workflow with no team coordination art
 
 ---
 
-## Project Complete
+## 🚧 v1.6 CLI Calling Conventions (Phase 22-23)
 
-All milestones shipped! The MCP CLI Rust rewrite is feature-complete with:
+**Milestone Goal:** Add bash-style `--args` flag for tool calls and fix JSON help text
 
-- Core MCP protocol support (stdio + HTTP transports)
-- Connection daemon with cross-platform IPC
-- Ergonomic CLI output with JSON mode
-- Comprehensive test coverage (81 integration tests)
-- UX improvements aligned with original Bun implementation
+### Phase 22: Bash-Style Arguments
+**Goal**: Add `--args` flag for key=value syntax
+**Depends on**: v1.5 completion
+**Requirements**: ARGS-01, ARGS-02, ARGS-03, ARGS-04, ARGS-05
+**Success Criteria**:
+  1. `--args key=value` syntax works
+  2. Multiple `--args` flags supported
+  3. Backward compatible with JSON syntax
+**Plans**: 1-2 plans
+
+### Phase 23: Help Text Improvements
+**Goal**: Fix JSON error message and document both formats
+**Depends on**: Phase 22
+**Requirements**: HELP-01, HELP-02, HELP-03, HELP-04
+**Success Criteria**:
+  1. Error shows valid JSON format
+  2. Help documents both JSON and --args
+**Plans**: 1 plan
 
 ---
 
@@ -207,20 +220,23 @@ All milestones shipped! The MCP CLI Rust rewrite is feature-complete with:
 | 19 | Error Paths and Regression Tests | Complete | 100% |
 | 20 | UX Audit | Complete | 100% |
 | 21 | UX Improvements | Complete | 100% |
+| 22 | Bash-Style Arguments | Not Started | 0% |
+| 23 | Help Text Improvements | Not Started | 0% |
 
 **Progress Summary:**
-- **Phases completed:** 21/21
+- **Phases completed:** 21/23
 - **Total plans:** 73 plans executed
 - **v1 Coverage:** 42/42 requirements satisfied ✅
 - **v1.2 Coverage:** 18/18 requirements satisfied ✅
 - **v1.3 Coverage:** 46/47 requirements satisfied ✅
-- **v1.4 Coverage:** 17/17 requirements satisfied ✅ (TEST-01 through TEST-17)
-- **v1.5 Coverage:** 13/13 requirements satisfied ✅ (UX-01 through UX-17)
-- **Total Coverage:** 130/130 requirements satisfied ✅
+- **v1.4 Coverage:** 17/17 requirements satisfied ✅
+- **v1.5 Coverage:** 13/13 requirements satisfied ✅
+- **v1.6 Coverage:** 0/9 requirements (in progress)
+- **Total Coverage:** 130/130 + 9 pending
 
 ---
 
-**Last updated:** 2026-02-13 (v1.5 milestone complete: UX Audit & Improvements shipped)
+**Last updated:** 2026-02-14 (v1.6 started: CLI Calling Conventions)
 
 ### Phase 12-16: Tech Debt & Code Quality
 
