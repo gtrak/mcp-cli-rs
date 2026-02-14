@@ -89,6 +89,9 @@ pub enum Commands {
 
     /// Execute a tool (EXEC-01, EXEC-02)
     ///
+    /// Supports two argument formats: JSON (e.g., '{"key": "value"}') or
+    /// flag style (e.g., --key value, --key=value).
+    ///
     /// Examples:
     ///   mcp call filesystem/read_file '{}'                              # JSON args
     ///   mcp call filesystem/read_file '{"path": "/tmp"}'               # JSON args
