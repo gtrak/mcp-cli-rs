@@ -90,16 +90,21 @@ pub enum Commands {
     /// Execute a tool (EXEC-01, EXEC-02)
     ///
     /// Examples:
-    ///   mcp call filesystem/read_file '{}'           # Call with args
-    ///   echo '{"path": "/tmp"}' | mcp call filesystem/read_file  # From stdin
+    ///   mcp call filesystem/read_file '{}'                              # JSON args
+    ///   mcp call filesystem/read_file '{"path": "/tmp"}'               # JSON args
+    ///   mcp call filesystem/read_file --path /tmp/file.txt             # --key value style
+    ///   mcp call filesystem/read_file --path=/tmp/file.txt             # --key=value style
+    ///   mcp call filesystem/read_file --options '{"a":1}'              # JSON value
+    ///   echo '{"path": "/tmp"}' | mcp call filesystem/read_file        # From stdin
     Call {
         /// Tool identifier (server/tool or server tool)
         #[arg(value_name = "TOOL")]
         tool: String,
 
-        /// JSON arguments for the tool
-        #[arg(value_name = "ARGS")]
-        args: Option<String>,
+        /// Arguments: JSON or --key value pairs
+        /// Supports: --key value, --key=value, --key {"json": "value"}
+        #[arg(last = true, allow_hyphen_values = true)]
+        args: Vec<String>,
     },
 
     /// Search for tools by name pattern (DISC-04)
@@ -193,7 +198,7 @@ pub async fn execute_command(
             cmd_tool_info(client, &tool, detail_level, output_mode).await
         }
         Commands::Call { tool, args } => {
-            cmd_call_tool(client, &tool, args.as_deref(), output_mode).await
+            cmd_call_tool(client, &tool, args, output_mode).await
         }
         Commands::Search {
             pattern,
@@ -323,7 +328,7 @@ mod tests {
         };
         let _ = Commands::Call {
             tool: "test".to_string(),
-            args: None,
+            args: vec![],
         };
         let _ = Commands::Search {
             pattern: "test".to_string(),

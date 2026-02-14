@@ -8,8 +8,92 @@ use crate::ipc::ProtocolClient;
 use crate::output::print_error;
 use crate::retry::{RetryConfig, retry_with_backoff};
 use futures_util::FutureExt;
-use std::io::{self, IsTerminal, Read};
+use std::io::{self, Read};
 use std::sync::Arc;
+
+/// Parse command-line arguments into a JSON object.
+///
+/// Supports multiple formats:
+/// - Empty args → empty object {}
+/// - JSON only (starts with {) → parse as JSON (backward compatible)
+/// - --key value → {"key": "value"}
+/// - --key=value → {"key": "value"}
+/// - --key {"a":1} → parse JSON value → {"key": {"a": 1}}
+fn parse_arguments(args: Vec<String>) -> Result<serde_json::Value> {
+    // Empty args → empty object (don't try to read stdin - that happens at a higher level)
+    if args.is_empty() {
+        return Ok(serde_json::Value::Object(serde_json::Map::new()));
+    }
+
+    // If first arg starts with '{', treat as JSON (backward compatible)
+    if args.first().map(|s| s.starts_with('{')).unwrap_or(false) {
+        let json_str = args.join(" ");
+        return serde_json::from_str(&json_str).map_err(|e| McpError::InvalidJson { source: e });
+    }
+
+    // Parse as --key value pairs
+    let mut map = serde_json::Map::new();
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if !arg.starts_with("--") {
+            return Err(McpError::usage_error(&format!(
+                "Expected --key value pair, got: {}",
+                arg
+            )));
+        }
+
+        // Strip -- prefix
+        let key_with_value = arg.trim_start_matches("--");
+
+        // Check for = separator in the argument itself (--key=value)
+        if let Some((k, v)) = key_with_value.split_once('=') {
+            // --key=value format
+            let value = parse_json_value(v)?;
+            map.insert(k.to_string(), value);
+            i += 1;
+            continue;
+        }
+
+        // No = separator
+        let key = key_with_value;
+        
+        // Check if next arg exists and is not a flag
+        let has_value = i + 1 < args.len() && !args[i + 1].starts_with("--");
+        
+        if has_value {
+            let next_arg = &args[i + 1];
+            if next_arg.starts_with('{') {
+                // Next arg is JSON → use as value directly
+                let value = parse_json_value(next_arg)?;
+                map.insert(key.to_string(), value);
+                i += 2;
+            } else {
+                // --key value format
+                map.insert(key.to_string(), serde_json::Value::String(next_arg.clone()));
+                i += 2;
+            }
+        } else {
+            // Boolean flag (no value or next arg is another flag)
+            map.insert(key.to_string(), serde_json::Value::Bool(true));
+            i += 1;
+        }
+    }
+
+    Ok(serde_json::Value::Object(map))
+}
+
+/// Parse a value string into JSON, handling both plain strings and JSON.
+fn parse_json_value(value: &str) -> Result<serde_json::Value> {
+    let trimmed = value.trim();
+    // Try to parse as JSON first
+    if let Ok(parsed) = serde_json::from_str(trimmed) {
+        Ok(parsed)
+    } else {
+        // Treat as plain string
+        Ok(serde_json::Value::String(trimmed.to_string()))
+    }
+}
 
 /// Execute tool call command.
 ///
@@ -22,7 +106,7 @@ use std::sync::Arc;
 /// # Arguments
 /// * `daemon` - Daemon IPC client (will be wrapped in `Arc<Mutex>`)
 /// * `tool_id` - Tool identifier in format "server/tool" or "server tool"
-/// * `args_json` - JSON arguments as a string, or None to read from stdin
+/// * `args` - Arguments as Vec<String>, supports: JSON, --key value, --key=value, --key {"a":1}
 /// * `output_mode` - Output format (human or JSON)
 ///
 /// # Errors
@@ -32,7 +116,7 @@ use std::sync::Arc;
 pub async fn cmd_call_tool(
     mut daemon: Box<dyn ProtocolClient>,
     tool_id: &str,
-    args_json: Option<&str>,
+    args: Vec<String>,
     output_mode: OutputMode,
 ) -> Result<()> {
     let (server_name, tool_name) = crate::cli::info::parse_tool_id(tool_id)?;
@@ -51,34 +135,12 @@ pub async fn cmd_call_tool(
         }
     })?;
 
-    // Parse arguments (inline or from stdin)
-    let arguments: serde_json::Value = match args_json {
-        Some(args) => {
-            serde_json::from_str(args).map_err(|e| McpError::InvalidJson { source: e })?
-        }
-        None => {
-            // Read from stdin if not provided (EXEC-02)
-            if std::io::stdin().is_terminal() {
-                print_error(
-                    "No arguments provided. Pass JSON arguments as a command-line argument, or pipe JSON to stdin.",
-                );
-                let available_tools = match daemon.list_tools(&server_name).await {
-                    Ok(tools) => {
-                        let names: Vec<String> = tools.iter().map(|t| t.name.clone()).collect();
-                        names.join(", ")
-                    }
-                    Err(_) => "(unavailable)".to_string(),
-                };
-                println!();
-                print_error(&format!(
-                    "Available tools on '{}': {}",
-                    server_name, available_tools
-                ));
-                return Ok(());
-            }
-
-            let input = read_stdin_async()?;
-            serde_json::from_str(&input).map_err(|e| McpError::InvalidJson { source: e })?
+    // Parse arguments - supports JSON, --key value, --key=value, --key {"a":1}
+    let arguments: serde_json::Value = match parse_arguments(args) {
+        Ok(parsed) => parsed,
+        Err(e) => {
+            print_error(&format!("Failed to parse arguments: {}", e));
+            return Err(e);
         }
     };
 
@@ -278,5 +340,93 @@ mod tests {
         assert!(!model.success);
         assert!(model.error.is_some());
         assert_eq!(model.retries, 3);
+    }
+
+    // Tests for parse_arguments function (ARGS-01, ARGS-02, ARGS-03, ARGS-04)
+
+    #[test]
+    fn test_parse_arguments_empty() {
+        // Empty args → empty object {}
+        let result = parse_arguments(vec![]).unwrap();
+        assert_eq!(result, serde_json::json!({}));
+    }
+
+    #[test]
+    fn test_parse_arguments_json_backward_compatible() {
+        // JSON only → parse as JSON (ARGS-04: backward compatible)
+        let result = parse_arguments(vec!["{\"key\": \"value\"}".to_string()]).unwrap();
+        assert_eq!(result, serde_json::json!({"key": "value"}));
+    }
+
+    #[test]
+    fn test_parse_arguments_key_value() {
+        // --key value → {"key": "value"} (ARGS-01)
+        let result = parse_arguments(vec!["--key".to_string(), "value".to_string()]).unwrap();
+        assert_eq!(result, serde_json::json!({"key": "value"}));
+    }
+
+    #[test]
+    fn test_parse_arguments_key_equals_value() {
+        // --key=value → {"key": "value"} (ARGS-02)
+        let result = parse_arguments(vec!["--key=value".to_string()]).unwrap();
+        assert_eq!(result, serde_json::json!({"key": "value"}));
+    }
+
+    #[test]
+    fn test_parse_arguments_key_json_value() {
+        // --key {"a":1} → {"key": {"a": 1}} (ARGS-03)
+        let result = parse_arguments(vec!["--key".to_string(), "{\"a\":1}".to_string()]).unwrap();
+        assert_eq!(result, serde_json::json!({"key": {"a": 1}}));
+    }
+
+    #[test]
+    fn test_parse_arguments_multiple_flags() {
+        // Multiple flags
+        let result = parse_arguments(vec![
+            "--path".to_string(),
+            "/tmp/file.txt".to_string(),
+            "--verbose".to_string(),
+            "true".to_string(),
+        ]).unwrap();
+        assert_eq!(result, serde_json::json!({"path": "/tmp/file.txt", "verbose": "true"}));
+    }
+
+    #[test]
+    fn test_parse_arguments_boolean_flag() {
+        // Boolean flags (next arg is another flag)
+        let result = parse_arguments(vec![
+            "--flag1".to_string(),
+            "--flag2".to_string(),
+        ]).unwrap();
+        // Both flags should be boolean true
+        assert_eq!(result, serde_json::json!({"flag1": true, "flag2": true}));
+    }
+
+    #[test]
+    fn test_parse_arguments_json_with_nesting() {
+        // JSON with nested objects
+        let result = parse_arguments(vec!["{\"a\": {\"b\": 2}}".to_string()]).unwrap();
+        assert_eq!(result, serde_json::json!({"a": {"b": 2}}));
+    }
+
+    #[test]
+    fn test_parse_arguments_key_equals_json_value() {
+        // --key={"a":1} → {"key": {"a": 1}}
+        let result = parse_arguments(vec!["--key={\"a\":1}".to_string()]).unwrap();
+        assert_eq!(result, serde_json::json!({"key": {"a": 1}}));
+    }
+
+    #[test]
+    fn test_parse_arguments_single_boolean_flag() {
+        // Single boolean flag (no value) should be true
+        let result = parse_arguments(vec!["--key".to_string()]).unwrap();
+        assert_eq!(result, serde_json::json!({"key": true}));
+    }
+
+    #[test]
+    fn test_parse_arguments_error_invalid_format() {
+        // Non-flag argument should error
+        let result = parse_arguments(vec!["not-a-flag".to_string()]);
+        assert!(result.is_err());
     }
 }
