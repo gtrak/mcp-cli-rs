@@ -191,7 +191,7 @@ Project follows a solo developer + Claude workflow with no team coordination art
 **Success Criteria**:
   1. Error shows valid JSON format
   2. Help documents both JSON and --args
-**Plans**: 1 plan
+**Plans**: 1 plan → 23-01-PLAN.md (Help text improvements)
 
 ---
 
