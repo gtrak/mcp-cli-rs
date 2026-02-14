@@ -22,9 +22,9 @@
 | v1.3 | ✅ COMPLETE | 46/47 (98%) | 12-16 |
 | v1.4 | ✅ COMPLETE | 17/17 (100%) | 17-19 |
 | v1.5 | ✅ COMPLETE | 13/13 (100%) | 20-21 |
-| v1.6 | 🔄 ACTIVE | 5/9 (56%) | 22-23 |
+| v1.6 | ✅ COMPLETE | 9/9 (100%) | 22-23 |
 
-**Total Requirements:** 130/130 satisfied
+**Total Requirements:** 139/139 satisfied
 
 ---
 
@@ -53,8 +53,8 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 
 **Core value:** Reliable cross-platform MCP server interaction without dependencies
 
-**Current focus:** Project complete - all milestones shipped
+**Current focus:** v1.6 complete - all 6 milestones shipped
 
 ---
 
-_Milestone v1.5 complete_
+_Milestone v1.6 complete_

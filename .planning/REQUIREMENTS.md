@@ -42,15 +42,14 @@ Add bash-style calling conventions and fix JSON help text.
 | ARGS-03 | Phase 22 | Complete |
 | ARGS-04 | Phase 22 | Complete |
 | ARGS-05 | Phase 22 | Pending |
-| HELP-01 | Phase 23 | Pending |
-| HELP-02 | Phase 23 | Pending |
-| HELP-03 | Phase 23 | Pending |
-| HELP-04 | Phase 23 | Pending |
+| HELP-01 | Phase 23 | Complete |
+| HELP-02 | Phase 23 | Complete |
+| HELP-03 | Phase 23 | Complete |
+| HELP-04 | Phase 23 | Complete |
 
 **Coverage:**
 - v1.6 requirements: 9 total
-- Mapped to phases: 4
-- Unmapped: 0 ✓
+- Completed: 9/9 (100%)
 
 ---
 *Requirements defined: 2026-02-14*
