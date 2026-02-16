@@ -119,9 +119,12 @@ Project follows a solo developer + Claude workflow with no team coordination art
 
 **Gap Closure:**
 ✅ **COMPLETE** - All verification gaps addressed:
-1. ✅ **Code bug fixed:** create_ipc_server() made async, removed Handle::block_on()
-2. ✅ **Status corrected:** LINUX-03 verified complete with test results
-3. ✅ **Docs corrected:** 25-02-SUMMARY.md accurately describes code bug
+1. ✅ **Code bug fixed:** create_ipc_server() made async, removed Handle::block_on() (25-03)
+2. ✅ **Status corrected:** LINUX-03 verified complete with test results (25-04)
+3. ✅ **Docs corrected:** 25-02-SUMMARY.md accurately describes code bug (25-04)
+4. ✅ **Socket conflicts fixed:** Unique socket paths with AtomicU64 counters (25-05)
+5. ✅ **Socket cleanup added:** Robust cleanup helpers and stale file handling (25-06)
+6. ✅ **Daemon tests fixed:** All daemon_ipc_tests pass (was 1/4) (25-07)
 
 **Status:** ✅ COMPLETE — All cross-platform test validation done, gaps closed
 

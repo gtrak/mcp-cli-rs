@@ -73,6 +73,12 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 - ✅ Phase 25 Gap Closure COMPLETE - All VERIFICATION.md gaps addressed
 - ✅ Fixed socket path conflicts using AtomicU64 unique identifiers (25-05)
 - ✅ 5/5 Unix socket tests pass, no more "Address already in use" errors (25-05)
+- ✅ Added cleanup_socket_file() helper for robust socket cleanup (25-06)
+- ✅ Improved stale socket file handling in create_ipc_server (25-06)
+- ✅ Fixed daemon_ipc_tests - all 4 tests now pass (was 1/4) (25-07)
+- ✅ Fixed critical TempDir dropping bug in daemon_test_helper (25-07)
+- ✅ Active socket waiting instead of fixed sleep in spawn_test_daemon (25-07)
+- ✅ Phase 25 Gap Closure COMPLETE - Test infrastructure fully fixed
 - ✅ Added socket cleanup helpers: cleanup_socket_file() and cleanup_all_test_sockets() (25-06)
 - ✅ Updated all Unix socket tests with consistent cleanup patterns (25-06)
 - ✅ Improved stale socket handling - warn instead of error (25-06)
