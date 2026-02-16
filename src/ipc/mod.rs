@@ -245,7 +245,7 @@ pub fn create_ipc_client(config: &Config) -> Result<Box<dyn ProtocolClient>, Mcp
 ///
 /// Returns `Box<dyn IpcServer>` with platform-specific implementation
 #[cfg(windows)]
-pub fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, McpError> {
+pub async fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, McpError> {
     Ok(Box::new(crate::ipc::windows::NamedPipeIpcServer::new(
         path,
     )?))
@@ -255,15 +255,8 @@ pub fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, McpError> {
 ///
 /// Returns `Box<dyn IpcServer>` with platform-specific implementation
 #[cfg(unix)]
-pub fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, McpError> {
-    use tokio::runtime::Handle;
-
-    let server = Handle::try_current()
-        .map_err(|e| McpError::IpcError {
-            message: format!("No Tokio runtime available for IPC server creation: {}", e),
-        })?
-        .block_on(crate::ipc::unix::UnixIpcServer::new(path))?;
-
+pub async fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, McpError> {
+    let server = crate::ipc::unix::UnixIpcServer::new(path).await?;
     Ok(Box::new(server))
 }
 
