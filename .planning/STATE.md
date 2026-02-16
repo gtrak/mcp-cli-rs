@@ -13,7 +13,7 @@
 **Phase:** 26 - Documentation & README
 **Plan:** Not started - Phase 25 COMPLETE
 
-**Last activity:** 2026-02-16 - Completed 25-02-PLAN.md (Verified all tests pass on Linux)
+**Last activity:** 2026-02-16 - Completed 25-03-PLAN.md (Fixed runtime nesting bug in create_ipc_server)
 
 **Progress:** ████████████ 100% of Phase 25
 
@@ -66,6 +66,8 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 - ✅ 71+ integration tests pass on Linux (25-02)
 - ✅ LINUX-02 and LINUX-03 requirements complete (25-02)
 - ✅ Phase 25 Cross-Platform Test Validation COMPLETE
+- ✅ Fixed runtime nesting bug: make create_ipc_server async (25-03)
+- ✅ Removed Handle::block_on() anti-pattern from IPC server creation
 
 ---
 
