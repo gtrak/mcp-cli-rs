@@ -166,6 +166,11 @@ Project follows a solo developer + Claude workflow with no team coordination art
 3. GitHub Actions workflow for macOS testing
 4. All workflows trigger on PR and push to main
 
+**Plans:** 1 plan
+
+**Plan List:**
+- [ ] 27-01-PLAN.md — Create GitHub Actions CI workflow with matrix builds
+
 ---
 
 ## Progress
