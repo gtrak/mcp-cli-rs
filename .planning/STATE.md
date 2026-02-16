@@ -11,9 +11,9 @@
 
 **Status:** Milestone v1.7 in progress
 **Phase:** 24 - Linux Compatibility Fixes
-**Plan:** 02 complete, ready for 03
+**Plan:** 03 complete, ready for 04 (or phase transition)
 
-**Last activity:** 2026-02-16 - Completed 24-02-PLAN.md (create_ipc_server Unix implementation)
+**Last activity:** 2026-02-16 - Completed 24-03-PLAN.md (Linux compilation fixes)
 
 ---
 
@@ -42,7 +42,6 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 **Current focus:** v1.7 - Linux compatibility fixes, comprehensive README, and CI/CD setup
 
 **Active Issues:**
-- Linux compilation failures (code-level issues: IPC method signatures, error handling)
 - No README.md exists
 - Missing CI/CD for automated cross-platform testing
 
@@ -51,6 +50,9 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 - ✅ Made windows-sys Windows-only (24-01)
 - ✅ Fixed create_ipc_server unresolved import on Linux (24-02)
 - ✅ Added Unix implementation with async/sync compatibility (24-02)
+- ✅ Fixed Unix socket address display using as_pathname() (24-03)
+- ✅ Added DaemonNotRunning to Unix exit_code match (24-03)
+- ✅ All Linux compilation errors resolved - cargo build succeeds (24-03)
 
 ---
 
