@@ -11,9 +11,9 @@
 
 **Status:** Milestone v1.7 in progress
 **Phase:** 24 - Linux Compatibility Fixes
-**Plan:** 01 complete, ready for 02
+**Plan:** 02 complete, ready for 03
 
-**Last activity:** 2026-02-16 - Completed 24-01-PLAN.md
+**Last activity:** 2026-02-16 - Completed 24-02-PLAN.md (create_ipc_server Unix implementation)
 
 ---
 
@@ -49,6 +49,8 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 **Recently Resolved:**
 - ✅ Added nix crate for Unix signal handling (24-01)
 - ✅ Made windows-sys Windows-only (24-01)
+- ✅ Fixed create_ipc_server unresolved import on Linux (24-02)
+- ✅ Added Unix implementation with async/sync compatibility (24-02)
 
 ---
 
