@@ -57,9 +57,13 @@ impl IpcServer for UnixIpcServer {
         match self.listener.accept().await {
             Ok((stream, addr)) => {
                 // UnixStream already implements AsyncRead + AsyncWrite
+                let addr_str = addr
+                    .as_pathname()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
                 Ok((
                     Box::new(stream) as Box<dyn crate::ipc::IpcStream>,
-                    addr.to_string_lossy().to_string(),
+                    addr_str,
                 ))
             }
             Err(e) => Err(McpError::IpcError {
