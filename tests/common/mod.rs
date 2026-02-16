@@ -20,7 +20,7 @@ pub async fn test_ipc_roundtrip_with_timeout(
     expected_response: DaemonResponse,
 ) -> anyhow::Result<()> {
     // Implementation using helpers and common patterns
-    let server = ipc::create_ipc_server(&socket_path)?;
+    let server = ipc::create_ipc_server(&socket_path).await?;
     let expected_response_clone = expected_response.clone();
     let server_handle = tokio::spawn(async move {
         let result = timeout(

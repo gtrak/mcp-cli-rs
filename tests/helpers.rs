@@ -64,7 +64,7 @@ pub fn get_test_socket_path_with_suffix(suffix: &str) -> PathBuf {
 /// This pattern is repeated across 10+ tests in the codebase.
 pub async fn run_ping_pong_roundtrip(socket_path: PathBuf) -> anyhow::Result<()> {
     // Create IPC server
-    let mut server = ipc::create_ipc_server(&socket_path)?;
+    let mut server = ipc::create_ipc_server(&socket_path).await?;
 
     // Spawn server task
     let server_handle = tokio::spawn(async move {
@@ -126,6 +126,7 @@ pub async fn spawn_single_response_server(
     response: DaemonResponse,
 ) -> tokio::task::JoinHandle<()> {
     let mut server = ipc::create_ipc_server(&socket_path)
+        .await
         .expect("Failed to create IPC server");
 
     tokio::spawn(async move {

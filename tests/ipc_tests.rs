@@ -19,7 +19,7 @@ mod ipc_tests {
         let socket_path = crate::helpers::get_test_socket_path_with_suffix("roundtrip");
 
         // Create IPC server
-        let server = ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
+        let server = ipc::create_ipc_server(&socket_path).await.expect("Failed to create IPC server");
 
         // Spawn server task
         let server_handle = tokio::spawn(async move {
@@ -83,7 +83,7 @@ mod ipc_tests {
         let socket_path = crate::helpers::get_test_socket_path_with_suffix("concurrent");
 
         // Create IPC server
-        let server = ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
+        let server = ipc::create_ipc_server(&socket_path).await.expect("Failed to create IPC server");
 
         // Spawn server task to handle multiple connections
         let server_handle = tokio::spawn(async move {
@@ -150,7 +150,7 @@ mod ipc_tests {
 
         // Create IPC server
         let server =
-            mcp_cli_rs::ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
+            mcp_cli_rs::ipc::create_ipc_server(&socket_path).await.expect("Failed to create IPC server");
 
         // Create large JSON object (simulating tool response with big content)
         let large_content = serde_json::json!({

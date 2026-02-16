@@ -51,7 +51,7 @@ async fn test_unix_socket_multiple_concurrent_connections() {
 
     // Create IPC server
     let mut server =
-        mcp_cli_rs::ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
+        mcp_cli_rs::ipc::create_ipc_server(&socket_path).await.expect("Failed to create IPC server");
 
     // Spawn server task handling 3 concurrent connections
     let server_handle = tokio::spawn(async move {
@@ -115,7 +115,7 @@ async fn test_unix_socket_large_message_transfer() {
 
     // Create IPC server
     let mut server =
-        mcp_cli_rs::ipc::create_ipc_server(&socket_path).expect("Failed to create IPC server");
+        mcp_cli_rs::ipc::create_ipc_server(&socket_path).await.expect("Failed to create IPC server");
 
     // Create large JSON object (100KB text as in plan)
     let large_content = serde_json::json!({
@@ -179,6 +179,7 @@ async fn test_unix_socket_cleanup_on_removal() {
 
     // Create IPC server
     let _server = mcp_cli_rs::ipc::create_ipc_server(&socket_path)
+        .await
         .expect("Failed to create IPC server");
 
     // Remove socket path manually
@@ -189,6 +190,7 @@ async fn test_unix_socket_cleanup_on_removal() {
 
     // Create server again at same path - should handle stale file gracefully
     let _server2 = mcp_cli_rs::ipc::create_ipc_server(&socket_path)
+        .await
         .expect("Failed to create server after cleanup");
 
     // Clean up
@@ -202,6 +204,7 @@ async fn test_unix_socket_stale_error_handling() {
 
     // Create IPC server
     let server = mcp_cli_rs::ipc::create_ipc_server(&socket_path)
+        .await
         .expect("Failed to create IPC server");
 
     // Spawn server task
