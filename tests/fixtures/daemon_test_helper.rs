@@ -38,6 +38,9 @@ pub struct TestDaemon {
     shutdown_tx: Option<oneshot::Sender<()>>,
     /// Daemon task handle
     daemon_handle: Option<tokio::task::JoinHandle<Result<()>>>,
+    /// Temp directory holding the socket file (must be kept alive)
+    #[allow(dead_code)]
+    temp_dir: TempDir,
 }
 
 impl TestDaemon {
@@ -152,14 +155,31 @@ pub async fn spawn_test_daemon(config: Config) -> Result<TestDaemon> {
         }
     });
 
-    // Give daemon time to start accepting connections
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    // Wait for socket file to exist (daemon is ready)
+    let socket_ready = tokio::time::timeout(
+        Duration::from_secs(5),
+        async {
+            loop {
+                if socket_path.exists() {
+                    // Give a bit more time for daemon to start listening
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        }
+    ).await;
+
+    if socket_ready.is_err() {
+        return Err(anyhow::anyhow!("Daemon failed to create socket within 5 seconds"));
+    }
 
     Ok(TestDaemon {
         socket_path: socket_path.clone(),
         config,
         shutdown_tx: Some(shutdown_tx),
         daemon_handle: Some(daemon_handle),
+        temp_dir,
     })
 }
 
