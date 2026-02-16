@@ -31,11 +31,15 @@ impl UnixIpcServer {
 
         // Remove stale socket file if exists
         if path.exists() {
-            tokio::fs::remove_file(path)
-                .await
-                .map_err(|e| McpError::IpcError {
-                    message: format!("Failed to remove stale socket file: {}", path.display()),
-                })?;
+            match tokio::fs::remove_file(path).await {
+                Ok(_) => {}
+                Err(e) => {
+                    // If we can't remove it, the bind might still succeed
+                    // (e.g., if it's not actually a socket or permissions issue)
+                    eprintln!("Warning: Could not remove stale socket file: {} - {}",
+                             path.display(), e);
+                }
+            }
         }
 
         // Bind Unix listener to the socket path
