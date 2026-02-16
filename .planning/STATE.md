@@ -1,7 +1,7 @@
 # State: MCP CLI Rust Rewrite
 
 **Created:** 2025-02-06
-**Last updated:** 2026-02-14 - v1.6 milestone complete
+**Last updated:** 2026-02-16 - v1.7 milestone started
 **Mode:** yolo
 **Depth:** standard
 
@@ -9,7 +9,9 @@
 
 ## Current Position
 
-**Status:** Milestone complete
+**Status:** Milestone v1.7 in progress
+**Phase:** 24 - Linux Compatibility Fixes
+**Plan:** —
 
 ---
 
@@ -23,31 +25,25 @@
 | v1.4 | ✅ COMPLETE | 17/17 (100%) | 17-19 |
 | v1.5 | ✅ COMPLETE | 13/13 (100%) | 20-21 |
 | v1.6 | ✅ COMPLETE | 9/9 (100%) | 22-23 |
+| v1.7 | 🚧 IN PROGRESS | 0/20 (0%) | 24-27 |
 
-**Total Requirements:** 139/139 satisfied
-
----
-
-## Project Complete
-
-All 6 milestones shipped:
-- **v1.0:** Core CLI with daemon connection pooling
-- **v1.2:** Ergonomic CLI output with JSON mode
-- **v1.3:** Tech debt cleanup & code quality
-- **v1.4:** Test coverage (81 integration tests)
-- **v1.5:** UX audit & improvements
-- **v1.6:** CLI Calling Conventions
+**Total Requirements:** 139/139 satisfied (v1.0-v1.6), 0/20 in progress (v1.7)
 
 ---
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-14)
+See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Reliable cross-platform MCP server interaction without dependencies
 
-**Current focus:** v1.6 complete - all milestones shipped
+**Current focus:** v1.7 - Linux compatibility fixes, comprehensive README, and CI/CD setup
+
+**Active Issues:**
+- Linux compilation failures (missing nix crate, platform-specific exports)
+- No README.md exists
+- Missing CI/CD for automated cross-platform testing
 
 ---
 
-_Milestone v1.6 complete_
+_Milestone v1.7 started: Linux Compatibility & Documentation_

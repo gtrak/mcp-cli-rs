@@ -3,7 +3,7 @@
 **Created:** 2025-02-06
 **Core Value:** Reliable cross-platform MCP server interaction without dependencies
 **Depth:** Standard (4 phases)
-**Coverage:** 60/60 requirements mapped
+**Coverage:** 159/159 requirements mapped
 
 ## Overview
 
@@ -47,163 +47,88 @@ Project follows a solo developer + Claude workflow with no team coordination art
 
 ---
 
-## Progress
-
-| Phase | Name | Status | Completion |
-|-------|------|--------|------------|
-| 1 | Core Protocol & Configuration | Complete | 100% |
-| 2 | Connection Daemon & Cross-Platform IPC | Complete | 100% |
-| 3 | Performance & Reliability | Complete | 100% |
-| 4 | Tool Filtering & Cross-Platform Validation | Complete | 100% |
-| 5 | Unified Daemon Architecture | Complete | 100% |
-| 6 | Output Formatting & Visual Hierarchy | Complete | 100% |
-| 7 | JSON Output & Machine-Readable Modes | Complete | 100% |
-| 8 | Fix Phase 4 Windows Tests (XP-01) | Complete | 100% |
-| 9 | Cross-Platform Verification (XP-02, XP-04) | Complete | 100% |
-| 10 | Phase 6 Verification Documentation | Complete | 100% |
-| 11 | Code Quality Cleanup | Complete | 100% |
-| 12 | Test Infrastructure | Complete | 100% |
-
-**Progress Summary:**
-- **Phases completed:** 12/16
-- **Total plans:** 44 plans executed
-- **v1 Coverage:** 42/42 requirements satisfied ✅
-- **v1.2 Coverage:** 18/18 requirements satisfied ✅
-- **v1.3 Coverage:** 9/37 requirements satisfied ✅ (TEST requirements complete)
-- **Total Coverage:** 69/97 requirements satisfied ✅
-
----
-
 <details>
-<summary>✅ v1.3 Tech Debt Cleanup & Code Quality (Phases 12-16) — SHIPPED 2026-02-13</summary>
+<summary>✅ v1.3-v1.6 Previous Milestones — SHIPPED</summary>
 
-**Milestone v1.3: Tech debt cleanup, code organization, and code quality**
+- [x] **v1.3**: Tech Debt Cleanup & Code Quality (Phases 12-16) — Shipped 2026-02-13
+- [x] **v1.4**: Test Coverage (Phases 17-19) — Shipped 2026-02-13
+- [x] **v1.5**: UX Audit & Improvements (Phases 20-21) — Shipped 2026-02-13
+- [x] **v1.6**: CLI Calling Conventions (Phases 22-23) — Shipped 2026-02-14
 
-- [x] Phase 12: Test Infrastructure (5/5 plans) — Completed 2026-02-12
-- [x] Phase 13: Code Organization (7/7 plans) — Completed 2026-02-12
-- [x] Phase 14: Duplication Elimination (5/5 plans) — Completed 2026-02-12
-- [x] Phase 15: Documentation & API (4/4 plans) — Completed 2026-02-13
-- [x] Phase 16: Code Quality Sweep (4/4 plans) — Completed 2026-02-13
-
-**Results:**
-- Codebase: 12,408 → 9,568 lines (23% reduction)
-- Zero cargo doc warnings
-- All files under 600 lines
-- 98 library tests pass, 7 doc tests pass
-
-**Archived to:** `.planning/milestones/v1.3-ROADMAP.md`
-**Requirements archived to:** `.planning/milestones/v1.3-REQUIREMENTS.md`
+**Total:** 139/139 requirements satisfied across v1.0-v1.6
 
 </details>
 
 ---
 
-## Progress
+## 🚧 v1.7 Linux Compatibility & Documentation
 
-| Phase | Name | Status | Completion |
-|-------|------|--------|------------|
-| 1 | Core Protocol & Configuration | Complete | 100% |
-| 2 | Connection Daemon & Cross-Platform IPC | Complete | 100% |
-| 3 | Performance & Reliability | Complete | 100% |
-| 4 | Tool Filtering & Cross-Platform Validation | Complete | 100% |
-| 5 | Unified Daemon Architecture | Complete | 100% |
-| 6 | Output Formatting & Visual Hierarchy | Complete | 100% |
-| 7 | JSON Output & Machine-Readable Modes | Complete | 100% |
-| 8 | Fix Phase 4 Windows Tests (XP-01) | Complete | 100% |
-| 9 | Cross-Platform Verification (XP-02, XP-04) | Complete | 100% |
-| 10 | Phase 6 Verification Documentation | Complete | 100% |
-| 11 | Code Quality Cleanup | Complete | 100% |
-| 12 | Test Infrastructure | Complete | 100% |
-| 13 | Code Organization | Complete | 100% |
-| 14 | Duplication Elimination | Complete | 100% |
-| 15 | Documentation & API | Complete | 100% |
-| 16 | Code Quality Sweep | Complete | 100% |
-| 17 | Tool Call Integration Tests | Complete | 100% |
-| 18 | Retry and IPC Tests | Complete | 100% |
-| 19 | Error Paths and Regression Tests | Complete | 100% |
-| 20 | UX Audit | Complete | 100% |
-| 21 | UX Improvements | Complete | 100% |
-| 22 | Dynamic Flag Parsing | Complete | 100% |
-| 23 | Help Text Improvements | Complete | 100% |
+**Status:** In Progress
 
-**Progress Summary:**
-- **Phases completed:** 23/23
-- **Total plans:** 75 plans executed
-- **v1 Coverage:** 42/42 requirements satisfied ✅
-- **v1.2 Coverage:** 18/18 requirements satisfied ✅
-- **v1.3 Coverage:** 46/47 requirements satisfied ✅
-- **v1.4 Coverage:** 17/17 requirements satisfied ✅
-- **v1.5 Coverage:** 13/13 requirements satisfied ✅
-- **v1.6 Coverage:** 9/9 requirements (100%)
-- **Total Coverage:** 139/139 requirements satisfied ✅
+### Phase 24: Linux Compatibility Fixes
+
+**Goal:** Fix compilation errors and platform-specific issues on Linux
+
+**Requirements:** LINUX-01 through LINUX-09
+
+**Success Criteria:**
+1. `cargo build` succeeds on Linux without errors
+2. `cargo test --lib` passes all library tests
+3. All platform-specific code properly gated with `#[cfg()]` attributes
+4. Cross-platform IPC exports are consistent
+
+**Key Fixes Needed:**
+- Add `nix` crate dependency for Unix signal handling
+- Gate Windows-only exports (`create_ipc_server`) properly
+- Fix `send_request` method signature mismatch
+- Fix Unix socket address `to_string_lossy` compatibility
+- Add missing `DaemonNotRunning` error pattern
+- Make `windows-sys` dependency Windows-only
 
 ---
 
-<details>
-<summary>✅ v1.4 Test Coverage (Phases 17-19) — SHIPPED 2026-02-13</summary>
+### Phase 25: Cross-Platform Test Validation
 
-**Milestone v1.4: Test Coverage**
+**Goal:** Ensure all tests pass on Linux, Windows, and macOS
 
-- [x] Phase 17: Tool Call Integration Tests (4/4 plans) — Completed 2026-02-13
-- [x] Phase 18: Retry and IPC Tests (2/2 plans) — Completed 2026-02-13
-- [x] Phase 19: Error Paths and Regression Tests (2/2 plans) — Completed 2026-02-13
+**Requirements:** LINUX-02, LINUX-03
 
-**Results:**
-- 81 integration tests added
-- All tests passing
-
-**Archived to:** `.planning/milestones/v1.4-ROADMAP.md`
-**Requirements archived to:** `.planning/milestones/v1.4-REQUIREMENTS.md`
-
-</details>
+**Success Criteria:**
+1. All 98 library tests pass on Linux
+2. All 81 integration tests pass on Linux
+3. Test suite runs successfully in CI environment
+4. Platform-specific test variations documented
 
 ---
 
-<details>
-<summary>✅ v1.5 UX Audit & Improvements (Phases 20-21) — SHIPPED 2026-02-13</summary>
+### Phase 26: README and Documentation
 
-**Milestone v1.5: UX Audit & Improvements**
+**Goal:** Create comprehensive README with installation, usage, and examples
 
-- [x] Phase 20: UX Audit (1/1 plans) — Completed 2026-02-13
-- [x] Phase 21: UX Improvements (1/1 plans) — Completed 2026-02-13
+**Requirements:** DOC-01 through DOC-07
 
-**Results:**
-- 10 UX fixes implemented
-- Help text improved with examples
-- Error messages enhanced with suggestions
-- --version flag added
-
-**Archived to:** `.planning/milestones/v1.5-ROADMAP.md`
-**Requirements archived to:** `.planning/milestones/v1.5-REQUIREMENTS.md`
-
-</details>
+**Success Criteria:**
+1. README.md exists at project root
+2. Installation instructions cover all platforms
+3. Quick start guide with examples
+4. Configuration documentation
+5. All commands documented with examples
+6. Development setup guide
+7. Troubleshooting section
 
 ---
 
-<details>
-<summary>✅ v1.6 CLI Calling Conventions (Phases 22-23) — SHIPPED 2026-02-14</summary>
+### Phase 27: CI/CD Setup
 
-**Milestone v1.6: CLI Calling Conventions**
+**Goal:** Automated testing across all platforms
 
-- [x] Phase 22: Dynamic Flag Parsing (1/1 plans) — Completed 2026-02-14
-- [x] Phase 23: Help Text Improvements (1/1 plans) — Completed 2026-02-14
+**Requirements:** CI-01 through CI-04
 
-**Results:**
-- `--key value`, `--key=value`, `--key JSON` syntax all supported
-- Error messages show valid JSON format hint
-- Help documents both JSON and --args formats
-- List command shows calling hint
-
-**Archived to:** `.planning/milestones/v1.6-ROADMAP.md`
-**Requirements archived to:** `.planning/milestones/v1.6-REQUIREMENTS.md`
-
-</details>
-
----
-
-## 🚧 v1.7 [Next Milestone]
-
-*Not yet planned*
+**Success Criteria:**
+1. GitHub Actions workflow for Linux testing
+2. GitHub Actions workflow for Windows testing
+3. GitHub Actions workflow for macOS testing
+4. All workflows trigger on PR and push to main
 
 ---
 
@@ -234,22 +159,21 @@ Project follows a solo developer + Claude workflow with no team coordination art
 | 21 | UX Improvements | Complete | 100% |
 | 22 | Dynamic Flag Parsing | Complete | 100% |
 | 23 | Help Text Improvements | Complete | 100% |
+| 24 | Linux Compatibility Fixes | In Progress | 0% |
+| 25 | Cross-Platform Test Validation | Not Started | 0% |
+| 26 | README and Documentation | Not Started | 0% |
+| 27 | CI/CD Setup | Not Started | 0% |
 
 **Progress Summary:**
-- **Phases completed:** 23/23
-- **Total plans:** 75 plans executed
-- **v1 Coverage:** 42/42 requirements satisfied ✅
-- **v1.2 Coverage:** 18/18 requirements satisfied ✅
-- **v1.3 Coverage:** 46/47 requirements satisfied ✅
-- **v1.4 Coverage:** 17/17 requirements satisfied ✅
-- **v1.5 Coverage:** 13/13 requirements satisfied ✅
-- **v1.6 Coverage:** 9/9 requirements (100%)
-- **Total Coverage:** 139/139 requirements satisfied ✅
+- **Phases completed:** 23/27
+- **Total plans:** 75 plans executed (v1.0-v1.6)
+- **v1.0-v1.6 Coverage:** 139/139 requirements satisfied ✅
+- **v1.7 Coverage:** 0/20 requirements in progress
 
 ---
 
-**Last updated:** 2026-02-14 (v1.6 complete: CLI Calling Conventions)
+**Last updated:** 2026-02-16 (v1.7 started: Linux Compatibility & Documentation)
 
 ---
 
-*For archived roadmap details, see `.planning/milestones/v1-ROADMAP.md` through `.planning/milestones/v1.5-ROADMAP.md`*
+*For archived roadmap details, see `.planning/milestones/v1-ROADMAP.md` through `.planning/milestones/v1.6-ROADMAP.md`*
