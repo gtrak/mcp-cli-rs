@@ -83,7 +83,7 @@ pub async fn run_daemon(
     tracing::info!("Starting daemon with socket: {:?}", socket_path);
 
     // Create IPC server
-    let ipc_server: Box<dyn IpcServer> = create_ipc_server(&socket_path)?;
+    let ipc_server: Box<dyn IpcServer> = create_ipc_server(&socket_path).await?;
     tracing::info!("IPC server started on: {:?}", socket_path);
 
     // Calculate config fingerprint
