@@ -86,7 +86,7 @@ async fn test_unix_socket_multiple_concurrent_connections() {
     });
 
     // Create IPC client and send 3 concurrent requests
-    let config = crate::helpers::create_test_config();
+    let config = crate::helpers::create_test_config_with_socket(socket_path.clone());
     let mut client = mcp_cli_rs::ipc::create_ipc_client(&*config)
         .expect("Failed to create IPC client");
     let request = DaemonRequest::Ping;
@@ -145,8 +145,8 @@ async fn test_unix_socket_large_message_transfer() {
             .expect("Failed to send response");
     });
 
-    // Create IPC client
-    let config = crate::helpers::create_test_config();
+    // Create IPC client using the same socket path as the server
+    let config = crate::helpers::create_test_config_with_socket(socket_path.clone());
     let mut client = mcp_cli_rs::ipc::create_ipc_client(&*config)
         .expect("Failed to create IPC client");
 
