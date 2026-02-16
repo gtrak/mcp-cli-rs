@@ -78,6 +78,32 @@ pub fn get_test_socket_path_with_suffix(suffix: &str) -> PathBuf {
     }
 }
 
+/// Clean up socket file if it exists
+///
+/// Should be called at the start of each test to ensure clean state,
+/// and in cleanup to ensure no stale files remain.
+pub fn cleanup_socket_file(socket_path: &std::path::Path) {
+    if socket_path.exists() {
+        let _ = std::fs::remove_file(socket_path);
+    }
+}
+
+/// Clean up all MCP test socket files in temp directory
+///
+/// Use sparingly - only when test isolation is broken.
+pub fn cleanup_all_test_sockets() {
+    let temp_dir = std::env::temp_dir();
+    if let Ok(entries) = std::fs::read_dir(&temp_dir) {
+        for entry in entries.flatten() {
+            if let Ok(name) = entry.file_name().into_string() {
+                if name.starts_with("mcp-test-") && name.ends_with(".sock") {
+                    let _ = std::fs::remove_file(entry.path());
+                }
+            }
+        }
+    }
+}
+
 /// Run a simple IPC roundtrip test (Ping -> Pong)
 ///
 /// Creates server, spawns task, sends Ping request, awaits Pong response.
