@@ -13,7 +13,7 @@
 **Phase:** 26 - Documentation & README
 **Plan:** Not started - Phase 25 COMPLETE with Gap Closure
 
-**Last activity:** 2026-02-16 - Completed 25-05-PLAN.md (Gap closure - socket path conflicts)
+**Last activity:** 2026-02-16 - Completed 25-07-PLAN.md (Gap closure - daemon_ipc_tests socket handling)
 
 **Progress:** ████████████ 100% of Phase 25
 
@@ -77,6 +77,9 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 - ✅ Updated all Unix socket tests with consistent cleanup patterns (25-06)
 - ✅ Improved stale socket handling - warn instead of error (25-06)
 - ✅ No more "Failed to remove stale socket file" errors (25-06)
+- ✅ Fixed daemon_ipc_tests by storing TempDir in TestDaemon struct (25-07)
+- ✅ Replaced fixed 300ms sleep with active socket waiting (25-07)
+- ✅ All 4 daemon_ipc_tests pass consistently (was 1/4) (25-07)
 
 ---
 
