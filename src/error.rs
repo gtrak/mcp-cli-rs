@@ -165,7 +165,8 @@ pub fn exit_code(error: &McpError) -> i32 {
         | McpError::AmbiguousCommand { .. }
         | McpError::UsageError { .. }
         | McpError::OperationCancelled { .. }
-        | McpError::MaxRetriesExceeded { .. } => 1, // Client error
+        | McpError::MaxRetriesExceeded { .. }
+        | McpError::DaemonNotRunning { .. } => 1, // Client error
 
         McpError::InvalidProtocol { .. } => 2, // Server error
 
