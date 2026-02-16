@@ -843,6 +843,7 @@ dependencies = [
  "glob",
  "hex",
  "http",
+ "hyper",
  "rand 0.8.5",
  "reqwest",
  "serde",
