@@ -7,6 +7,7 @@
 //! - Test configuration factories
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -17,33 +18,22 @@ use mcp_cli_rs::config::Config;
 use mcp_cli_rs::daemon::protocol::{DaemonRequest, DaemonResponse};
 use mcp_cli_rs::ipc;
 
+/// Thread-safe counter for generating unique socket paths
+static SOCKET_COUNTER: AtomicU64 = AtomicU64::new(0);
+
 /// Get a platform-specific test socket/pipe path for testing
 ///
-/// Returns Unix socket path on Linux/macOS (e.g., /tmp/mcp-test-12345.sock)
-/// Returns Windows named pipe path on Windows (e.g., \\.\pipe\mcp-test-12345)
-pub fn get_test_socket_path() -> PathBuf {
-    #[cfg(unix)]
-    {
-        let mut path = std::env::temp_dir();
-        path.push(format!("mcp-test-{}.sock", std::process::id()));
-        path
-    }
-    #[cfg(windows)]
-    {
-        let mut path = std::env::temp_dir();
-        path.push(format!(r"\\.\pipe\mcp-test-{}", std::process::id()));
-        path
-    }
-}
-
-/// Get a unique test socket/pipe path with custom suffix
+/// Returns Unix socket path on Linux/macOS (e.g., /tmp/mcp-test-12345-0.sock)
+/// Returns Windows named pipe path on Windows (e.g., \\.\pipe\mcp-test-12345-0)
 ///
-/// Useful for creating multiple distinct test endpoints
-pub fn get_test_socket_path_with_suffix(suffix: &str) -> PathBuf {
+/// Uses a thread-safe atomic counter to ensure unique paths even when
+/// tests run in parallel. This prevents "Address already in use" errors.
+pub fn get_test_socket_path() -> PathBuf {
+    let counter = SOCKET_COUNTER.fetch_add(1, Ordering::SeqCst);
     #[cfg(unix)]
     {
         let mut path = std::env::temp_dir();
-        path.push(format!("mcp-test-{}-{}.sock", std::process::id(), suffix));
+        path.push(format!("mcp-test-{}-{}.sock", std::process::id(), counter));
         path
     }
     #[cfg(windows)]
@@ -52,6 +42,36 @@ pub fn get_test_socket_path_with_suffix(suffix: &str) -> PathBuf {
         path.push(format!(
             r"\\.\pipe\mcp-test-{}-{}",
             std::process::id(),
+            counter
+        ));
+        path
+    }
+}
+
+/// Get a unique test socket/pipe path with custom suffix
+///
+/// Useful for creating multiple distinct test endpoints.
+/// Uses thread-safe atomic counter to ensure uniqueness in parallel tests.
+pub fn get_test_socket_path_with_suffix(suffix: &str) -> PathBuf {
+    let counter = SOCKET_COUNTER.fetch_add(1, Ordering::SeqCst);
+    #[cfg(unix)]
+    {
+        let mut path = std::env::temp_dir();
+        path.push(format!(
+            "mcp-test-{}-{}-{}.sock",
+            std::process::id(),
+            counter,
+            suffix
+        ));
+        path
+    }
+    #[cfg(windows)]
+    {
+        let mut path = std::env::temp_dir();
+        path.push(format!(
+            r"\\.\pipe\mcp-test-{}-{}-{}",
+            std::process::id(),
+            counter,
             suffix
         ));
         path
