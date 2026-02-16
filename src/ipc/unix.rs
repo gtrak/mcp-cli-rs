@@ -97,7 +97,7 @@ impl crate::ipc::IpcClient for UnixIpcClient {
 
     /// Send a daemon protocol request and receive response
     async fn send_request(
-        &self,
+        &mut self,
         request: &crate::daemon::protocol::DaemonRequest,
     ) -> Result<crate::daemon::protocol::DaemonResponse, McpError> {
         // Connect to daemon

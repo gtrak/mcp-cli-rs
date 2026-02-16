@@ -44,7 +44,8 @@ pub fn is_daemon_running(pid: u32) -> bool {
 
     // Send signal 0 to check if process exists
     // If it succeeds, the process is running
-    match kill(Pid::from_raw(pid as i32), Signal::SIGZERO) {
+    // Note: nix::sys::signal::Signal doesn't have SIGZERO, use None for signal 0 check
+    match kill(Pid::from_raw(pid as i32), None) {
         Ok(()) => true,
         Err(_) => false,
     }
