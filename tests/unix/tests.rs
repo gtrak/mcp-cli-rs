@@ -32,7 +32,7 @@ async fn test_unix_socket_creation() {
     );
 
     // Clean up
-    let _ = std::fs::remove_file(&socket_path);
+    crate::helpers::cleanup_socket_file(&socket_path);
 }
 
 /// Test Unix socket client-server roundtrip (Linux/macOS)
@@ -102,10 +102,8 @@ async fn test_unix_socket_multiple_concurrent_connections() {
     // Wait for server to complete
     server_handle.await.expect("Server task failed to join");
 
-    // Clean up socket file (Unix only)
-    std::fs::remove_file(&socket_path)
-        .ok()
-        .expect("Failed to remove socket file");
+    // Clean up socket file
+    crate::helpers::cleanup_socket_file(&socket_path);
 }
 
 /// Test Unix socket large message transfer (Linux/macOS)
@@ -169,7 +167,7 @@ async fn test_unix_socket_large_message_transfer() {
     server_handle.await.expect("Server task failed to join");
 
     // Clean up
-    let _ = std::fs::remove_file(&socket_path);
+    crate::helpers::cleanup_socket_file(&socket_path);
 }
 
 /// Test Unix socket server cleanup on path removal (Linux/macOS)
@@ -194,7 +192,7 @@ async fn test_unix_socket_cleanup_on_removal() {
         .expect("Failed to create server after cleanup");
 
     // Clean up
-    let _ = std::fs::remove_file(&socket_path);
+    crate::helpers::cleanup_socket_file(&socket_path);
 }
 
 /// Test Unix socket StaleSocketError handling (Linux/macOS)
@@ -227,5 +225,5 @@ async fn test_unix_socket_stale_error_handling() {
     server_handle.await.expect("Server task failed to join");
 
     // Clean up
-    let _ = std::fs::remove_file(&socket_path);
+    crate::helpers::cleanup_socket_file(&socket_path);
 }
