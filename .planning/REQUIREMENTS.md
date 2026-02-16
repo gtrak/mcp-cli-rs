@@ -8,8 +8,8 @@
 ### Linux Compatibility
 
 - [ ] **LINUX-01**: Project compiles successfully on Linux (cargo build)
-- [ ] **LINUX-02**: All library tests pass on Linux (cargo test --lib)
-- [ ] **LINUX-03**: All integration tests pass on Linux (cargo test --test '*')
+- [x] **LINUX-02**: All library tests pass on Linux (cargo test --lib)
+- [x] **LINUX-03**: All integration tests pass on Linux (cargo test --test '*')
 - [ ] **LINUX-04**: Missing nix crate dependency added for Unix signal handling
 - [ ] **LINUX-05**: Windows-only exports properly gated with cfg attributes
 - [ ] **LINUX-06**: IPC method signatures compatible across platforms
@@ -57,8 +57,8 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | LINUX-01 | Phase 24 | Pending |
-| LINUX-02 | Phase 24 | Pending |
-| LINUX-03 | Phase 25 | Pending |
+| LINUX-02 | Phase 24 | Complete |
+| LINUX-03 | Phase 25 | Complete |
 | LINUX-04 | Phase 24 | Pending |
 | LINUX-05 | Phase 24 | Pending |
 | LINUX-06 | Phase 24 | Pending |
