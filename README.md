@@ -5,7 +5,11 @@
 
 **MCP CLI client in Rust — Cross-platform MCP server interaction without runtime dependencies**
 
-A fast, reliable CLI for discovering, inspecting, and executing tools from Model Context Protocol (MCP) servers. Works on Linux, macOS, and **Windows** (via named pipes).
+A CLI for discovering, inspecting, and executing tools from Model Context Protocol (MCP) servers with lazy background daemon. Works on Linux, macOS, and **Windows** (via named pipes).
+
+[Vibe-kit Disclaimer](https://github.com/gtrak/vibe-kit/blob/main/DISCLAIMER.md)
+
+This is just an experiment for its own sake.  I don't intend to rely on it heavily. Use the original https://github.com/philschmid/mcp-cli.
 
 ---
 
@@ -13,7 +17,7 @@ A fast, reliable CLI for discovering, inspecting, and executing tools from Model
 
 ```bash
 # Install from source
-git clone https://github.com/gary/mcp-cli-rs.git
+git clone https://github.com/gtrak/mcp-cli-rs.git
 cd mcp-cli-rs
 cargo build --release
 
@@ -51,7 +55,7 @@ This is a Rust rewrite of the original [Bun-based MCP CLI](https://github.com/f/
 
 ```bash
 # Clone and build
-git clone https://github.com/gary/mcp-cli-rs.git
+git clone https://github.com/gtrak/mcp-cli-rs.git
 cd mcp-cli-rs
 cargo build --release
 
