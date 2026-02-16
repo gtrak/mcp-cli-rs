@@ -11,7 +11,9 @@
 
 **Status:** Milestone v1.7 in progress
 **Phase:** 24 - Linux Compatibility Fixes
-**Plan:** —
+**Plan:** 01 complete, ready for 02
+
+**Last activity:** 2026-02-16 - Completed 24-01-PLAN.md
 
 ---
 
@@ -40,9 +42,13 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 **Current focus:** v1.7 - Linux compatibility fixes, comprehensive README, and CI/CD setup
 
 **Active Issues:**
-- Linux compilation failures (missing nix crate, platform-specific exports)
+- Linux compilation failures (code-level issues: IPC method signatures, error handling)
 - No README.md exists
 - Missing CI/CD for automated cross-platform testing
+
+**Recently Resolved:**
+- ✅ Added nix crate for Unix signal handling (24-01)
+- ✅ Made windows-sys Windows-only (24-01)
 
 ---
 
