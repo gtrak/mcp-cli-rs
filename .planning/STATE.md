@@ -10,12 +10,12 @@
 ## Current Position
 
 **Status:** Milestone v1.7 in progress
-**Phase:** 24 - Linux Compatibility Fixes
-**Plan:** 04 COMPLETE - Phase complete
+**Phase:** 25 - Cross-Platform Test Validation
+**Plan:** 01 COMPLETE - Fixed integration test compilation errors
 
-**Last activity:** 2026-02-16 - Completed 24-04-PLAN.md (Linux test verification)
+**Last activity:** 2026-02-16 - Completed 25-01-PLAN.md (Fixed orphan_cleanup_tests.rs and cross_platform_daemon_tests.rs compilation)
 
-**Progress:** ████████████ 100% of Phase 24
+**Progress:** ██░░░░░░░░░░ 17% of Phase 25
 
 ---
 
@@ -58,6 +58,9 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 - ✅ All 109 library tests pass on Linux (24-04)
 - ✅ Documentation builds successfully on Linux (24-04)
 - ✅ Phase 24 Linux Compatibility COMPLETE
+- ✅ Fixed orphan_cleanup_tests.rs import error (25-01)
+- ✅ Fixed cross_platform_daemon_tests.rs async/privacy errors (25-01)
+- ✅ Integration test suite compiles successfully (25-01)
 
 ---
 
