@@ -61,119 +61,32 @@ Project follows a solo developer + Claude workflow with no team coordination art
 
 ---
 
-## 🚧 v1.7 Linux Compatibility & Documentation
+<details>
+<summary>✅ v1.7 Linux Compatibility & Documentation (Phases 24-27) — SHIPPED 2026-02-16</summary>
 
-**Status:** In Progress
+**Milestone v1.7: Linux compatibility, comprehensive README, CI/CD automation**
 
-### Phase 24: Linux Compatibility Fixes
+- [x] Phase 24: Linux Compatibility Fixes (4/4 plans) — Fixed compilation, platform-gated dependencies, all 109 tests pass
+- [x] Phase 25: Cross-Platform Test Validation (7/7 plans) — Fixed runtime nesting bug, socket conflicts, daemon tests pass
+- [x] Phase 26: README and Documentation (1/1 plan) — 354-line README with installation, usage, troubleshooting
+- [x] Phase 27: CI/CD Setup (1/1 plan) — GitHub Actions with matrix builds for Linux/Windows/macOS
 
-**Goal:** Fix compilation errors and platform-specific issues on Linux
+**Key Fixes:**
+- Platform-gated windows-sys dependency, added nix crate for Unix
+- Fixed critical `create_ipc_server()` runtime nesting bug (removed Handle::block_on())
+- Fixed socket path conflicts with AtomicU64 unique identifiers
+- Fixed TempDir lifetime bug in daemon tests
 
-**Requirements:** LINUX-01 through LINUX-09
+**Requirements:** 17/20 satisfied (85% — LINUX-03 gap closure complete, test isolation is tech debt)
 
-**Success Criteria:**
-1. `cargo build` succeeds on Linux without errors
-2. `cargo test --lib` passes all library tests
-3. All platform-specific code properly gated with `#[cfg()]` attributes
-4. Cross-platform IPC exports are consistent
+**Archived to:** `.planning/milestones/v1.7-ROADMAP.md`
+**Requirements archived to:** `.planning/milestones/v1.7-REQUIREMENTS.md`
 
-**Plans:** 4 plans
-
-**Key Fixes Needed:**
-- Add `nix` crate dependency for Unix signal handling
-- Gate Windows-only exports (`create_ipc_server`) properly
-- Fix `send_request` method signature mismatch
-- Fix Unix socket address `to_string_lossy` compatibility
-- Add missing `DaemonNotRunning` error pattern
-- Make `windows-sys` dependency Windows-only
-
-**Plan List:**
-- [x] 24-01-PLAN.md — Fix Cargo.toml dependencies (platform-gated windows-sys, add nix crate)
-- [x] 24-02-PLAN.md — Add Unix implementation of create_ipc_server
-- [x] 24-03-PLAN.md — Fix Unix socket address and error handling
-- [x] 24-04-PLAN.md — Verify library tests pass on Linux
-
-**Status:** ✅ COMPLETE — All Linux compatibility issues resolved, all 109 tests pass
+</details>
 
 ---
 
-### Phase 25: Cross-Platform Test Validation
-
-**Goal:** Ensure all tests pass on Linux, Windows, and macOS
-
-**Requirements:** LINUX-02, LINUX-03
-
-**Success Criteria:**
-1. All 109 library tests pass on Linux
-2. All integration tests pass on Linux
-3. Test suite runs successfully in CI environment
-4. Platform-specific test variations documented
-
-**Plans:** 4 plans (2 original + 2 gap closure)
-
-**Plan List:**
-- [x] 25-01-PLAN.md — Fix integration test compilation errors
-- [x] 25-02-PLAN.md — Run and verify all tests pass
-- [x] 25-03-PLAN.md — Fix create_ipc_server runtime nesting bug (gap closure)
-- [x] 25-04-PLAN.md — Update docs and re-verify tests (gap closure)
-
-**Gap Closure:**
-✅ **COMPLETE** - All verification gaps addressed:
-1. ✅ **Code bug fixed:** create_ipc_server() made async, removed Handle::block_on() (25-03)
-2. ✅ **Status corrected:** LINUX-03 verified complete with test results (25-04)
-3. ✅ **Docs corrected:** 25-02-SUMMARY.md accurately describes code bug (25-04)
-4. ✅ **Socket conflicts fixed:** Unique socket paths with AtomicU64 counters (25-05)
-5. ✅ **Socket cleanup added:** Robust cleanup helpers and stale file handling (25-06)
-6. ✅ **Daemon tests fixed:** All daemon_ipc_tests pass (was 1/4) (25-07)
-
-**Status:** ✅ COMPLETE — All cross-platform test validation done, gaps closed
-
----
-
-### Phase 26: README and Documentation
-
-**Goal:** Create comprehensive README with installation, usage, and examples
-
-**Requirements:** DOC-01 through DOC-07
-
-**Success Criteria:**
-1. README.md exists at project root
-2. Installation instructions cover all platforms
-3. Quick start guide with examples
-4. Configuration documentation
-5. All commands documented with examples
-6. Development setup guide
-7. Troubleshooting section
-
-**Plans:** 1 plan
-
-**Plan List:**
-- [x] 26-01-PLAN.md — Create comprehensive README.md
-
-**Status:** ✅ COMPLETE — All DOC requirements satisfied
-
----
-
-### Phase 27: CI/CD Setup
-
-**Goal:** Automated testing across all platforms
-
-**Requirements:** CI-01 through CI-04
-
-**Success Criteria:**
-1. GitHub Actions workflow for Linux testing
-2. GitHub Actions workflow for Windows testing
-3. GitHub Actions workflow for macOS testing
-4. All workflows trigger on PR and push to main
-
-**Plans:** 1 plan
-
-**Plan List:**
-- [x] 27-01-PLAN.md — Create GitHub Actions CI workflow with matrix builds
-
-**Status:** ✅ COMPLETE — All CI requirements satisfied (CI-01 through CI-04)
-
----
+## 🚧 Next Milestone (Planning)
 
 ## Progress
 
@@ -200,16 +113,15 @@ Project follows a solo developer + Claude workflow with no team coordination art
 | 27 | CI/CD Setup | Complete | 100% |
 
 **Progress Summary:**
-- **Phases completed:** 24/27
-- **Total plans:** 76 plans executed (v1.0-v1.7)
-- **v1.0-v1.6 Coverage:** 139/139 requirements satisfied ✅
-- **v1.7 Coverage:** 20/20 requirements satisfied (100%) ✅
-- **v1.7 Phases:** Phase 24 complete (9 requirements), Phase 25 complete (2 requirements), Phase 26 complete (7 requirements), Phase 27 complete (4 requirements)
+- **Phases completed:** 27/27 (ALL COMPLETE) ✅
+- **Total plans:** 76 plans executed across v1.0-v1.7
+- **Total requirements:** 156/159 satisfied (98.1%) ✅
+- **Milestones shipped:** v1.0, v1.2, v1.3, v1.4, v1.5, v1.6, v1.7 ✅
 
 ---
 
-**Last updated:** 2026-02-16 (Phase 26 planned: README and Documentation)
+**Last updated:** 2026-02-16 (Milestone v1.7 shipped)
 
 ---
 
-*For archived roadmap details, see `.planning/milestones/v1-ROADMAP.md` through `.planning/milestones/v1.6-ROADMAP.md`*
+*For archived roadmap details, see `.planning/milestones/v1-ROADMAP.md` through `.planning/milestones/v1.7-ROADMAP.md`*

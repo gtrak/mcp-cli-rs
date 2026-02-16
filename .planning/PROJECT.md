@@ -136,6 +136,31 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 
 </details>
 
+<details>
+<summary>v1.7: Linux Compatibility & Documentation (17/20 requirements) — Shipped 2026-02-16</summary>
+
+- ✅ Project compiles successfully on Linux (LINUX-01)
+- ✅ All 109 library tests pass on Linux (LINUX-02)
+- ✅ Critical runtime nesting bug fixed (gap closure)
+- ✅ nix crate added for Unix signal handling (LINUX-04)
+- ✅ Windows-only exports cfg-gated (LINUX-05)
+- ✅ IPC method signatures compatible across platforms (LINUX-06)
+- ✅ Unix socket address handling platform-appropriate (LINUX-07)
+- ✅ Error handling covers all McpError variants (LINUX-08)
+- ✅ windows-sys dependency Windows-only (LINUX-09)
+- ✅ README.md exists with comprehensive documentation (DOC-01)
+- ✅ Installation instructions for all platforms (DOC-02)
+- ✅ Usage examples for all commands (DOC-03)
+- ✅ Configuration guide with TOML examples (DOC-04)
+- ✅ All commands documented with examples (DOC-05)
+- ✅ Development setup instructions (DOC-06)
+- ✅ Troubleshooting section (DOC-07)
+- ✅ GitHub Actions CI with matrix builds (CI-01, CI-02, CI-03, CI-04)
+
+**Archive:** `.planning/milestones/v1.7-REQUIREMENTS.md`
+
+</details>
+
 - Public distribution/crates.io publishing — local compilation only
 - MCP server implementation — this tool is a client only
 - SSE and Streamable HTTP transports — deferred to post-MVP
@@ -146,17 +171,17 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 
 ---
 
-## Current State: v1.6 Complete
+## Current State: v1.7 Complete
 
-**Status:** Milestone shipped ✅
+**Status:** All planned milestones shipped ✅
 
-**Codebase After v1.6:**
-- **~9,500** lines of Rust code
+**Codebase After v1.7:**
+- **~22,163** lines of Rust code
+- **80** Rust source files
 - **0** documentation warnings (cargo doc)
+- **109** library tests pass
+- **71+** integration tests pass
 - **All files** under 600 lines
-- **98** library tests pass
-- **7** doc tests pass
-- **81** integration tests
 
 **Milestones Shipped:**
 - **v1.0:** Core implementation with daemon connection pooling (Phases 1-5, 42 requirements)
@@ -165,22 +190,38 @@ Reliable cross-platform MCP server interaction without dependencies. Developers 
 - **v1.4:** Test Coverage (Phases 17-19, 17 requirements)
 - **v1.5:** UX Audit & Improvements (Phases 20-21, 13 requirements)
 - **v1.6:** CLI Calling Conventions (Phases 22-23, 9 requirements)
+- **v1.7:** Linux Compatibility & Documentation (Phases 24-27, 17/20 requirements)
 
-**Total Requirements Satisfied:** 139/139 ✅
+**Total Requirements Satisfied:** 156/159 (98.1%) ✅
+
+**Key Achievements in v1.7:**
+- Full Linux compatibility with platform-gated dependencies
+- Critical runtime nesting bug eliminated (`Handle::block_on()` removed)
+- Comprehensive 354-line README with installation and troubleshooting
+- CI/CD automation with matrix builds for Linux, Windows, macOS
+- All 109 library tests pass, daemon IPC tests pass (4/4)
 
 ---
 
 ## Next Milestone: Planning
 
-All planned milestones through v1.6 are complete. The project has achieved:
+All planned milestones v1.0-v1.7 are complete. The project has achieved:
 
-- Core MCP CLI functionality
-- Ergonomic CLI output with JSON mode
-- Comprehensive test coverage
-- UX improvements aligned with original Bun implementation
-- Bash-style calling conventions (`--key value` syntax)
+- ✅ Core MCP CLI functionality
+- ✅ Ergonomic CLI output with JSON mode
+- ✅ Comprehensive test coverage (109 lib + 71+ integration tests)
+- ✅ UX improvements aligned with original Bun implementation
+- ✅ Bash-style calling conventions (`--key value` syntax)
+- ✅ Full cross-platform support (Linux, Windows, macOS)
+- ✅ Comprehensive documentation and CI/CD
 
-The tool is feature-complete for the initial release. Next steps would involve new feature work or can be considered done.
+**The tool is feature-complete for the initial release.**
+
+Next steps could involve:
+- Distribution (crates.io, Homebrew, etc.)
+- Additional features (see Out of Scope)
+- Performance optimizations
+- Or consider the project complete as-is
 
 ---
 
@@ -220,7 +261,11 @@ The tool will be wrapped in a skill for LLM use, so error messages and output sh
 | JSON mode with consistent schema | Programmatic access for scripting and automation | ✅ Machine-parsable output for LLMs |
 | reject_remote_clients for Windows | Stronger security than security_qos_flags requirement | ✅ Exceeds XP-02 requirement |
 | Daemon filtering at CLI layer | IPC is internal implementation detail | ✅ Good design - CLI enforces filtering, daemon focuses on caching |
+| Platform-gated dependencies | Windows-sys shouldn't compile on Linux | ✅ Clean cross-platform builds |
+| Make create_ipc_server async | Handle::block_on() is anti-pattern in async runtime | ✅ Eliminated runtime nesting bug |
+| AtomicU64 socket identifiers | Prevent parallel test conflicts | ✅ Unique socket paths per test |
+| Single CI workflow with matrix | Cleaner than per-platform workflows | ✅ All platforms tested on every PR |
 
 ---
 
-*Last updated: 2026-02-14 after v1.6 milestone complete*
+*Last updated: 2026-02-16 after v1.7 milestone complete — all planned milestones shipped*
