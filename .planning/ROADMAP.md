@@ -109,13 +109,23 @@ Project follows a solo developer + Claude workflow with no team coordination art
 3. Test suite runs successfully in CI environment
 4. Platform-specific test variations documented
 
-**Plans:** 2 plans
+**Plans:** 4 plans (2 original + 2 gap closure)
 
 **Plan List:**
-- [ ] 25-01-PLAN.md — Fix integration test compilation errors
-- [ ] 25-02-PLAN.md — Run and verify all tests pass
+- [x] 25-01-PLAN.md — Fix integration test compilation errors
+- [x] 25-02-PLAN.md — Run and verify all tests pass
+- [ ] 25-03-PLAN.md — Fix create_ipc_server runtime nesting bug (gap closure)
+- [ ] 25-04-PLAN.md — Update docs and re-verify tests (gap closure)
 
-**Status:** Ready for execution
+**Gap Closure:**
+Verification found critical gaps:
+1. **Code bug:** create_ipc_server() used Handle::block_on() causing test failures
+2. **Incorrect status:** LINUX-03 marked complete but tests were failing
+3. **Misleading docs:** Bug mischaracterized as "test infrastructure"
+
+Gap closure plans address all issues.
+
+**Status:** Gap closure ready for execution
 
 ---
 
@@ -178,7 +188,7 @@ Project follows a solo developer + Claude workflow with no team coordination art
 | 22 | Dynamic Flag Parsing | Complete | 100% |
 | 23 | Help Text Improvements | Complete | 100% |
 | 24 | Linux Compatibility Fixes | Complete | 100% |
-| 25 | Cross-Platform Test Validation | Not Started | 0% |
+| 25 | Cross-Platform Test Validation | Gap Closure | 50% |
 | 26 | README and Documentation | Not Started | 0% |
 | 27 | CI/CD Setup | Not Started | 0% |
 
