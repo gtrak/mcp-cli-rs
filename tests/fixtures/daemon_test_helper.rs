@@ -8,11 +8,15 @@
 
 use anyhow::Result;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 use tokio::sync::oneshot;
 use tokio::time::timeout;
+
+/// Thread-safe counter for generating unique daemon socket paths
+static DAEMON_SOCKET_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 use mcp_cli_rs::config::{Config, ServerConfig, ServerTransport};
 use mcp_cli_rs::daemon::lifecycle::DaemonLifecycle;
@@ -391,14 +395,25 @@ fn find_mock_server_binary() -> Result<PathBuf> {
 ///
 /// On Unix: returns a path in the temp directory
 /// On Windows: returns a named pipe path
+/// Uses thread-safe atomic counter to ensure unique paths in parallel tests.
 #[cfg(unix)]
 fn get_daemon_socket_path(temp_dir: &TempDir) -> PathBuf {
-    temp_dir.path().join(format!("daemon-test-{}.sock", std::process::id()))
+    let counter = DAEMON_SOCKET_COUNTER.fetch_add(1, Ordering::SeqCst);
+    temp_dir.path().join(format!(
+        "daemon-test-{}-{}.sock",
+        std::process::id(),
+        counter
+    ))
 }
 
 #[cfg(windows)]
 fn get_daemon_socket_path(_temp_dir: &TempDir) -> PathBuf {
-    PathBuf::from(format!(r"\\.\pipe\mcp-cli-daemon-test-{}", std::process::id()))
+    let counter = DAEMON_SOCKET_COUNTER.fetch_add(1, Ordering::SeqCst);
+    PathBuf::from(format!(
+        r"\\.\pipe\mcp-cli-daemon-test-{}-{}",
+        std::process::id(),
+        counter
+    ))
 }
 
 /// Wait for daemon to be ready for connections

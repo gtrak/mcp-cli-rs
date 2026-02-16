@@ -86,18 +86,29 @@ async fn test_unix_socket_multiple_concurrent_connections() {
     });
 
     // Create IPC client and send 3 concurrent requests
-    let config = crate::helpers::create_test_config_with_socket(socket_path.clone());
-    let mut client = mcp_cli_rs::ipc::create_ipc_client(&*config)
-        .expect("Failed to create IPC client");
-    let request = DaemonRequest::Ping;
-    let response = client
-        .send_request(&request)
-        .await
-        .expect("Failed to send request");
-    assert!(
-        matches!(response, DaemonResponse::Pong),
-        "Expected Pong response"
-    );
+    let mut handles = vec![];
+    for _ in 0..3 {
+        let config = crate::helpers::create_test_config_with_socket(socket_path.clone());
+        let handle = tokio::spawn(async move {
+            let mut client = mcp_cli_rs::ipc::create_ipc_client(&*config)
+                .expect("Failed to create IPC client");
+            let request = DaemonRequest::Ping;
+            let response = client
+                .send_request(&request)
+                .await
+                .expect("Failed to send request");
+            assert!(
+                matches!(response, DaemonResponse::Pong),
+                "Expected Pong response"
+            );
+        });
+        handles.push(handle);
+    }
+
+    // Wait for all client requests to complete
+    for handle in handles {
+        handle.await.expect("Client task failed");
+    }
 
     // Wait for server to complete
     server_handle.await.expect("Server task failed to join");
