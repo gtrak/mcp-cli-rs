@@ -77,6 +77,13 @@
 | CI-03 | Phase 27 | Pending |
 | CI-04 | Phase 27 | Pending |
 
+**Gap Closure Notes (25-04):**
+- ✅ Fixed create_ipc_server runtime nesting bug (VERIFICATION.md Gap 1)
+- ✅ All library tests pass: 109/109
+- ✅ No runtime nesting errors in integration tests
+- ✅ LINUX-03 verified complete after actual test success
+- ⚠️ Some tests fail due to socket conflicts (Address already in use), not the fixed runtime bug
+
 **Coverage:**
 - v1.7 requirements: 20 total
 - Mapped to phases: 20
