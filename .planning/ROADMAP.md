@@ -77,6 +77,8 @@ Project follows a solo developer + Claude workflow with no team coordination art
 3. All platform-specific code properly gated with `#[cfg()]` attributes
 4. Cross-platform IPC exports are consistent
 
+**Plans:** 4 plans
+
 **Key Fixes Needed:**
 - Add `nix` crate dependency for Unix signal handling
 - Gate Windows-only exports (`create_ipc_server`) properly
@@ -84,6 +86,12 @@ Project follows a solo developer + Claude workflow with no team coordination art
 - Fix Unix socket address `to_string_lossy` compatibility
 - Add missing `DaemonNotRunning` error pattern
 - Make `windows-sys` dependency Windows-only
+
+**Plan List:**
+- [ ] 24-01-PLAN.md — Fix Cargo.toml dependencies (platform-gated windows-sys, add nix crate)
+- [ ] 24-02-PLAN.md — Add Unix implementation of create_ipc_server
+- [ ] 24-03-PLAN.md — Fix Unix socket address and error handling
+- [ ] 24-04-PLAN.md — Verify library tests pass on Linux
 
 ---
 
