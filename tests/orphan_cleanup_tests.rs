@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use mcp_cli_rs::config::Config;
 use mcp_cli_rs::daemon::orphan::{
     cleanup_orphaned_daemon, get_fingerprint_file_path, get_pid_file_path, is_daemon_running,
-    write_daemon_pid,
+    kill_daemon_process, write_daemon_pid,
 };
 
 #[cfg(test)]
@@ -233,7 +233,7 @@ async fn test_is_daemon_running_with_real_process() {
 #[test]
 fn test_kill_daemon_process_unix() {
     let pid = std::process::id();
-    let result = super::kill_daemon_process(pid);
+    let result = kill_daemon_process(pid);
     // This will fail because we don't want to kill the current process
     // in a test, but it shows the function works for the target PID
     assert!(
