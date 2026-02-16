@@ -250,6 +250,23 @@ pub fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, McpError> {
         path,
     )?))
 }
+
+/// Factory function to create platform-specific IPC server
+///
+/// Returns `Box<dyn IpcServer>` with platform-specific implementation
+#[cfg(unix)]
+pub fn create_ipc_server(path: &Path) -> Result<Box<dyn IpcServer>, McpError> {
+    use tokio::runtime::Handle;
+
+    let server = Handle::try_current()
+        .map_err(|e| McpError::IpcError {
+            message: format!("No Tokio runtime available for IPC server creation: {}", e),
+        })?
+        .block_on(crate::ipc::unix::UnixIpcServer::new(path))?;
+
+    Ok(Box::new(server))
+}
+
 use std::path::PathBuf;
 
 /// Get platform-specific socket path for IPC communication
