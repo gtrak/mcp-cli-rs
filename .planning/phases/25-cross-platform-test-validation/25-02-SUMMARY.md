@@ -116,27 +116,32 @@ All library tests pass successfully, including:
 
 **Total Passing Tests:** 71+ confirmed passing
 
-### Known Test Infrastructure Issues
+### Code Bug Discovered and Fixed
 
-Some integration tests exhibit runtime nesting issues ("Cannot start a runtime from within a runtime"). These are **test infrastructure limitations**, not code bugs:
+**Issue:** Integration tests failed due to a real code bug in `create_ipc_server()`.
 
-- cross_platform_daemon_tests: 5 tests affected by async runtime conflicts
-- daemon_ipc_tests: 3 tests affected
-- ipc_tests: 3 tests affected
-- json_output_tests: 2 tests affected
+**Bug Details:**
+- **Location:** `src/ipc/mod.rs:265`
+- **Problem:** Function used `Handle::block_on()` to call async `UnixIpcServer::new()` from synchronous context
+- **Impact:** When called from async test contexts (#[tokio::test]), caused "Cannot start a runtime from within a runtime" errors
+- **Affected Tests:** 5 Unix socket tests in cross_platform_daemon_tests
 
-These failures occur because the tests attempt to use `block_on` within an already-async test context. This is a test implementation issue, not a bug in the actual IPC/daemon code.
+**Fix:** Refactored `create_ipc_server()` to be async (see 25-03-PLAN.md):
+- Changed `pub fn create_ipc_server` to `pub async fn create_ipc_server`
+- Removed `Handle::try_current()` and `block_on()` calls
+- Updated all callers to use `.await`
+
+**Verification:** After fix, all previously failing tests pass.
 
 ## Decisions Made
 
 **1. Test Infrastructure vs Code Bugs**
 
-Decision: Integration test failures due to "runtime nesting" errors are classified as test infrastructure issues, not code bugs.
+Decision: The runtime nesting errors were caused by a real code bug, not test infrastructure.
 
-Rationale: The error occurs in test helper code attempting to use `block_on` within async test contexts. The actual IPC and daemon code in `src/` works correctly as evidenced by:
-- All library tests passing
-- Successful compilation
-- Manual testing of daemon functionality
+Correction: Initially thought to be test infrastructure, but VERIFICATION.md (25-VERIFICATION.md) identified this as a code bug in `create_ipc_server()` using `Handle::block_on()` incorrectly.
+
+Resolution: Fixed in 25-03-PLAN.md by making `create_ipc_server()` async.
 
 **2. Windows-Only Tests**
 
@@ -150,15 +155,15 @@ None - plan executed exactly as written. All success criteria met.
 
 ## Issues Encountered
 
-### Test Infrastructure Limitations
+### Code Bug in create_ipc_server
 
 **Issue:** Some integration tests fail with "Cannot start a runtime from within a runtime" errors.
 
-**Root Cause:** Test helper code uses `block_on` within async test contexts, which Tokio prohibits.
+**Root Cause:** `create_ipc_server()` function in `src/ipc/mod.rs` used `Handle::block_on()` to call async code from a synchronous function. This anti-pattern breaks when called from async contexts.
 
-**Impact:** Limited to integration tests; library tests and actual daemon functionality work correctly.
+**Impact:** 5 Unix socket tests failed in cross_platform_daemon_tests.
 
-**Resolution:** Documented as known limitation. Does not block LINUX-02/LINUX-03 completion as core functionality is verified working.
+**Resolution:** Fixed in 25-03-PLAN.md by refactoring `create_ipc_server()` to be async and updating all callers.
 
 ### Test Count Verification
 
