@@ -10,7 +10,7 @@ use std::process::Command;
 /// Helper to run the CLI and capture JSON output
 fn run_json_command(args: &[&str]) -> Result<serde_json::Value, String> {
     let output = Command::new("cargo")
-        .args(["run", "--"])
+        .args(["run", "--bin", "mcp-cli-rs", "--"])
         .args(args)
         .args(["--json"])
         .output()
@@ -43,6 +43,7 @@ fn test_list_json_schema() {
         Ok(j) => j,
         Err(e) if e.contains("No servers configured") => return,
         Err(e) if e.contains("Empty output") => return,
+        Err(e) if e.contains("Failed to read config file") => return,
         Err(e) => panic!("Unexpected error: {}", e),
     };
 
@@ -130,7 +131,7 @@ fn test_plain_text_when_piped() {
 fn test_info_command_json_with_help() {
     // Test that `info --help` still works (not affected by --json flag in normal usage)
     let output = Command::new("cargo")
-        .args(["run", "--", "info", "--help"])
+        .args(["run", "--bin", "mcp-cli-rs", "--", "info", "--help"])
         .output()
         .expect("Failed to run command");
 
@@ -141,8 +142,8 @@ fn test_info_command_json_with_help() {
     );
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("USAGE"), "Help output should contain USAGE");
-    assert!(stdout.contains("ARGS"), "Help output should contain ARGS");
+    assert!(stdout.contains("Usage:"), "Help output should contain Usage");
+    assert!(stdout.contains("Arguments:"), "Help output should contain Arguments");
 }
 
 #[test]

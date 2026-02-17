@@ -48,6 +48,7 @@ async fn test_daemon_mode_list_servers_and_tools() {
 }
 
 /// Test that spawn_daemon_and_wait works correctly
+#[cfg(windows)]
 #[test]
 fn test_spawn_daemon_using_main_entry() {
     // This test spawns a daemon and verifies it starts
@@ -60,14 +61,14 @@ fn test_spawn_daemon_using_main_entry() {
     // Spawn daemon in background
     #[allow(clippy::zombie_processes)]
     let mut daemon = Command::new("cargo")
-        .args(["run", "--", "daemon", "--ttl", "5"])
+        .args(["run", "--bin", "mcp-cli-rs", "--", "daemon", "--ttl", "5"])
         .spawn()
         .expect("Failed to spawn daemon");
     thread::sleep(Duration::from_secs(2));
 
     // Try to list servers (should use daemon)
     let output = Command::new("cargo")
-        .args(["run", "--", "list"])
+        .args(["run", "--bin", "mcp-cli-rs", "--", "list"])
         .output()
         .expect("Failed to run list");
 

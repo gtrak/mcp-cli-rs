@@ -211,14 +211,20 @@ async fn try_connect_via_ipc(daemon_config: &Config, socket_path: &Path) -> Resu
     use crate::daemon::protocol::DaemonRequest;
     use tokio::time::{Duration, timeout};
 
+    // Quick check: if socket file doesn't exist, daemon is definitely not running
+    if !socket_path.exists() {
+        return Err(anyhow::anyhow!("Socket file does not exist"));
+    }
+
     // Create a config with the custom socket path
     let custom_config = Config {
         socket_path: socket_path.to_path_buf(),
         ..daemon_config.clone()
     };
 
-    // Create IPC client
-    let mut client = crate::ipc::create_ipc_client(&custom_config)?;
+    // Create IPC client - this is fast and doesn't do any I/O
+    let mut client = crate::ipc::create_ipc_client(&custom_config)
+        .map_err(|e| anyhow::anyhow!("Failed to create IPC client: {}", e))?;
 
     // Try to send a Ping request with a short timeout
     match timeout(

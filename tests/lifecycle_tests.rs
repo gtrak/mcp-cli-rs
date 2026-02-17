@@ -51,11 +51,13 @@ async fn test_graceful_shutdown_handling() {
     let lifecycle = Arc::new(Mutex::new(DaemonLifecycle::new(60)));
 
     // Initial state should be active
-    let lifecycle_guard = lifecycle.lock().await;
-    assert!(
-        !lifecycle_guard.is_shutting_down().await,
-        "Daemon should not be in shutdown state initially"
-    );
+    {
+        let lifecycle_guard = lifecycle.lock().await;
+        assert!(
+            !lifecycle_guard.is_shutting_down().await,
+            "Daemon should not be in shutdown state initially"
+        );
+    }
 
     // Shutdown the daemon
     lifecycle.lock().await.shutdown().await;
@@ -105,21 +107,25 @@ async fn test_lifecycle_state_transition() {
     let lifecycle = Arc::new(Mutex::new(DaemonLifecycle::new(60)));
 
     // Initial state should be active (not shutdown)
-    let lifecycle_guard = lifecycle.lock().await;
-    assert!(
-        !lifecycle_guard.is_shutting_down().await,
-        "Daemon should not be in shutdown state initially"
-    );
+    {
+        let lifecycle_guard = lifecycle.lock().await;
+        assert!(
+            !lifecycle_guard.is_shutting_down().await,
+            "Daemon should not be in shutdown state initially"
+        );
 
-    // Simulate activity
-    lifecycle_guard.update_activity().await;
+        // Simulate activity
+        lifecycle_guard.update_activity().await;
+    }
 
     // Verify not shutdown after activity
-    let lifecycle_guard = lifecycle.lock().await;
-    assert!(
-        !lifecycle_guard.is_shutting_down().await,
-        "Daemon should not be in shutdown state after activity"
-    );
+    {
+        let lifecycle_guard = lifecycle.lock().await;
+        assert!(
+            !lifecycle_guard.is_shutting_down().await,
+            "Daemon should not be in shutdown state after activity"
+        );
+    }
 
     // Shutdown the daemon
     lifecycle.lock().await.shutdown().await;
@@ -160,11 +166,13 @@ async fn test_config_change_detection() {
     let lifecycle = Arc::new(Mutex::new(DaemonLifecycle::new(60)));
 
     // Set initial config hash
-    let lifecycle_guard = lifecycle.lock().await;
-    // Note: Current implementation doesn't support config_hash
-    // This test verifies the method exists or is added
-    if let Some(hash) = lifecycle_guard.get_config_hash() {
-        assert_eq!(hash, "");
+    {
+        let lifecycle_guard = lifecycle.lock().await;
+        // Note: Current implementation doesn't support config_hash
+        // This test verifies the method exists or is added
+        if let Some(hash) = lifecycle_guard.get_config_hash() {
+            assert_eq!(hash, "");
+        }
     }
 
     // Simulate new config hash
@@ -209,14 +217,18 @@ async fn test_resource_count_tracking() {
     let lifecycle = Arc::new(Mutex::new(DaemonLifecycle::new(60)));
 
     // Get resource count
-    let lifecycle_guard = lifecycle.lock().await;
-    if let Some(count) = lifecycle_guard.get_resource_count() {
-        assert_eq!(count, 0);
+    {
+        let lifecycle_guard = lifecycle.lock().await;
+        if let Some(count) = lifecycle_guard.get_resource_count() {
+            assert_eq!(count, 0);
+        }
     }
 
     // Set resource count
-    let _lifecycle_guard = lifecycle.lock().await;
-    // Placeholder - no actual method to set count
+    {
+        let _lifecycle_guard = lifecycle.lock().await;
+        // Placeholder - no actual method to set count
+    }
 }
 
 /// Test 9: Shutdown confirmation
@@ -225,21 +237,25 @@ async fn test_shutdown_confirmation() {
     let lifecycle = Arc::new(Mutex::new(DaemonLifecycle::new(60)));
 
     // Verify not shutting down initially
-    let lifecycle_guard = lifecycle.lock().await;
-    assert!(
-        !lifecycle_guard.is_shutting_down().await,
-        "Should not be shutting down initially"
-    );
+    {
+        let lifecycle_guard = lifecycle.lock().await;
+        assert!(
+            !lifecycle_guard.is_shutting_down().await,
+            "Should not be shutting down initially"
+        );
+    }
 
     // Trigger shutdown
     lifecycle.lock().await.shutdown().await;
 
     // Verify shutdown has proceeded
-    let lifecycle_guard = lifecycle.lock().await;
-    assert!(
-        lifecycle_guard.shutdown_proceeded().await,
-        "Shutdown should have proceeded"
-    );
+    {
+        let lifecycle_guard = lifecycle.lock().await;
+        assert!(
+            lifecycle_guard.shutdown_proceeded().await,
+            "Shutdown should have proceeded"
+        );
+    }
 }
 
 /// Test 10: Multiple lifecycle instances
@@ -277,20 +293,20 @@ async fn test_multiple_lifecycle_instances() {
 /// Test 11: Activity pruning on timeout
 #[tokio::test]
 async fn test_activity_pruning_on_timeout() {
-    let lifecycle = Arc::new(Mutex::new(DaemonLifecycle::new(60)));
+    let lifecycle = Arc::new(Mutex::new(DaemonLifecycle::new(1)));
 
     // Update activity
     lifecycle.lock().await.update_activity().await;
 
-    // Wait for timeout
-    tokio::time::sleep(tokio::time::Duration::from_secs(65)).await;
+    // Wait for timeout (1 second TTL + small buffer)
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
     // Verify activity was pruned
     let lifecycle_guard = lifecycle.lock().await;
     let elapsed = lifecycle_guard.elapsed_since_last_activity().await;
     drop(lifecycle_guard);
     assert!(
-        elapsed >= std::time::Duration::from_secs(5),
+        elapsed >= std::time::Duration::from_secs(1),
         "Activity should have been pruned after timeout"
     );
 }
@@ -341,9 +357,11 @@ async fn test_lifecycle_error_handling() {
     let lifecycle = Arc::new(Mutex::new(DaemonLifecycle::new(60)));
 
     // Get error state
-    let lifecycle_guard = lifecycle.lock().await;
-    let error = lifecycle_guard.get_error();
-    assert!(error.is_none(), "Should have no error initially");
+    {
+        let lifecycle_guard = lifecycle.lock().await;
+        let error = lifecycle_guard.get_error();
+        assert!(error.is_none(), "Should have no error initially");
+    }
 
     // Set error (placeholder)
     {
@@ -444,15 +462,15 @@ async fn test_shutdown_timeout_behavior() {
 /// Test 20: Activity expiration verification
 #[tokio::test]
 async fn test_activity_expiration_verification() {
-    let lifecycle = Arc::new(Mutex::new(DaemonLifecycle::new(60)));
+    let lifecycle = Arc::new(Mutex::new(DaemonLifecycle::new(1)));
 
     // Update activity
     lifecycle.lock().await.update_activity().await;
 
-    // Wait for timeout
-    tokio::time::sleep(tokio::time::Duration::from_secs(65)).await;
+    // Wait for timeout (1 second TTL + small buffer)
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
     // Verify activity expired
     let elapsed = lifecycle.lock().await.elapsed_since_last_activity().await;
-    assert!(elapsed >= std::time::Duration::from_secs(5));
+    assert!(elapsed >= std::time::Duration::from_secs(1));
 }

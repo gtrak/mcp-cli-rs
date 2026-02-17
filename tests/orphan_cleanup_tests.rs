@@ -71,10 +71,11 @@ async fn test_orphan_pid_file_cleanup() {
     let env = helpers::TestEnvironment::new();
     let socket_path = env.path().join("test_orphan.sock");
 
-    // Write PID to the PID file
-    let pid = std::process::id();
+    // Write PID to the PID file - use a non-existent PID
+    // (don't use current process ID as it would try to kill the test itself)
+    let fake_pid = 99998;
     let pid_file = get_pid_file_path(&socket_path);
-    write_daemon_pid(&socket_path, pid).unwrap();
+    std::fs::write(&pid_file, fake_pid.to_string()).unwrap();
 
     // Create a config
     let config = Config::default();
@@ -118,25 +119,25 @@ async fn test_no_false_positives() {
     // Create a config
     let config = Config::default();
 
-    // Write PID to the PID file for a non-existent process
-    let pid = std::process::id();
-    let _pid_file = get_pid_file_path(&socket_path);
-    write_daemon_pid(&socket_path, pid).unwrap();
+    // Write PID to the PID file for a non-existent process (not the current test process!)
+    // Use a very high PID that definitely doesn't exist
+    let fake_pid = 999999;
+    let pid_file = get_pid_file_path(&socket_path);
+    std::fs::write(&pid_file, fake_pid.to_string()).unwrap();
 
-    // Verify the current process is still running (no false positive cleanup)
+    // Verify the fake process is not running
     assert!(
-        is_daemon_running(pid),
-        "Current process should be detected as running"
+        !is_daemon_running(fake_pid),
+        "Fake process should not be detected as running"
     );
 
     // Clean up the orphaned resources
+    // Since the socket doesn't exist and the PID doesn't exist, it should clean up everything
     let result: anyhow::Result<()> = cleanup_orphaned_daemon(&config, &socket_path).await;
-    assert!(result.is_ok());
-
-    // Note: This test demonstrates that orphan cleanup correctly identifies
-    // that the current process is still running and does not clean it up.
-    // The cleanup function will try to connect via IPC first and find
-    // that daemon is running (via existing connections), preventing cleanup.
+    assert!(result.is_ok(), "Cleanup should succeed");
+    
+    // Verify the PID file was cleaned up (since the process doesn't exist)
+    assert!(!pid_file.exists(), "PID file should be cleaned up when process doesn't exist");
 }
 
 #[tokio::test]
@@ -232,12 +233,33 @@ async fn test_is_daemon_running_with_real_process() {
 #[cfg(unix)]
 #[test]
 fn test_kill_daemon_process_unix() {
-    let pid = std::process::id();
+    // Spawn a child process that will sleep, then try to kill it
+    use std::process::{Command, Stdio};
+    
+    let mut child = Command::new("sleep")
+        .arg("10")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("Failed to spawn test process");
+    
+    let pid = child.id();
+    
+    // Give the process a moment to start
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    
+    // Verify the process is running
+    assert!(is_daemon_running(pid), "Child process should be running");
+    
+    // Kill the process
     let result = kill_daemon_process(pid);
-    // This will fail because we don't want to kill the current process
-    // in a test, but it shows the function works for the target PID
-    assert!(
-        result.is_err(),
-        "Killing current process should return an error"
-    );
+    assert!(result.is_ok(), "Killing child process should succeed");
+    
+    // Wait for the process to exit - need to reap the zombie process
+    // is_daemon_running returns true for zombie processes until wait() is called
+    let wait_result = child.wait();
+    assert!(wait_result.is_ok(), "Waiting for child should succeed");
+    
+    // Verify the process is no longer running
+    assert!(!is_daemon_running(pid), "Child process should be killed after SIGTERM");
 }

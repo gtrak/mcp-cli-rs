@@ -23,8 +23,8 @@ fn ensure_binary_built() {
 /// Sends graceful shutdown request and waits for process to exit
 fn shutdown_daemon_gracefully() -> Result<(), Box<dyn std::error::Error>> {
     // Send shutdown request to daemon
-    let output = Command::new("./target/debug/mcp-cli-rs.exe")
-        .args(["shutdown"])
+    let output = Command::new("cargo")
+        .args(["run", "--bin", "mcp-cli-rs", "--", "shutdown"])
         .env("RUST_LOG", "")
         .env("SERENA_LOG_LEVEL", "error")
         .output()?;
@@ -96,8 +96,8 @@ transport = { type = "stdio", command = "mock-mcp-server" }
 "#;
     let (_temp_dir, config_path) = temp_config_file(config_content);
 
-    let output = Command::new("./target/debug/mcp-cli-rs.exe")
-        .args(["list", "--no-daemon", "--config", config_path.to_str().unwrap()])
+    let output = Command::new("cargo")
+        .args(["run", "--bin", "mcp-cli-rs", "--", "list", "--no-daemon", "--config", config_path.to_str().unwrap()])
         .env("RUST_LOG", "")
         .env("SERENA_LOG_LEVEL", "error")
         .output();
@@ -135,8 +135,8 @@ fn test_manual_daemon_spawn() {
     println!("Testing: Manual daemon spawn and query");
     ensure_binary_built();
 
-    let daemon = Command::new("./target/debug/mcp-cli-rs.exe")
-        .args(["daemon", "--ttl", "10"])
+    let daemon = Command::new("cargo")
+        .args(["run", "--bin", "mcp-cli-rs", "--", "daemon", "--ttl", "10"])
         .env("RUST_LOG", "")
         .env("SERENA_LOG_LEVEL", "error")
         .spawn()
@@ -147,8 +147,8 @@ fn test_manual_daemon_spawn() {
 
     std::thread::sleep(Duration::from_secs(2));
 
-    let output = Command::new("./target/debug/mcp-cli-rs.exe")
-        .args(["list", "--require-daemon"])
+    let output = Command::new("cargo")
+        .args(["run", "--bin", "mcp-cli-rs", "--", "list", "--require-daemon"])
         .env("RUST_LOG", "")
         .env("SERENA_LOG_LEVEL", "error")
         .output()
@@ -203,8 +203,8 @@ transport = { type = "stdio", command = "mock-mcp-server" }
     let (_temp_dir, config_path) = temp_config_file(config_content);
 
     // Start daemon with test config
-    let daemon = Command::new("./target/debug/mcp-cli-rs.exe")
-        .args(["daemon", "--ttl", "10", "--config", config_path.to_str().unwrap()])
+    let daemon = Command::new("cargo")
+        .args(["run", "--bin", "mcp-cli-rs", "--", "daemon", "--ttl", "10", "--config", config_path.to_str().unwrap()])
         .env("RUST_LOG", "")
         .env("SERENA_LOG_LEVEL", "error")
         .spawn()
@@ -216,8 +216,8 @@ transport = { type = "stdio", command = "mock-mcp-server" }
     std::thread::sleep(Duration::from_secs(2));
 
     // Test list with --require-daemon (must use same config as daemon)
-    let output = Command::new("./target/debug/mcp-cli-rs.exe")
-        .args(["list", "--require-daemon", "--config", config_path.to_str().unwrap()])
+    let output = Command::new("cargo")
+        .args(["run", "--bin", "mcp-cli-rs", "--", "list", "--require-daemon", "--config", config_path.to_str().unwrap()])
         .env("RUST_LOG", "")
         .env("SERENA_LOG_LEVEL", "error")
         .output()
@@ -252,8 +252,8 @@ transport = { type = "stdio", command = "mock-mcp-server" }
 "#;
     let (_temp_dir, config_path) = temp_config_file(config_content);
 
-    let output = Command::new("./target/debug/mcp-cli-rs.exe")
-        .args(["list", "--json", "--no-daemon", "--config", config_path.to_str().unwrap()])
+    let output = Command::new("cargo")
+        .args(["run", "--bin", "mcp-cli-rs", "--", "list", "--json", "--no-daemon", "--config", config_path.to_str().unwrap()])
         .env("RUST_LOG", "")
         .env("SERENA_LOG_LEVEL", "error")
         .output()
@@ -318,8 +318,12 @@ url = "http://localhost:9999"
 
     let (_temp_dir, config_path) = temp_config_file(config_content);
 
-    let output = Command::new("./target/debug/mcp-cli-rs.exe")
+    let output = Command::new("cargo")
         .args([
+            "run",
+            "--bin",
+            "mcp-cli-rs",
+            "--",
             "list",
             "--no-daemon",
             "--config",
@@ -356,8 +360,12 @@ fn test_list_empty_config() {
 
     let (_temp_dir, config_path) = temp_config_file(config_content);
 
-    let output = Command::new("./target/debug/mcp-cli-rs.exe")
+    let output = Command::new("cargo")
         .args([
+            "run",
+            "--bin",
+            "mcp-cli-rs",
+            "--",
             "list",
             "--no-daemon",
             "--config",
@@ -390,8 +398,12 @@ fn test_list_missing_config() {
 
     println!("Testing: list with missing config file");
 
-    let output = Command::new("./target/debug/mcp-cli-rs.exe")
+    let output = Command::new("cargo")
         .args([
+            "run",
+            "--bin",
+            "mcp-cli-rs",
+            "--",
             "list",
             "--no-daemon",
             "--config",
@@ -430,8 +442,12 @@ malformed = toml content [[[
 
     let (_temp_dir, config_path) = temp_config_file(config_content);
 
-    let output = Command::new("./target/debug/mcp-cli-rs.exe")
+    let output = Command::new("cargo")
         .args([
+            "run",
+            "--bin",
+            "mcp-cli-rs",
+            "--",
             "list",
             "--no-daemon",
             "--config",

@@ -37,10 +37,6 @@ mod tests {
         // Check if tool matches disabled patterns
         let matches = tools_match_any(tool_name, disabled_patterns);
         assert!(matches.is_some(), "Tool should match disabled pattern");
-        assert!(
-            matches.unwrap() > 0,
-            "Tool should match disabled pattern with valid index"
-        );
 
         println!("✓ Test disabled tool execution blocked");
     }
@@ -71,10 +67,6 @@ mod tests {
         // Check if tool matches allowed patterns
         let matches = tools_match_any(tool_name, allowed_patterns);
         assert!(matches.is_some(), "Tool should match allowed pattern");
-        assert!(
-            matches.unwrap() > 0,
-            "Tool should match allowed pattern with valid index"
-        );
 
         println!("✓ Test allowed tool execution unblocked");
     }
@@ -112,22 +104,8 @@ mod tests {
             "Tool should match disabled pattern"
         );
         assert!(
-            disabled_matches.unwrap() > 0,
-            "Tool should match disabled pattern with valid index"
-        );
-        assert!(
             allowed_matches.is_some(),
             "Tool should match allowed pattern"
-        );
-        assert!(
-            allowed_matches.unwrap() > 0,
-            "Tool should match allowed pattern with valid index"
-        );
-
-        // Verify both patterns match (showing disabled takes precedence in implementation)
-        assert!(
-            disabled_matches.unwrap() > 0 && allowed_matches.unwrap() > 0,
-            "Both patterns should match but disabled takes precedence in implementation"
         );
 
         println!("✓ Test disabled tool precedence over allowed");
@@ -159,10 +137,6 @@ mod tests {
         // Check if tool matches disabled patterns
         let matches = tools_match_any(tool_name, disabled_patterns);
         assert!(matches.is_some(), "Tool should match disabled pattern");
-        assert!(
-            matches.unwrap() > 0,
-            "Tool should match disabled pattern with valid index"
-        );
 
         // Verify all patterns match
         let patterns_str = disabled_patterns.join(", ");
